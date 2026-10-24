@@ -26,7 +26,10 @@ const PHRASES = [
   "Is there anything you need?",
   "Can you hear me okay?",
   "Do you want me to read you your messages?",
-  "Hey, can you grab the chart from room 4?", // not addressed to the patient
+  // Not addressed to the patient: should print NOT ADDRESSED.
+  "Hey, can you grab the chart from room 4?",
+  "Dr. Patel, the labs from bed 6 came back.",
+  "I'll be on break for fifteen minutes.",
 ];
 
 const ms: number[] = [];
@@ -35,7 +38,7 @@ for (const p of PHRASES) {
   try {
     const r = await getReplies({ transcript: p });
     ms.push(Date.now() - t0);
-    console.log(`\n${p}  [${r.source}, ${Date.now() - t0} ms]\n  ${r.replies.join("  |  ")}`);
+    console.log(`\n${p}  [${r.source}, ${Date.now() - t0} ms${r.addressed ? "" : ", NOT ADDRESSED"}]\n  ${r.replies.join("  |  ")}`);
   } catch (e) {
     console.log(`\n${p}  ERROR ${(e as Error).message} (${Date.now() - t0} ms)`);
   }

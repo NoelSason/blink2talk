@@ -33,12 +33,16 @@ Rules:
 - Never invent medical facts, symptoms, or decisions the patient has not signaled. If the question is open-ended, offer short common needs (water, repositioning, family, rest) rather than guessing a diagnosis.
 - Use the patient profile and recent conversation only to pick relevant specifics (names, preferences).
 - If the patient seems fatigued, give 3 options and keep them very short.
-- If the message is not addressed to the patient or is unintelligible, offer: "Please say that again", "I didn't understand", "Yes", "No".`;
+- Set addressed_to_patient to false only when the speech is clearly meant for someone else (staff talking to each other, a phone call, "grab the chart from room 4"). Anything that could plausibly be for the patient, including greetings and statements about their care, counts as addressed. Still fill in replies either way.
+- If the message is unintelligible, offer: "Please say that again", "I didn't understand", "Yes", "No".`;
 
 const REPLIES_SCHEMA = {
   type: "object",
-  properties: { replies: { type: "array", items: { type: "string" } } },
-  required: ["replies"],
+  properties: {
+    addressed_to_patient: { type: "boolean" },
+    replies: { type: "array", items: { type: "string" } },
+  },
+  required: ["addressed_to_patient", "replies"],
   additionalProperties: false,
 } as const;
 
@@ -54,9 +58,11 @@ function text(res: Anthropic.Message): string {
   throw new Error(`no text block (stop_reason=${res.stop_reason})`);
 }
 
-export async function getReplies(inp: RepliesInput): Promise<{ replies: string[]; source: string }> {
-  if (isConsentQuestion(inp.transcript)) return { replies: CONSENT_REPLIES, source: "consent-rule" };
-  if (mock()) return { replies: mockReplies(inp.transcript), source: "mock" };
+export async function getReplies(
+  inp: RepliesInput,
+): Promise<{ replies: string[]; source: string; addressed: boolean }> {
+  if (isConsentQuestion(inp.transcript)) return { replies: CONSENT_REPLIES, source: "consent-rule", addressed: true };
+  if (mock()) return { replies: mockReplies(inp.transcript), source: "mock", addressed: true };
 
   const history = (inp.history ?? [])
     .slice(-6)
@@ -79,10 +85,11 @@ export async function getReplies(inp: RepliesInput): Promise<{ replies: string[]
     messages: [{ role: "user", content: prompt }],
   }, { timeout: REPLIES_TIMEOUT_MS, maxRetries: 0 });
   if (res.stop_reason === "refusal") throw new Error("model refused");
-  const parsed = JSON.parse(text(res)) as { replies: string[] };
+  const parsed = JSON.parse(text(res)) as { addressed_to_patient: boolean; replies: string[] };
   const replies = parsed.replies.map((r) => r.trim()).filter(Boolean).slice(0, 4);
   if (replies.length === 0) throw new Error("empty replies");
-  return { replies, source: MODEL };
+  // Replies are kept even when not addressed, so "Reply anyway" is instant.
+  return { replies, source: MODEL, addressed: parsed.addressed_to_patient !== false };
 }
 
 export async function completeWord(inp: {

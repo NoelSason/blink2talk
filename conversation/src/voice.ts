@@ -32,6 +32,13 @@ export async function synthesize(text: string): Promise<Buffer> {
   return buf;
 }
 
+/** Short-lived STT-only token so the browser can stream mic audio to Cartesia Ink without seeing the API key. */
+export async function sttToken(): Promise<string> {
+  client ??= new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
+  const { token } = await client.accessToken.create({ expires_in: 3600, grants: { stt: true } });
+  return token;
+}
+
 export async function warm(texts: string[]): Promise<void> {
   await Promise.allSettled(texts.map((t) => synthesize(t)));
 }

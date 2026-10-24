@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { completeWord, getReplies } from "./claude.js";
 import { CONSENT_REPLIES, SPELL_OPTION, URGENT } from "./safety.js";
-import { synthesize, usingClone, warm } from "./voice.js";
+import { sttToken, synthesize, usingClone, warm } from "./voice.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -38,6 +38,7 @@ app.post("/replies", async (req, res) => {
     res.json({
       replies: CONSENT_REPLIES, // yes / no / explain: safe when the model is down
       source: "fallback",
+      addressed: true,
       urgent: URGENT,
       spellOption: SPELL_OPTION,
       ms: Date.now() - t0,
@@ -56,6 +57,20 @@ app.post("/complete", async (req, res) => {
   } catch (err) {
     console.error("complete failed:", err);
     res.json({ words: [] });
+  }
+});
+
+// Browser streams the nurse mic straight to Cartesia Ink-2 with this token. 204 = use Web Speech instead.
+app.get("/stt-token", async (_req, res) => {
+  if (mockVoice()) {
+    res.status(204).end();
+    return;
+  }
+  try {
+    res.json({ token: await sttToken() });
+  } catch (err) {
+    console.error("stt token failed:", err);
+    res.status(204).end();
   }
 });
 
