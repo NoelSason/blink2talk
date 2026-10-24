@@ -1,37 +1,35 @@
-# Patient state context (owner: Marco)
+# Submission + evidence context (owner: Marco)
 
-Updated: 2026-10-24 15:00 PDT
+Updated: 2026-10-24 16:20 PDT
+
+Was "Patient state" (Presage vitals + nurse window). Presage is cut (CLAUDE.md decisions log, 2026-10-24). This file keeps its name so links don't break.
 
 ## Now
-- Working on: scaffold `vitals/` (mock `vitals` emitter, README, env), and the context-doc system for the team.
-- Next: wire `@smartspectra/node-sdk` into the Electron shell (main + preload + renderer entry points), then the nurse window (build step 3).
-- Blocked on: a Presage API key (physiology.presagetech.com) and a decision on where the nurse window lives (second `BrowserWindow` vs the care drawer in `app/`).
+- Working on: eyes adapter back to the vision module only (branch `marco/vision-only-eyes`, see Decisions).
+- Next: backup video, Devpost, root README, consent note; human test with numbers (4 people, 2 lighting conditions, hit rate + false selects); CLAUDE.md reconciled with the build.
+- Blocked on: nothing.
 
 ## Build-order status
-- Step 3 (nurse window: transcript + pulse/breathing with confidence, static layout): not started. Mock emitter exists.
-- Step 2 note: CLAUDE.md says no Presage mock. I added `MOCK_VITALS` anyway so Noel can lay out the nurse window before I have a key. See Deviations.
+- Step 3 (nurse view): Noel's care drawer covers transcript + alerts. No vitals, by decision.
+- Step 5 (video, README, Devpost, consent note): not started. Mine.
 
 ## Interfaces as built
-- Emits `vitals` `{ pulse, breathing, confidence: { pulse, breathing }, t }` at 1 Hz. `confidence` values are 0..1; both 0 for the first seconds ("measuring"). Mock only so far.
-- Consumes: the renderer's camera `MediaStream` (same one MediaPipe uses). Not wired yet.
+None. This role emits docs, not events.
 
 ## Deviations from CLAUDE.md
 | Date | CLAUDE.md says | We did | Why | Affects | CLAUDE.md updated? |
 | --- | --- | --- | --- | --- | --- |
-| 2026-10-24 | Mocks for STT, Claude, TTS only; "Camera and Presage are live or absent" | Added `MOCK_VITALS` (canned pulse/breathing, confidence ramps 0 to 0.9 over 10 s) | Nurse window layout can't wait for a Presage key; mock is 40 lines and shows the "mock" badge like the others | Product (nurse window) | No. Proposing to add `MOCK_VITALS` to the Mock modes line. |
 
 ## Decisions (newest first)
-- 2026-10-24: Use the SDK's own Electron entry points (`@smartspectra/node-sdk/main`, `/preload`, `/renderer`) with `useMediaStream(stream)` on the MediaPipe stream, instead of hand-writing the `frame` MessagePort pipe. Why: the SDK already ships RGBA frames renderer-to-main over a MessagePort and owns the SDK instance per window, which is exactly the `frame` row in CLAUDE.md. Rejected: custom `frame` channel with `sendFrame()` (same result, more code, I own the bugs).
-- 2026-10-24: Vitals code lives in `vitals/` as its own package, imported by `app/` like `vision/` is. Why: matches how Julian and Samarth integrate; Noel keeps control of the shell. Rejected: writing straight into `app/main.js`.
+- 2026-10-24: Presage cut. Why: ICU patients are on monitors, a vented patient's breathing rate is the ventilator's, and one sponsor track out of six isn't worth bending the product. Rejected: keep it as a family-facing comfort signal.
+- 2026-10-24: App eye input follows the vision module only (its calibration, quadrant focus, `quadrantSelect`); the app-side gaze model, auto re-center, and practice round come out. Why: two classifiers answering "which box" and a second dot sequence the patient didn't ask for. Rejected: disable re-center only. Noel's head-turn concern goes to Julian's module, where the fix belongs.
 
 ## Open questions / needs from others
-- @Noel: nurse window as a second `BrowserWindow` (CLAUDE.md "nurse/family window") or the care-panel drawer already in `app/`? The SDK binds one instance per renderer, so a second window means its own preload. I'd go second window, static layout.
-- @Noel: `app/` serves the page from an `app://` scheme with its own `preload.js`. The SDK preload needs to be required from yours, and its worker needs `worker-src blob:` in the CSP. OK to add both?
-- @Julian: can `vision/` expose the camera `MediaStream` (or the `<video>` element) so Presage reads the same stream? Two `getUserMedia` calls on one webcam may fail on macOS.
-- Team: who has or is getting the Presage API key?
+- @Noel: vitals tiles in the care drawer can go ("Not connected" forever otherwise). Your "blocked on Marco" line is clear.
+- @Julian: Noel found the quadrant classifier mis-picks on head turns. If that's real, the fix belongs in `vision/` (head pose in the feature vector), not in `app/`.
 
 ## Run and check
 ```sh
-cd vitals && npm install          # pulls ~hundreds of MB of native runtimes for all platforms; expected
-MOCK_VITALS=1 node src/mock.js    # prints one vitals JSON line per second
+./start                       # whole app
+cd app && npm test            # e2e checks
 ```

@@ -6,7 +6,7 @@ One file per owner. You write only yours. Everyone reads everyone's.
 | --- | --- | --- |
 | `input.md` | Julian | `vision/` |
 | `conversation.md` | Samarth | `conversation/` |
-| `patient-state.md` | Marco | `vitals/` |
+| `patient-state.md` | Marco | `docs/` submission files (not gated) |
 | `product.md` | Noel | `app/`, `design/` (`docs/` is shared, not gated) |
 
 ## Why this shape

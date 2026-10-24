@@ -18,17 +18,17 @@ Convention and templates: `context/README.md`. Use `/handoff` before pushing.
 A patient who is awake, intubated, and can't use their hands communicates by eye. The nurse speaks
 (push-to-talk), Claude proposes 3 short replies plus "none of these" in a 2x2 grid, the patient looks at
 a corner and confirms with a squint or closure (≥ 800 ms), and the reply is spoken in the patient's cloned
-voice. Presage SmartSpectra reads pulse/breathing from the same webcam for a nurse/family window.
+voice. A care drawer shows the nurse the transcript and alerts.
 
 Stack: Electron 28+, run unpackaged with `npm start`. MediaPipe Face Landmarker in the renderer for
-gaze and blink/squint. `@smartspectra/node-sdk` in the main process. Claude `claude-haiku-5-5` for replies.
+gaze and blink/squint. Claude `claude-haiku-5-5` for replies.
 Cartesia Ink (STT) + Sonic-3.6 (TTS, cloned voice). API keys live in the main process only.
 
 ## Build order (do these in sequence; nothing out of order)
 
 1. Main loop end to end on one laptop: PTT → STT → Claude → 2x2 → squint → spoken. Nothing else until this runs.
-2. Mocks for STT, Claude, TTS (not camera, not Presage).
-3. Nurse window: transcript + Presage pulse/breathing with confidence. Static layout.
+2. Mocks for STT, Claude, TTS (not camera).
+3. Nurse view: transcript + alerts. Static layout. No vitals.
 4. "None of these" flow (see below).
 5. Backup video, README, Devpost, consent note.
 6. Only if 1–5 are done: fatigue slows the dwell timer (one multiplier).
@@ -41,6 +41,7 @@ Cartesia Ink (STT) + Sonic-3.6 (TTS, cloned voice). API keys live in the main pr
 - Distress alerts, `uiHint`, two-step confirm except on the high-stakes screen.
 - Spacetime, Figma pass, iOS, packaging/asar, local LLM.
 - Vertical-only gaze, Morse code, any "FDA-cleared" wording.
+- Presage / camera vitals (pulse, breathing). ICU patients are already on monitors; a vented patient's breathing rate is the ventilator's. Cut 2026-10-24.
 
 ## Input (one path)
 
@@ -68,10 +69,8 @@ Cartesia Ink (STT) + Sonic-3.6 (TTS, cloned voice). API keys live in the main pr
 | `transcript` | Conversation → Product | `{ text, final: bool }` |
 | `options` | Conversation → Product | `{ replies: [{ text, intent }], highStakes: bool }` (exactly 3; UI adds "none") |
 | `speak` | Product → Conversation | `{ text }` (resolves when playback ends) |
-| `vitals` | Patient state → Nurse | `{ pulse, breathing, confidence: {…}, t }` (confidence 0 renders "measuring") |
-| `frame` | Renderer → Main | RGBA `ImageData` + `timestampUs`, every 2nd frame via `MessagePort` |
 
-Transport: `ipcRenderer`/`ipcMain` for events, `MessagePort` for frames. All events carry `t` (ms epoch).
+Transport: `ipcRenderer`/`ipcMain` for events. All events carry `t` (ms epoch).
 
 ## State machine (patient window)
 
@@ -81,7 +80,7 @@ Override: `PAUSED` (rest). High-stakes options show a second confirm before SPEA
 ## Mock modes
 
 `MOCK_STT` (typed text / hotkeys 1-2-3) · `MOCK_LLM` (canned replies, one `highStakes`) · `MOCK_TTS` (pre-rendered WAVs).
-Env flags read once at startup. UI shows a "mock" badge per active subsystem. Camera and Presage are live or absent.
+Env flags read once at startup. UI shows a "mock" badge per active subsystem. The camera is live or absent.
 
 ## Claude contract
 
@@ -93,17 +92,18 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 - Needs the patient to hold gaze; no fallback for nystagmus or a swollen eye.
 - Blink/squint thresholds not validated across eye shapes; duration gate is the main protection. Tested on 4 teammates.
-- No free text. Vitals are a wellness indicator, not a monitor.
+- No free text. No vitals: the monitor above the bed does that.
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-24 — Marco: Presage vitals cut. Redundant with ICU monitors; not worth bending the product for one sponsor track. Owner 3 becomes submission, evidence, and doc reconciliation.
 - 2026-10-25 — Input: 2x2 gaze with 20 s calibration + squint confirm. Scanning/blink mode cut.
 - 2026-10-25 — Scope cut to build order above; scanning keyboard, alerts, Spacetime, Figma dropped.
 - 2026-10-24 — Voice vendor: Cartesia for both STT and TTS. ElevenLabs is fallback only.
 
 ## Owners
 
-1 Input (gaze/squint) · 2 Conversation (STT, Claude, TTS) · 3 Patient state (Presage, nurse window) · 4 Product (shell, state machine, mocks, demo, Devpost).
+1 Input (gaze/squint) · 2 Conversation (STT, Claude, TTS) · 3 Submission + evidence (video, Devpost, README, consent note, human test numbers, CLAUDE.md reconciliation) · 4 Product (shell, state machine, mocks, demo, Devpost).
 
 ## Run
 

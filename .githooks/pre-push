@@ -8,7 +8,6 @@ map() {
   case "$1" in
     vision/*)              echo context/input.md ;;
     conversation/*)        echo context/conversation.md ;;
-    vitals/*)              echo context/patient-state.md ;;
     app/*|design/*)        echo context/product.md ;;   # docs/ is shared, not gated
   esac
 }
