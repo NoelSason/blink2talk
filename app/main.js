@@ -76,20 +76,6 @@ ipcMain.handle('conversation', async (_event, { route, body }) => {
 });
 
 // ---------- Window ----------
-// ---------- Eye-tracker recordings ----------
-// One file per launch in app/logs/ (git-ignored): the eye and head numbers from each camera frame,
-// with what calibration, practice, and picks say the patient was looking at. No images. Used to tune
-// renderer/gaze.js on real sessions.
-let gazeLogFile = null;
-ipcMain.on('gaze-log', (_event, lines) => {
-  if (!gazeLogFile) {
-    const dir = path.join(__dirname, 'logs');
-    fs.mkdirSync(dir, { recursive: true });
-    gazeLogFile = path.join(dir, `gaze-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`);
-  }
-  fs.appendFile(gazeLogFile, String(lines), (err) => { if (err) console.error('gaze log:', err.message); });
-});
-
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
