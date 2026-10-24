@@ -77,10 +77,15 @@ export async function startEyes(on, settings) {
   }
 
   // Full recalibration: a fresh pipeline with the current settings, and a fresh head model.
-  function rebuild() {
+  function reset() {
     build();
     gaze = createGazeModel();
     labels = { phase: null, since: 0, looks: {}, poses: [] };
+  }
+
+  // Starts the dots. Only on request (the Calibrate button, C, or the dev panel); never automatically.
+  function rebuild() {
+    reset();
     pipeline.startCalibration();
     status('Eyes: calibrating…');
   }
@@ -176,7 +181,8 @@ export async function startEyes(on, settings) {
     }));
   };
 
-  rebuild();
+  reset();
+  status('Eyes: not calibrated. Press Calibrate.');
   video.requestVideoFrameCallback(loop);
 
   return { calibrate: rebuild, rebuild };

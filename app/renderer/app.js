@@ -89,6 +89,9 @@ let requestToken = 0;
 let beforeSelect = null;      // what to go back to on a double blink
 let nextQuestion = 0;
 let eyesOn = false;           // the camera is calibrated and reporting where the patient looks
+let eyesCalibrated = false;   // has the camera been calibrated at least once this session
+const calibButton = document.getElementById('calib-start');
+calibButton.addEventListener('click', () => { calibButton.blur(); runAction('calibrate'); });
 let keyboardUntil = 0;
 let micQuietUntil = 0;
 let micWanted = true;
@@ -541,7 +544,7 @@ function pickHighlighted() {
 const camera = {
   status: (text) => demo.setEyes(text),
   calibration: (progress) => { s.calibration = progress; },
-  calibrated: () => toListening(),
+  calibrated: () => { eyesCalibrated = true; toListening(); },
   rest: (on) => { s.resting = on; },
   hold: (b) => {
     const wasEngaged = s.cam.engaged;
@@ -617,6 +620,9 @@ function tick() {
   }
 
   const holdShown = choosing() && ((closedAt != null && t - closedAt > TIMING.holdShow) || (s.cam.engaged && s.cam.progress > 0.25));
+  // The Calibrate button: hidden while the dots run, highlighted until the first calibration.
+  calibButton.hidden = !!s.calibration;
+  calibButton.dataset.needed = String(!eyesCalibrated);
   view.render({
     name: memory.profile.name,
     eyesClosed: s.eyesClosed || s.cam.closed,

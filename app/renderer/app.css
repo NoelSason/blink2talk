@@ -590,3 +590,15 @@ p { margin: 0; }
 .dev-target[data-at="bottomLeft"] { left: 25%; top: 78%; }
 .dev-target[data-at="bottomRight"] { left: 75%; top: 78%; }
 
+/* Panels must honor the hidden attribute (their display rules would otherwise win). */
+.demo[hidden] { display: none; }
+
+/* Calibrate: starts the dots on request. Highlighted until the first calibration. */
+.calib-start {
+  position: fixed; left: 16px; bottom: 16px; z-index: 20;
+  font: inherit; font-size: 14px; padding: 10px 16px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer;
+}
+.calib-start[hidden] { display: none; }
+.calib-start[data-needed="true"] { background: var(--selected); color: #151A24; border-color: transparent; font-weight: 600; }
+
