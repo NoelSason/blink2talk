@@ -1,0 +1,80 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>BlinkVoice conversation test</title>
+<style>
+  body { font: 16px system-ui; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+  button { font: inherit; padding: .6rem 1rem; margin: .25rem; cursor: pointer; }
+  .urgent { background: #fdd; } .spell { background: #eee; }
+  #log { color: #555; white-space: pre-wrap; }
+</style>
+<h2>BlinkVoice: conversation test</h2>
+<p id="mode"></p>
+<input id="t" size="50" placeholder="What the nurse says…" autofocus>
+<button id="go">Predict</button> <button id="mic">🎤 Listen</button>
+<div id="opts"></div>
+<p id="log"></p>
+<script>
+const $ = (id) => document.getElementById(id);
+let cfg, history = [];
+const log = (s) => ($("log").textContent = s + "\n" + $("log").textContent);
+
+async function speak(text) {
+  const t0 = performance.now();
+  const r = await fetch("/speak", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
+  if (r.status === 204) { speechSynthesis.speak(new SpeechSynthesisUtterance(text)); log(`spoke (browser voice): ${text}`); return; }
+  if (!r.ok) { log(`speak failed ${r.status}`); return; }
+  const url = URL.createObjectURL(await r.blob());
+  const a = new Audio(url);
+  a.onplaying = () => log(`spoke "${text}" ${Math.round(performance.now() - t0)} ms to audio`);
+  a.play();
+}
+
+function pick(text) {
+  history.push({ role: "patient", text });
+  speak(text);
+}
+
+function show(d) {
+  const o = $("opts"); o.innerHTML = "";
+  const add = (label, cls) => { const b = document.createElement("button"); b.textContent = label; b.className = cls || ""; b.onclick = () => pick(label); o.append(b); };
+  d.replies.forEach((r) => add(r));
+  add(d.spellOption, "spell");
+  d.urgent.forEach((u) => add(u, "urgent"));
+}
+
+async function predict(transcript) {
+  if (!transcript.trim()) return;
+  history.push({ role: "nurse", text: transcript });
+  const r = await fetch("/replies", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ transcript, history: history.slice(0, -1) }) });
+  const d = await r.json();
+  log(`replies from ${d.source} in ${d.ms} ms`);
+  show(d);
+}
+
+$("go").onclick = () => predict($("t").value);
+$("t").addEventListener("keydown", (e) => { if (e.key === "Enter") predict($("t").value); });
+
+// Phase 3 preview: Web Speech API, ~700 ms silence = nurse is done.
+$("mic").onclick = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return log("no Web Speech API in this browser (use Chrome)");
+  const rec = new SR(); rec.interimResults = true; rec.lang = "en-US"; let timer, last = "";
+  const btn = $("mic");
+  rec.onstart = () => { btn.textContent = "🔴 Listening…"; $("t").value = ""; log("mic on: speak now"); };
+  rec.onaudiostart = () => log("audio is coming in from the mic");
+  rec.onspeechstart = () => log("speech detected");
+  rec.onresult = (e) => {
+    last = [...e.results].map((r) => r[0].transcript).join("");
+    $("t").value = last; clearTimeout(timer);
+    timer = setTimeout(() => { rec.stop(); log(`heard: "${last}", predicting`); predict(last); }, 700);
+  };
+  rec.onerror = (e) => log(`mic error: ${e.error}` + (e.error === "not-allowed" ? " (allow mic in the address bar)" : e.error === "no-speech" ? " (heard nothing: check the input device)" : ""));
+  rec.onend = () => { btn.textContent = "🎤 Listen"; log("mic off"); };
+  rec.start();
+};
+
+fetch("/config").then((r) => r.json()).then((c) => {
+  cfg = c;
+  $("mode").textContent = `replies: ${c.mockReplies ? "MOCK" : "Claude"} | voice: ${c.mockVoice ? "MOCK (browser)" : c.clonedVoice ? "Cartesia clone" : "Cartesia default voice"}`;
+});
+</script>

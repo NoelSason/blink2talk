@@ -1,0 +1,160 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>BlinkVoice: patient</title>
+<style>
+  :root { --hi: #ffd84d; }
+  body { font: 28px system-ui; margin: 0; background: #111; color: #eee; height: 100vh; display: flex; flex-direction: column; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; font-size: 18px; color: #aaa; }
+  #state { font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: .05em; }
+  #heard { padding: 8px 24px 16px; min-height: 1.4em; color: #9cf; }
+  #opts { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; padding: 0 24px; align-content: start; }
+  .opt { background: #222; border: 4px solid #333; border-radius: 16px; padding: 28px 20px; text-align: center; }
+  .opt.urgent { background: #3a1414; border-color: #5a2020; }
+  .opt.spell { background: #1d1d2a; }
+  .opt.sel { border-color: var(--hi); box-shadow: 0 0 0 4px var(--hi); }
+  #spellbar { padding: 0 24px 12px; font-size: 36px; min-height: 1.3em; color: var(--hi); }
+  footer { padding: 12px 24px; font-size: 16px; color: #777; display: flex; gap: 16px; align-items: center; }
+  footer input { flex: 1; font: inherit; padding: 6px; background: #222; color: #eee; border: 1px solid #444; }
+  footer button { font: inherit; }
+</style>
+<header><span>BlinkVoice</span><span id="state">listening</span><span id="voice"></span></header>
+<div id="heard"></div>
+<div id="spellbar"></div>
+<div id="opts"></div>
+<footer>
+  <span>←/→ move · Space select · N nurse mic</span>
+  <input id="typed" placeholder="Or type what the nurse says, then Enter">
+  <button id="mic">🎤 Nurse</button>
+</footer>
+<script>
+// Input contract for Julien's blink/gaze module: call these instead of the keyboard.
+//   window.blinkvoice.select() / .gazeLeft() / .gazeRight() / .setFatigue(0..1)
+const $ = (id) => document.getElementById(id);
+const post = (url, body) => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+const ALPHABET = "ETAOINSHRDLUCMWFGYPBVKJXQZ".split(""); // frequency order: fewer moves on average
+
+let cfg = { urgent: [], spellOption: "" };
+let state = "listening";          // listening | options | spelling | speaking
+let items = [], sel = 0;          // current choices: { label, kind }
+let history = [], lastNurse = "", fatigue = 0;
+let spelled = "", prefix = "";    // spelling mode
+
+function setState(s) { state = s; $("state").textContent = s; }
+
+function render() {
+  const o = $("opts"); o.innerHTML = "";
+  items.forEach((it, i) => {
+    const d = document.createElement("div");
+    d.className = `opt ${it.kind || ""} ${i === sel ? "sel" : ""}`;
+    d.textContent = it.label;
+    d.onclick = () => { sel = i; select(); };
+    o.append(d);
+  });
+  $("spellbar").textContent = state === "spelling" ? (spelled + prefix + "▍") : "";
+}
+
+function showOptions(replies) {
+  items = [
+    ...replies.map((r) => ({ label: r, kind: "reply" })),
+    { label: cfg.spellOption, kind: "spell" },
+    ...cfg.urgent.map((u) => ({ label: u, kind: "urgent" })),
+  ];
+  sel = 0; setState("options"); render();
+}
+
+async function nurseSaid(text) {
+  if (!text.trim()) return;
+  lastNurse = text; $("heard").textContent = `Nurse: “${text}”`;
+  history.push({ role: "nurse", text });
+  setState("thinking"); items = []; render();
+  const d = await (await post("/replies", { transcript: text, history: history.slice(0, -1), fatigue })).json();
+  showOptions(d.replies);
+}
+
+async function speak(text) {
+  setState("speaking"); render();
+  history.push({ role: "patient", text });
+  const r = await post("/speak", { text });
+  if (r.status === 204) {
+    await new Promise((res) => { const u = new SpeechSynthesisUtterance(text); u.onend = res; speechSynthesis.speak(u); });
+  } else if (r.ok) {
+    const a = new Audio(URL.createObjectURL(await r.blob()));
+    await new Promise((res) => { a.onended = res; a.onerror = res; a.play(); });
+  }
+  spelled = ""; prefix = ""; setState("listening"); idle();
+}
+
+// Between questions: urgent options stay reachable.
+function idle() { items = cfg.urgent.map((u) => ({ label: u, kind: "urgent" })); sel = 0; render(); }
+
+// ---- spelling: letters + word completions, scanned with the same move/select ----
+async function spellItems() {
+  let words = [];
+  if (prefix) {
+    try { words = (await (await post("/complete", { prefix, sentenceSoFar: spelled, context: lastNurse })).json()).words; } catch {}
+  }
+  items = [
+    ...(spelled || prefix ? [{ label: "✓ Speak it", kind: "reply", act: "speak" }] : []),
+    ...words.map((w) => ({ label: w, kind: "reply", act: "word" })),
+    ...(prefix ? [{ label: "␣ space", kind: "spell", act: "space" }, { label: "⌫ delete", kind: "spell", act: "del" }] : []),
+    ...ALPHABET.map((c) => ({ label: c, act: "letter" })),
+    { label: "✕ Back to options", kind: "spell", act: "back" },
+    ...cfg.urgent.map((u) => ({ label: u, kind: "urgent" })),
+  ];
+  sel = 0; render();
+}
+
+async function spellSelect(it) {
+  if (it.kind === "urgent") return speak(it.label);
+  if (it.act === "letter") prefix += it.label.toLowerCase();
+  else if (it.act === "word") { spelled += it.label + " "; prefix = ""; }
+  else if (it.act === "space") { spelled += prefix + " "; prefix = ""; }
+  else if (it.act === "del") prefix = prefix.slice(0, -1);
+  else if (it.act === "speak") return speak((spelled + prefix).trim());
+  else if (it.act === "back") { spelled = ""; prefix = ""; return nurseSaid(lastNurse || "How are you feeling?"); }
+  await spellItems();
+}
+
+// ---- input actions ----
+function move(d) { if (!items.length || state === "speaking") return; sel = (sel + d + items.length) % items.length; render(); }
+function select() {
+  const it = items[sel]; if (!it) return;
+  if (state === "spelling") return spellSelect(it);
+  if (state !== "options" && it.kind !== "urgent") return;
+  if (it.kind === "spell") { setState("spelling"); spelled = ""; prefix = ""; return spellItems(); }
+  speak(it.label);
+}
+window.blinkvoice = { select, gazeLeft: () => move(-1), gazeRight: () => move(1), setFatigue: (f) => (fatigue = f) };
+
+document.addEventListener("keydown", (e) => {
+  if (e.target === $("typed")) return;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(1); }
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(-1); }
+  else if (e.key === " ") { e.preventDefault(); select(); }
+  else if (e.key === "n" || e.key === "N") listen();
+});
+$("typed").addEventListener("keydown", (e) => { if (e.key === "Enter") { nurseSaid(e.target.value); e.target.value = ""; e.target.blur(); } });
+
+// ---- nurse mic (Web Speech, Chrome only), 700 ms silence = done ----
+function listen() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { $("heard").textContent = "Mic needs Chrome"; return; }
+  const rec = new SR(); rec.interimResults = true; rec.lang = "en-US"; let timer, last = "";
+  rec.onstart = () => { $("mic").textContent = "🔴 Listening"; $("heard").textContent = "Nurse: …"; };
+  rec.onresult = (e) => {
+    last = [...e.results].map((r) => r[0].transcript).join("");
+    $("heard").textContent = `Nurse: “${last}”`; clearTimeout(timer);
+    timer = setTimeout(() => { rec.stop(); nurseSaid(last); }, 700);
+  };
+  rec.onerror = (e) => ($("heard").textContent = `Mic error: ${e.error}`);
+  rec.onend = () => ($("mic").textContent = "🎤 Nurse");
+  rec.start();
+}
+$("mic").onclick = listen;
+
+fetch("/config").then((r) => r.json()).then((c) => {
+  cfg = c;
+  $("voice").textContent = c.mockVoice ? "browser voice" : c.clonedVoice ? "own voice ✓" : "default voice";
+  idle();
+});
+</script>
