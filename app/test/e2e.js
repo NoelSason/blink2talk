@@ -77,8 +77,12 @@ app.whenReady().then(async () => {
   // A yes or no to a consent question is confirmed before it's spoken ("Yes, please" here).
   await state('(s.consent = true)');
   await cam(`select('topLeft')`);
-  check('a consent yes asks "Is that right?" first', (await state('s.rowKind')) === 'confirm' && (await state('s.selected')) === -1);
-  await cam(`select('topRight')`);
+  check('a consent yes is confirmed first', (await state('s.rowKind')) === 'confirm' && (await state('s.selected')) === -1);
+  check('the confirm screen is two boxes, the question above them', JSON.stringify(await labels()) === JSON.stringify(['Say “Yes, please”', 'Go back'])
+    && (await js(`document.getElementById('caption').parentElement.id`)) === 'gaze-area');
+  await cam(`focus('bottomLeft')`);
+  check('on the confirm screen, any look to the left means the left box', (await state('s.hl')) === 0);
+  await cam(`select('bottomRight')`);
   check('"Go back" returns to the replies', (await state('s.rowKind')) === 'replies');
   await state('(s.consent = false)');
 

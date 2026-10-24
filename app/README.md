@@ -30,7 +30,7 @@ Every launch starts with eye onboarding, because lighting, posture, and the lapt
 1. **Calibration** (about 15 s): look at the dot in the center, then at each corner where the boxes will be, then squint. Turning your head a little toward a dot is fine.
 2. **Practice:** four rounds, one marked box at a time, each corner once in random order. Look at it and close your eyes for a moment. The demo controls (`D`) show the result, for example "Practice: 4 of 4 correct, 2.3 s each". Press `C` to calibrate again if it's low.
 
-- **Consent:** a yes or no to a consent or treatment question (the conversation server answers those with Yes / No / Explain more only) is confirmed with "Is that right?" before it's spoken.
+- **Consent:** a yes or no to a consent or treatment question (the conversation server answers those with Yes / No / Explain more only) is confirmed before it's spoken: the question stays on screen above two tall boxes, Say "Yes" on the left and Go back on the right. Only left or right counts there, the direction the eye tracker reads best.
 
 ## How the gaze works
 

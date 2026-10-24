@@ -66,7 +66,7 @@ function buildItem(item) {
   el.setAttribute('role', 'option');
   if (item.type === 'end') {
     el.className = 'end-option';
-    el.append(icon(item.kind === 'none' ? 'refresh' : 'keyboard'), span('', item.label));
+    el.append(icon({ none: 'refresh', back: 'arrow-left' }[item.kind] ?? 'keyboard'), span('', item.label));
     return el;
   }
   el.className = 'reply-card';
@@ -155,9 +155,10 @@ export function createView() {
       rowItems = model.items;
       rowEls = model.items.map(buildItem);
       // On the 2×2 screens the middle band (the question) is where the patient rests: no box.
-      els.row.replaceChildren(...rowEls, ...(model.grid ? [middle] : []));
+      els.row.replaceChildren(...rowEls, ...(model.grid && !model.columns ? [middle] : []));
       els.row.classList.toggle('reply-row--single', model.single);
       els.row.classList.toggle('reply-grid', model.grid);
+      els.row.classList.toggle('reply-grid--columns', model.columns);
       for (const key of [...last.keys()]) if (key.startsWith('item')) last.delete(key);
       fitNeeded = true;
     }
@@ -265,7 +266,7 @@ export function createView() {
 
     if (changed('lost', model.faceLost)) els.roomMessage.toggleAttribute('data-shown', model.faceLost);
     renderRow(model);
-    placeCaptionIfChanged(model.grid);
+    placeCaptionIfChanged(model.grid && !model.columns);
 
     if (changed('cue', model.cue ?? '')) {
       els.cue.hidden = !model.cue;

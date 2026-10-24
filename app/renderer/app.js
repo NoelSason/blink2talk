@@ -246,11 +246,16 @@ function select(i) {
   }
 }
 
+// The question stays on screen, so the patient can check what they're answering. Two tall boxes,
+// left and right only: left/right is the direction the eye tracker reads best (Noel's recorded
+// session: about 4x the separation of up/down), so the step guarding a consent answer uses only that.
 function askConfirm(i, text) {
   chime('tick');
   s.prevPage = page(i);
-  s.caption = { kind: 'prompt', text: `You chose “${text}”. Is that right?` };
-  setRow('confirm', [card(`Say “${text}”`, { action: 'confirmed', say: text }), card('Go back', { action: 'unconfirm' }), null, null]);
+  setRow('confirm', [
+    card(`Say “${text}”`, { icon: 'volume', action: 'confirmed', say: text }),
+    { type: 'end', kind: 'back', label: 'Go back', action: 'unconfirm' },
+  ]);
 }
 
 // Selected: the card turns green with a check and a chime; Speaking follows (see tick).
@@ -487,8 +492,16 @@ function onLook(dir) {
   keyboardUntil = now() + TIMING.keyboard;
 }
 
+// The box a camera quadrant means. On the two-column confirm screen only left or right counts.
+function cellFor(quadrant) {
+  if (!quadrant) return -1;
+  return twoColumns() ? (quadrant.endsWith('Left') ? 0 : 1) : GRID[quadrant];
+}
+const twoColumns = () => s.rowKind === 'confirm';
+
 function gridMove(hl, dir) {
   if (hl < 0) return s.items.findIndex(Boolean);
+  if (twoColumns()) return { left: 0, right: 1 }[dir] ?? hl;
   const col = hl % 2;
   const row = Math.floor(hl / 2);
   const next = { left: row * 2, right: row * 2 + 1, up: col, down: 2 + col }[dir];
@@ -539,7 +552,7 @@ const camera = {
   focus: (quadrant) => {
     eyesOn = true;
     if (!gridShown() || now() < keyboardUntil) return;
-    const i = quadrant ? GRID[quadrant] : -1;
+    const i = cellFor(quadrant);
     s.hl = i >= 0 && s.items[i] ? i : -1;
   },
   // Selects the box that had focus when the hold started. Listening has one item, so any hold picks it.
@@ -547,7 +560,7 @@ const camera = {
     openedAt = now();
     if (s.stage !== 'choose' || s.loading || s.selected >= 0 || s.faceLost || s.calibration) return;
     if (s.rowKind === 'listen') return select(0);
-    const i = quadrant ? GRID[quadrant] : -1;
+    const i = cellFor(quadrant);
     if (i >= 0 && s.items[i]) {
       s.hl = i;
       select(i);
@@ -614,6 +627,7 @@ function tick() {
     stage: s.stage,
     single: s.rowKind === 'listen',
     grid: s.rowKind !== 'listen',
+    columns: twoColumns(),
     tiredRow: s.tired && s.rowKind === 'replies',
     items: s.items,
     itemStates: s.items.map((_, i) => itemState(i, holdShown)),
@@ -621,7 +635,7 @@ function tick() {
     progress: 0,
     hold: Math.min(1, hold),
     cue: null,
-    backHint: s.stage === 'choose' && s.selected < 0 && (!!s.prevPage || s.rowKind === 'spell'),
+    backHint: s.stage === 'choose' && s.selected < 0 && !twoColumns() && (!!s.prevPage || s.rowKind === 'spell'),
     summary: s.stage === 'choose' && s.rowKind === 'listen' ? s.summary?.forPatient ?? null : null,
     loading: s.loading,
     spoken: s.spoken,

@@ -1,6 +1,6 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-24 16:45 PDT
+Updated: 2026-10-24 16:58 PDT
 
 ## Now
 - Working on: who said each line (voice model + Claude names) and conversation summaries for the patient (Listening) and the care panel.
@@ -34,7 +34,7 @@ Conversation: `main.js` relays to `localhost:8787` over `ipcMain.handle('convers
 | Route | App use |
 | --- | --- |
 | `GET /config` | `urgent[]`, mock flags for the demo panel |
-| `POST /replies { transcript, history, patientProfile, fatigue, speaker }` → `{ replies: string[], urgent, addressed, source, speaker }` | `patientProfile` = name, nurse's notes, most-picked phrases. First 3 replies shown. `addressed: false` → "Reply anyway". `source: "consent-rule"` → "Is that right?" on Yes/No. `speaker` in = `{ voice, label, isNew }`; out = `{ label, role }` names the caption and every line of that voice |
+| `POST /replies { transcript, history, patientProfile, fatigue, speaker }` → `{ replies: string[], urgent, addressed, source, speaker }` | `patientProfile` = name, nurse's notes, most-picked phrases. First 3 replies shown. `addressed: false` → "Reply anyway". `source: "consent-rule"` → confirm screen on Yes/No. `speaker` in = `{ voice, label, isNew }`; out = `{ label, role }` names the caption and every line of that voice |
 | `POST /summary { history, patientProfile }` → `{ forPatient, forCaregiver[] }` (204 mock, 502 error) | 2 s after the conversation changes. `forPatient` = "So far" on Listening; `forCaregiver` = care panel Summary. Otherwise the last lines as said |
 | `POST /speak { text }` → WAV, or 204 | Fetched for every reply as it shows; played in the renderer. 204 → system voice |
 | `GET /stt-token` → `{ token }` | Renderer streams the mic to Cartesia `stt/turns/websocket` (Ink-2). `turn.update` = live caption, `turn.end` = question. Silence sent while speaking + 800 ms. `M` toggles |
@@ -67,7 +67,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 - 2026-10-24: Double blink walks back one page at a time, including out of Spell it and back to Listening from the urgent options. Why: Noel expected back to work there; it did nothing at the top of Spell it.
 - 2026-10-24: (Superseded by Marco's change above.) Box picking came from `app/renderer/gaze.js` (eye features + head pose, refit from practice picks); removed.
 - 2026-10-24: Eye calibration on every launch. Why: lighting and posture change. Rejected: reusing a saved calibration. (The practice round after it was removed in Marco's change.)
-- 2026-10-24: Yes/No on a consent question asks "Is that right?" before speaking (the high-stakes second confirm). Why: CLAUDE.md allows it on high stakes only.
+- 2026-10-24: Yes/No on a consent question is confirmed before speaking (the high-stakes second confirm): the question stays on screen above two tall boxes, Say "Yes" (left) and Go back (right); any left look means the left box. Why: CLAUDE.md allows it on high stakes only; Noel found the first version (a 2×2 with half empty) poor, and his recorded session separated left/right ~4x better than up/down. Rejected: "You chose X. Is that right?" in the 2×2.
 - 2026-10-24: Replies checked client-side (≤ 10 words, ≤ 80 chars, no duplicates; else Yes / No / Please say that again). Why: the prompt alone doesn't guarantee it.
 - 2026-10-24: Nurse window is a drawer in the patient window (answers Marco's question). Why: one laptop, one window; the drawer opens only from the corner button.
 - 2026-10-24: Voice for every reply on screen is fetched when it shows. Why: the pick plays with no ~3 s wait. Rejected: fetch on select.
