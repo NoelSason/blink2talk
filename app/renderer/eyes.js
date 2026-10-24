@@ -1,14 +1,15 @@
 // Camera eye input from the vision module (../vision, bundled into vendor/eyes.js by `npm run eyes`).
-// It runs MediaPipe's face model on this machine and reports left/right glances, holds (a long blink
-// or a held squint), ordinary blinks, the face coming and going, and fatigue. app.js decides what
-// each one does on screen. Without a camera or the bundle, the keyboard keeps working.
+// It runs MediaPipe's face model on this machine in its quadrant layout: it reports which of four
+// boxes the patient is looking at, holds (a long blink or a held squint) and which box they select,
+// ordinary blinks, the face coming and going, and fatigue. app.js decides what each one does on
+// screen. Without a camera or the bundle, the keyboard keeps working.
 
 const STORAGE_KEY = 'blink2talk.calibration';
 
 function loadCalibration() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    return saved?.layout === 'leftRight' && typeof saved.thresholds?.close === 'number' ? saved : null;
+    return saved?.layout === 'quadrants' && typeof saved.thresholds?.close === 'number' ? saved : null;
   } catch {
     return null;
   }
@@ -22,7 +23,8 @@ function saveCalibration(result) {
   }
 }
 
-// on: { status(text), calibration(progress | null), hold(state), gaze(dir), select(), blink(ms), face(found), fatigue(level) }
+// on: { status(text), calibration(progress | null), hold(state), focus(quadrant | null), select(quadrant | null),
+//       blink(ms), face(found), fatigue(level) }. Quadrants: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight'.
 export async function startEyes(on) {
   let vision;
   try {
@@ -49,8 +51,8 @@ export async function startEyes(on) {
     return null;
   }
 
-  // Left/right glances plus a hold: matches the single row of replies.
-  const pipeline = new EyePipeline({ calibration: { layout: 'leftRight' } });
+  // Look at a box to focus it, hold to select it: matches the 2×2 grid of replies.
+  const pipeline = new EyePipeline({ calibration: { layout: 'quadrants' } });
   const saved = loadCalibration();
   if (saved) pipeline.useCalibration(saved);
   else pipeline.startCalibration();
@@ -64,10 +66,13 @@ export async function startEyes(on) {
     onFrame: (out) => {
       const c = out.mode === 'calibrating' ? out.calibration : null;
       on.calibration(c && c.phase !== 'done' ? c : null);
-      if (out.mode === 'running') on.hold(out.blink ?? null);
+      if (out.mode === 'running') {
+        on.hold(out.blink ?? null);
+        on.focus(out.quadrant?.focus ?? null);
+      }
       for (const e of out.events) {
-        if (e.type === 'gaze') on.gaze(e.direction);
-        else if (e.type === 'select') on.select();
+        // The box that had focus when the hold started; null when the patient was on the rest circle.
+        if (e.type === 'quadrantSelect') on.select(e.quadrant);
         else if (e.type === 'blink') on.blink(e.durationMs);
         else if (e.type === 'faceLost' || e.type === 'faceFound') on.face(e.type === 'faceFound');
         else if (e.type === 'fatigue') on.fatigue(e.level);

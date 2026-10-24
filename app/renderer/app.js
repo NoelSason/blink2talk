@@ -35,6 +35,8 @@ const card = (label, extra = {}) => ({ type: 'card', label, action: 'say', ...ex
 const LISTEN_ITEMS = [card('I want to say something', { icon: 'message', action: 'start' })];
 const URGENT_ICONS = { "I'm in pain": 'bandage', "I can't breathe": 'wind', 'Call the nurse': 'bell' };
 const LETTER_ROWS = ['ETAOINSHR', 'DLCUMWFGY', 'PBVKJXQZ']; // most-used letters first
+// Replies and starters sit in a 2×2 grid, cells in reading order. The vision module names them by quadrant.
+const GRID = { topLeft: 0, topRight: 1, bottomLeft: 2, bottomRight: 3 };
 const SPELL_ACTIONS = ['Space', 'Delete', 'Speak', 'Back'];
 
 const s = {
@@ -78,6 +80,8 @@ let speechToken = 0;
 let requestToken = 0;
 let beforeSelect = null;      // what to go back to on a double blink
 let nextQuestion = 0;
+let eyesOn = false;           // the camera is calibrated and reporting where the patient looks
+let keyboardUntil = 0;        // arrow keys win over the camera's focus for a moment
 
 const later = (ms, fn) => timers.push(setTimeout(fn, ms));
 function reset() {
@@ -88,10 +92,14 @@ function reset() {
   stopSpeaking();
 }
 
+// The patient looks straight at a box, so the grid doesn't step on its own (Spell it still does).
 function setRow(rowKind, items, { hl = 0, pause = 0 } = {}) {
-  Object.assign(s, { stage: 'choose', rowKind, items, autoStep: rowKind !== 'listen', hl, loading: false, selected: -1, progress: 0, cue: null });
+  Object.assign(s, { stage: 'choose', rowKind, items, autoStep: false, hl, loading: false, selected: -1, progress: 0, cue: null });
   restartPace(pause);
 }
+
+// With the camera, nothing is highlighted until the patient looks at a box. On the keyboard, start top left.
+const startHl = () => (eyesOn ? -1 : 0);
 
 function restartPace(pause) {
   s.pace = pause ? 'look' : 'step';
@@ -100,11 +108,11 @@ function restartPace(pause) {
   s.progress = 0;
 }
 
-// Tired mode: 2 replies plus "None of these", no "Spell it".
+// Three replies and "None of these" bottom right, like the vision module's quadrant demo. Tired mode
+// keeps two replies. "Spell it" opens after the second "None of these".
 function replyItems(replies) {
-  return s.tired
-    ? [END_NONE, ...replies.slice(0, 2).map((r) => card(r))]
-    : [END_NONE, ...replies.map((r) => card(r)), END_SPELL];
+  const reply = (i) => (replies[i] != null && !(s.tired && i > 1) ? card(replies[i]) : null);
+  return [reply(0), reply(1), reply(2), END_NONE];
 }
 
 // ---------- Listening and replies ----------
@@ -150,8 +158,7 @@ async function requestReplies(history, attempt = 0) {
   if (token !== requestToken) return;
   s.urgent = d.urgent;
   s.replies = d.replies;
-  // The highlight starts on the first reply and waits while the patient reads.
-  setRow('replies', replyItems(s.replies), { hl: 1, pause: TIMING.readPause });
+  setRow('replies', replyItems(s.replies), { hl: startHl(), pause: TIMING.readPause });
 }
 
 function select(i) {
@@ -161,7 +168,7 @@ function select(i) {
     chime();
     s.caption = { kind: 'prompt', text: 'What do you want to say?' };
     const starters = [...s.urgent.map((u) => card(u, { icon: URGENT_ICONS[u] ?? 'message' })), card('Spell it', { icon: 'keyboard', action: 'spell' })];
-    setRow('starters', starters, { pause: TIMING.readPause });
+    setRow('starters', starters, { hl: startHl(), pause: TIMING.readPause });
   } else if (item.action === 'more') {
     chime();
     s.noneCount++;
@@ -281,7 +288,7 @@ function spellPick() {
     chime('undo');
     if (!sp.back) return toListening();
     s.caption = sp.back.caption;
-    return setRow(sp.back.rowKind, sp.back.items, { hl: 1, pause: TIMING.readPause });
+    return setRow(sp.back.rowKind, sp.back.items, { hl: startHl(), pause: TIMING.readPause });
   }
   chime('tick');
   sp.level = 'rows';
@@ -323,8 +330,7 @@ function setTired(on) {
   }
   const label = s.items[s.hl]?.label;
   const items = replyItems(s.replies);
-  const hl = Math.max(1, items.findIndex((it) => it.label === label));
-  setRow('replies', items, { hl, pause: TIMING.lookPause });
+  setRow('replies', items, { hl: items.findIndex((it) => it && it.label === label), pause: TIMING.lookPause });
 }
 
 function setFaceLost(on) {
