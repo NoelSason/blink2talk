@@ -1,0 +1,14 @@
+{
+  "name": "blink2talk-vitals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Patient state: Presage SmartSpectra pulse and breathing for the nurse window",
+  "main": "src/index.js",
+  "scripts": {
+    "mock": "MOCK_VITALS=1 node src/mock.js"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "^3.4.0"
+  }
+}

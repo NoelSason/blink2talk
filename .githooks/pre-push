@@ -1,0 +1,40 @@
+#!/bin/sh
+# Refuse a push that changes a subsystem's code without touching its context doc.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Skip once:              SKIP_CONTEXT=1 git push
+[ -n "$SKIP_CONTEXT" ] && exit 0
+
+map() {
+  case "$1" in
+    vision/*)              echo context/input.md ;;
+    conversation/*)        echo context/conversation.md ;;
+    vitals/*)              echo context/patient-state.md ;;
+    app/*|design/*|docs/*) echo context/product.md ;;
+  esac
+}
+
+zero=0000000000000000000000000000000000000000
+fail=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue   # deleting a remote branch
+  if [ "$remote_sha" = "$zero" ]; then
+    base=$(git merge-base "$local_sha" origin/main 2>/dev/null || echo "")
+    [ -z "$base" ] && continue
+    range="$base..$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+  changed=$(git diff --name-only "$range")
+  for f in $changed; do
+    ctx=$(map "$f")
+    [ -z "$ctx" ] && continue
+    if ! printf '%s\n' "$changed" | grep -qx "$ctx"; then
+      echo "pre-push: $f changed but $ctx did not." >&2
+      echo "          Update $ctx (Now / Deviations / Decisions), commit, push again." >&2
+      echo "          Or run /handoff in Claude Code. Skip once with SKIP_CONTEXT=1." >&2
+      fail=1
+      break
+    fi
+  done
+done
+exit $fail
