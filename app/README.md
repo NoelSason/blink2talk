@@ -25,7 +25,12 @@ Every choice sits in a 2×2 grid, so each target is a big box the eye tracker ca
 - **Blink twice:** undoes a pick, goes up a level in Spell it, or goes back from the urgent options.
 - **Room talk:** when Claude judges the speech wasn't meant for the patient ("grab the chart from room 4"), the screen stays quiet and offers "Reply anyway" next to the urgent options.
 
-The first launch calibrates the camera (about 15 s): look at the dot in the center, then in the middle of each box, then squint. Press `C` to calibrate again.
+Every launch starts with eye onboarding, because lighting, posture, and the laptop's position change between sessions:
+
+1. **Calibration** (about 15 s): look at the dot in the center, then in the middle of each box, then squint.
+2. **Practice:** four rounds, one marked box at a time, each corner once in random order. Look at it and close your eyes for a moment. The demo controls (`D`) show the result, for example "Practice: 4 of 4 correct, 2.3 s each". Press `C` to calibrate again if it's low.
+
+- **Consent:** a yes or no to a consent or treatment question (the conversation server answers those with Yes / No / Explain more only) is confirmed with "Is that right?" before it's spoken.
 
 ## For the nurse or family
 
@@ -44,6 +49,14 @@ The first launch calibrates the camera (about 15 s): look at the dot in the cent
 | `D` | Demo controls: type what the nurse says, sample questions, sources |
 | `Q` / `R` | Next sample question / back to Listening |
 | `M` / `C` / `T` / `F` / `L` | Mic on or off / calibrate / tired mode / pretend the face is lost / light theme |
+
+## Tests
+
+```sh
+npm test   # in app/: drives the real page off-screen, about 30 s
+```
+
+It runs on sample replies with the camera and mic blocked, so it gives the same result every time. Camera events go straight into the handlers the vision module calls, so a broken tracker-to-screen contract fails the test. It covers the grid, the rest circle, selecting each corner, "None of these" and back, Can't see you, tired mode (including while replies load), consent confirmation, undo while speaking, Spell it, and where the calibration dots land. The vision module has its own unit tests (`cd ../vision && npm test`). Neither measures real-camera accuracy; the practice round does that.
 
 ## For other eye trackers
 

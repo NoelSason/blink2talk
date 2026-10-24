@@ -27,7 +27,11 @@ app.whenReady().then(async () => {
   const doubleBlink = async () => { for (let i = 0; i < 2; i++) { await key('Space'); await sleep(80); await key('Space', 'keyup'); await sleep(120); } };
   const cam = (call) => js(`window.__test.camera.${call}; 1`);
   const state = (expr) => js(`(s => ${expr})(window.__test.state)`);
-  const labels = () => js(`[...document.querySelectorAll('#reply-row > *')].map(n => n.classList.contains('grid-empty') ? null : n.textContent.replace('Selected', '').trim())`);
+  // Boxes as drawn (the next frame), in reading order; null for an empty cell. The rest circle isn't a box.
+  const labels = async () => {
+    await sleep(80);
+    return js(`[...document.querySelectorAll('#reply-row > [role=option], #reply-row > .grid-empty')].map(n => n.classList.contains('grid-empty') ? null : n.textContent.replace('Selected', '').trim())`);
+  };
   const waitFor = async (expr, ms = 8000) => { for (const t0 = Date.now(); Date.now() - t0 < ms; await sleep(100)) if (await state(expr)) return true; return false; };
 
   // Listening: one item; a long blink opens the urgent options and Spell it.
@@ -67,6 +71,14 @@ app.whenReady().then(async () => {
   await key('KeyT');
   check('tired mode toggles during loading', await waitFor(`s.rowKind === 'replies' && !s.loading`));
   await key('KeyT');
+
+  // A yes or no to a consent question is confirmed before it's spoken ("Yes, please" here).
+  await state('(s.consent = true)');
+  await cam(`select('topLeft')`);
+  check('a consent yes asks "Is that right?" first', (await state('s.rowKind')) === 'confirm' && (await state('s.selected')) === -1);
+  await cam(`select('topRight')`);
+  check('"Go back" returns to the replies', (await state('s.rowKind')) === 'replies');
+  await state('(s.consent = false)');
 
   // Pick, then undo while speaking.
   await cam(`select('topLeft')`);
