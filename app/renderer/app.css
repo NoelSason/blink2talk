@@ -131,6 +131,33 @@ p { margin: 0; }
 }
 .room-message__lead { font-weight: 600; color: var(--text); }
 
+/* The 2×2 grid the vision module tracks: look at a box to highlight it, hold a blink or squint to pick it. */
+.reply-grid {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  align-items: stretch;
+  gap: var(--sp-6);
+}
+.reply-grid > .reply-card,
+.reply-grid > .end-option { width: auto; height: auto; min-height: 0; }
+.reply-grid > .end-option { font-size: var(--fs-reply); }
+.reply-grid > .end-option .icon { width: var(--icon-l); height: var(--icon-l); }
+.rest-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--icon-l);
+  height: var(--icon-l);
+  translate: -50% -50%;
+  border-radius: 50%;
+  border: 3px solid var(--border-strong);
+  background: var(--bg);
+}
+
 /* Tired mode: 2 replies and larger text (Figma screen 5). */
 .reply-row--tired .reply-card { font-size: var(--fs-reply-tired); }
 
@@ -389,14 +416,11 @@ p { margin: 0; }
   outline: var(--hl-outline) solid var(--focus-ring);
   translate: -50% -50%;
 }
-/* Same spots as the calibration dots in vision/src/demo/style.css. */
-.calibration__dot[data-at="left"] { left: 4%; }
-.calibration__dot[data-at="right"] { left: 96%; }
 .calibration__text {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(50% + var(--sp-8));
+  top: var(--sp-8);
   display: flex;
   flex-direction: column;
   align-items: center;

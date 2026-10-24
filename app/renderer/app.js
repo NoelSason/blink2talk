@@ -30,7 +30,6 @@ const TIMING = {
 };
 
 const END_NONE = { type: 'end', kind: 'none', label: 'None of these', action: 'more' };
-const END_SPELL = { type: 'end', kind: 'spell', label: 'Spell it', action: 'spell' };
 const card = (label, extra = {}) => ({ type: 'card', label, action: 'say', ...extra });
 const LISTEN_ITEMS = [card('I want to say something', { icon: 'message', action: 'start' })];
 const URGENT_ICONS = { "I'm in pain": 'bandage', "I can't breathe": 'wind', 'Call the nurse': 'bell' };
@@ -48,7 +47,7 @@ const s = {
   urgent: FALLBACK_URGENT,
   history: [],                // { role: 'nurse' | 'patient', text }, sent with each reply request
   transcript: '',             // what the nurse last said
-  noneCount: 0,
+  prevPage: null,             // the replies, while "None of these" shows the urgent options
   autoStep: false,
   loading: false,
   hl: 0,
@@ -119,7 +118,7 @@ function replyItems(replies) {
 function toListening() {
   reset();
   s.caption = { kind: 'waiting' };
-  s.noneCount = 0;
+  s.prevPage = null;
   setRow('listen', LISTEN_ITEMS);
 }
 
@@ -137,13 +136,13 @@ function nurseSaid(text, speaker = 'Nurse') {
   reset();
   s.caption = { kind: 'question', speaker, text };
   s.transcript = text;
-  s.noneCount = 0;
+  s.prevPage = null;
   s.history.push({ role: 'nurse', text });
   requestReplies(s.history.slice(0, -1));
 }
 
 // Shows the loading outlines until replies arrive. Stale answers are ignored.
-async function requestReplies(history, attempt = 0) {
+async function requestReplies(history) {
   const token = ++requestToken;
   Object.assign(s, {
     stage: 'choose', rowKind: 'replies', items: replyItems(['', '', '', '']),
@@ -154,11 +153,17 @@ async function requestReplies(history, attempt = 0) {
     history: history.slice(-6),
     patientProfile: { name: PATIENT },
     fatigue: s.tired ? Math.max(s.fatigue, 0.8) : s.fatigue,
-  }, attempt);
+  });
   if (token !== requestToken) return;
   s.urgent = d.urgent;
   s.replies = d.replies;
   setRow('replies', replyItems(s.replies), { hl: startHl(), pause: TIMING.readPause });
+}
+
+// The conversation server's options that are always offered: its urgent phrases and Spell it.
+// Four of them, so they fill the grid.
+function starterItems() {
+  return [...s.urgent.slice(0, 3).map((u) => card(u, { icon: URGENT_ICONS[u] ?? 'message' })), card('Spell it', { icon: 'keyboard', action: 'spell' })];
 }
 
 function select(i) {
@@ -167,14 +172,14 @@ function select(i) {
   if (item.action === 'start') {
     chime();
     s.caption = { kind: 'prompt', text: 'What do you want to say?' };
-    const starters = [...s.urgent.map((u) => card(u, { icon: URGENT_ICONS[u] ?? 'message' })), card('Spell it', { icon: 'keyboard', action: 'spell' })];
-    setRow('starters', starters, { hl: startHl(), pause: TIMING.readPause });
+    s.prevPage = null;
+    setRow('starters', starterItems(), { hl: startHl(), pause: TIMING.readPause });
   } else if (item.action === 'more') {
+    // "None of these": the grid has room for four boxes, so the urgent options and Spell it are the
+    // next page. A double blink goes back to the replies.
     chime();
-    s.noneCount++;
-    if (s.noneCount >= 2) return openSpell();
-    // Tell the model none of these fit, so the next set is different.
-    requestReplies([...s.history, { role: 'patient', text: `(None of these fit: ${s.replies.join(' / ')})` }], s.noneCount);
+    s.prevPage = { caption: s.caption, rowKind: s.rowKind, items: s.items, hl: i };
+    setRow('starters', starterItems(), { hl: startHl(), pause: TIMING.readPause });
   } else if (item.action === 'spell') {
     chime();
     openSpell();
@@ -224,9 +229,9 @@ const usableRow = (i) => i !== 0 || s.spell.words.length > 0;
 const firstRow = () => (usableRow(0) ? 0 : 1);
 
 function openSpell() {
-  const back = s.rowKind === 'replies' && s.replies.length
-    ? { caption: s.caption, rowKind: s.rowKind, items: replyItems(s.replies) }
-    : null;
+  const back = s.prevPage
+    ?? (s.rowKind === 'replies' && s.replies.length ? { caption: s.caption, rowKind: s.rowKind, items: replyItems(s.replies) } : null);
+  s.prevPage = null;
   reset();
   s.stage = 'spell';
   s.spell = { message: '', prefix: '', words: [], level: 'rows', row: 1, key: 0, back };
@@ -349,21 +354,26 @@ function setFaceLost(on) {
 const choosing = () => s.stage === 'choose' && !s.loading && s.selected < 0 && s.hl >= 0 && !s.faceLost;
 const spelling = () => s.stage === 'spell' && !s.faceLost;
 
+const gridShown = () => s.stage === 'choose' && s.rowKind !== 'listen' && !s.loading && s.selected < 0 && !s.faceLost;
+
+// Arrow keys (or gazeLeft/gazeRight): move around the grid, or through the rows and keys of Spell it.
 function onLook(dir) {
-  const d = dir === 'right' ? 1 : -1;
-  const t = now();
-  if (spelling() && !s.eyesClosed) {
-    spellMove(d, false);
-  } else if (choosing() && !s.eyesClosed && s.items.length > 1) {
-    s.hl = Math.min(s.items.length - 1, Math.max(0, s.hl + d));
-    s.cue = dir;
-    cueUntil = t + TIMING.cue;
-  } else {
-    return;
-  }
+  if (s.eyesClosed) return;
+  if (spelling()) spellMove(dir === 'right' || dir === 'down' ? 1 : -1, false);
+  else if (gridShown()) s.hl = gridMove(s.hl, dir);
+  else return;
+  keyboardUntil = now() + TIMING.lookPause;
   s.pace = 'look';
-  lookUntil = t + TIMING.lookPause;
+  lookUntil = now() + TIMING.lookPause;
   s.progress = 0;
+}
+
+function gridMove(hl, dir) {
+  if (hl < 0) return s.items.findIndex(Boolean);
+  const col = hl % 2;
+  const row = Math.floor(hl / 2);
+  const next = { left: row * 2, right: row * 2 + 1, up: col, down: 2 + col }[dir];
+  return s.items[next] ? next : hl;
 }
 
 function onEyes(closed) {
@@ -382,12 +392,19 @@ function onEyes(closed) {
   if (t - closeStartedAt < TIMING.shortBlink) shortBlink(t);
 }
 
-// Two short blinks close together undo.
+// Two short blinks close together undo, or go back from the urgent options to the replies.
 function shortBlink(t) {
   shortBlinks = shortBlinks.filter((x) => t - x < TIMING.doubleBlink);
   shortBlinks.push(t);
-  if (shortBlinks.length >= 2) {
-    shortBlinks = [];
+  if (shortBlinks.length < 2) return;
+  shortBlinks = [];
+  if (s.stage === 'choose' && s.prevPage && s.selected < 0) {
+    chime('undo');
+    const p = s.prevPage;
+    s.prevPage = null;
+    s.caption = p.caption;
+    setRow(p.rowKind, p.items, { hl: p.hl, pause: TIMING.lookPause });
+  } else {
     undo();
   }
 }
@@ -406,10 +423,24 @@ const camera = {
       restartPace(TIMING.lookPause);
     }
   },
-  gaze: (dir) => onLook(dir),
-  select: () => {
+  // The box the patient is looking at gets the highlight; the center (rest circle) highlights nothing.
+  focus: (quadrant) => {
+    eyesOn = true;
+    if (!gridShown() || now() < keyboardUntil) return;
+    const i = quadrant ? GRID[quadrant] : -1;
+    s.hl = i >= 0 && s.items[i] ? i : -1;
+  },
+  // Selects the box that had focus when the hold started. Listening has one item, so any hold picks it.
+  select: (quadrant) => {
     openedAt = now();
-    pickHighlighted();
+    if (spelling()) return spellPick();
+    if (s.stage !== 'choose' || s.loading || s.selected >= 0 || s.faceLost) return;
+    if (s.rowKind === 'listen') return select(0);
+    const i = quadrant ? GRID[quadrant] : -1;
+    if (i >= 0 && s.items[i]) {
+      s.hl = i;
+      select(i);
+    }
   },
   blink: (ms) => { if (ms < TIMING.shortBlink) shortBlink(now()); },
   face: (found) => runDemo('face', !found),
@@ -437,6 +468,7 @@ window.blinkvoice = {
 // ---------- Frame loop ----------
 function itemState(i, holdShown) {
   const item = s.items[i];
+  if (!item) return 'empty';
   if (s.loading) return item.type === 'card' ? 'loading' : 'default';
   if (i === s.selected) return item.type === 'card' ? 'selected' : 'highlighted';
   if (s.faceLost) return 'dimmed';
@@ -493,6 +525,7 @@ function tick() {
     caption: s.caption,
     stage: s.stage,
     single: s.rowKind === 'listen',
+    grid: s.rowKind !== 'listen',
     tiredRow: s.tired && s.rowKind === 'replies',
     items: s.items,
     itemStates: s.items.map((_, i) => itemState(i, holdShown)),
@@ -500,6 +533,7 @@ function tick() {
     progress: Math.min(1, s.progress),
     hold: Math.min(1, hold),
     cue: s.cue,
+    backHint: s.stage === 'choose' && !!s.prevPage && s.selected < 0,
     loading: s.loading,
     spoken: s.spoken,
     spell: s.spell && { text: spellText(), rows: spellRows(), level: s.spell.level, row: s.spell.row, key: s.spell.key },

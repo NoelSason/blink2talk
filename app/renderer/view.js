@@ -8,10 +8,15 @@ const FIT_STEPS = ['', 'reply-card__label--fit-1', 'reply-card__label--fit-2'];
 const CALIBRATION_TEXT = {
   ready: 'Get ready to look at the dot',
   center: 'Look at the dot',
-  left: 'Look at the dot on the left',
-  right: 'Look at the dot on the right',
+  topLeft: 'Look at the dot',
+  topRight: 'Look at the dot',
+  bottomLeft: 'Look at the dot',
+  bottomRight: 'Look at the dot',
   squint: 'Squint a little, still looking at the dot',
 };
+// The vision module's TARGET_POSITIONS: the center and the middle of each box of the 2×2 grid,
+// in [-1, 1] across the grid's area.
+const DOT_AT = { center: [0, 0], topLeft: [-0.5, -0.5], topRight: [0.5, -0.5], bottomLeft: [-0.5, 0.5], bottomRight: [0.5, 0.5] };
 
 function icon(name, extra = '') {
   const el = document.createElement('span');
@@ -47,6 +52,10 @@ function holdRing() {
 
 function buildItem(item) {
   const el = document.createElement('div');
+  if (!item) {
+    el.className = 'grid-empty';
+    return el;
+  }
   el.setAttribute('role', 'option');
   if (item.type === 'end') {
     el.className = 'end-option';
@@ -104,6 +113,7 @@ export function createView() {
     cueLabel: byId('cue-label'),
     cueIcon: byId('cue-icon'),
     loadingNote: byId('loading-note'),
+    backHint: byId('back-hint'),
     stageSpeaking: byId('stage-speaking'),
     spoken: byId('spoken'),
     undoHint: byId('undo-hint'),
@@ -136,8 +146,11 @@ export function createView() {
     if (model.items !== rowItems) {
       rowItems = model.items;
       rowEls = model.items.map(buildItem);
-      els.row.replaceChildren(...rowEls);
+      // The rest circle where the four boxes meet: looking there highlights nothing (vision module).
+      const rest = model.grid ? [span('rest-mark')] : [];
+      els.row.replaceChildren(...rowEls, ...rest);
       els.row.classList.toggle('reply-row--single', model.single);
+      els.row.classList.toggle('reply-grid', model.grid);
       for (const key of [...last.keys()]) if (key.startsWith('item')) last.delete(key);
       fitNeeded = true;
     }
@@ -149,7 +162,7 @@ export function createView() {
       const state = model.itemStates[i];
       if (changed(`item${i}`, state)) {
         el.dataset.state = state;
-        el.setAttribute('aria-selected', String(!['default', 'dimmed', 'loading'].includes(state)));
+        if (state !== 'empty') el.setAttribute('aria-selected', String(!['default', 'dimmed', 'loading'].includes(state)));
       }
       if (changed(`item${i}-paused`, i === model.paused)) el.toggleAttribute('data-paused', i === model.paused);
       if (state === 'progress' && changed(`item${i}-progress`, model.progress.toFixed(3))) {
@@ -199,7 +212,13 @@ export function createView() {
     if (!changed('calibration', c ? `${c.phase}|${seconds}` : '')) return;
     els.calibration.hidden = !c;
     if (!c) return;
-    els.calibDot.dataset.at = c.phase === 'left' || c.phase === 'right' ? c.phase : 'center';
+    // Dots go where the grid's boxes are, so calibration matches what the patient will look at.
+    const screen = els.screen.getBoundingClientRect();
+    let area = els.stageChoose.getBoundingClientRect();
+    if (!area.width) area = screen;
+    const [x, y] = DOT_AT[c.phase] ?? DOT_AT.center;
+    els.calibDot.style.left = `${area.left - screen.left + area.width * (0.5 + x / 2)}px`;
+    els.calibDot.style.top = `${area.top - screen.top + area.height * (0.5 + y / 2)}px`;
     els.calibText.textContent = CALIBRATION_TEXT[c.phase] ?? CALIBRATION_TEXT.center;
     els.calibCount.textContent = String(seconds);
   }
@@ -247,6 +266,7 @@ export function createView() {
       }
     }
     if (changed('loading', model.loading)) els.loadingNote.hidden = !model.loading;
+    if (changed('back', model.backHint)) els.backHint.hidden = !model.backHint;
   }
 
   return { render };

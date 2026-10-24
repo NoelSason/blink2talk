@@ -40,6 +40,7 @@
         <div class="status-line">
           <p class="cue" id="cue" hidden><span id="cue-label"></span><span class="icon" id="cue-icon"></span></p>
           <p id="loading-note" role="status" hidden>Getting replies ready</p>
+          <p id="back-hint" hidden>Blink twice to go back</p>
         </div>
       </div>
 
@@ -47,13 +48,6 @@
         <p class="spoken" id="spoken"></p>
         <p class="speaking-indicator"><span class="icon icon--l icon--volume"></span>Speaking</p>
       </div>
-      <div class="stage stage--spell" id="stage-spell" hidden>
-        <p class="message-bar" aria-live="polite">
-          <span id="message-text"></span><span class="message-bar__caret" aria-hidden="true"></span>
-        </p>
-        <div class="keyboard" id="keyboard" aria-label="Keyboard"></div>
-      </div>
-
       <p class="undo-hint" id="undo-hint" hidden>Blink twice to undo</p>
 
       <button type="button" class="care-button" aria-label="Open care panel">
@@ -72,6 +66,9 @@
     <!-- Camera frames for the eye tracker. Never shown to the patient. -->
     <video class="camera" id="camera" playsinline muted></video>
   </div>
+
+  <!-- Care panel for the nurse or family, behind the corner button. Built by care.js. -->
+  <aside class="care" id="care" aria-label="Care panel" hidden></aside>
 
   <!-- Operator panel for demos. Hidden until D is pressed; patients never see it. -->
   <aside class="demo" id="demo" aria-label="Demo controls" hidden></aside>

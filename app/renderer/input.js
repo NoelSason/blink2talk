@@ -3,7 +3,7 @@
 // open/closed timing, so a tracker only has to send these raw events.
 //
 // Until the tracker is wired in, the keyboard stands in (same keys as the Figma prototype):
-//   Left / Right arrow   look left / right
+//   Arrow keys           look at the next box in that direction
 //   Space (hold)         eyes closed while held; hold about 1 s for a long blink
 //   Space, Space         double blink
 //
@@ -12,16 +12,17 @@
 //   window.dispatchEvent(new CustomEvent('patient-input', { detail: { type: 'eyes', closed: true } }))
 
 // Typing in the demo panel's text box isn't patient input or a shortcut.
-const typing = (event) => event.target instanceof HTMLInputElement && event.target.type === 'text';
+const typing = (event) => (event.target instanceof HTMLInputElement && event.target.type === 'text') || event.target instanceof HTMLTextAreaElement;
 
 export function onPatientInput(handler) {
   window.addEventListener('patient-input', (event) => handler(event.detail));
 
   window.addEventListener('keydown', (event) => {
     if (typing(event)) return;
-    if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
+    const dir = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }[event.code];
+    if (dir) {
       event.preventDefault();
-      if (!event.repeat) handler({ type: 'look', dir: event.code === 'ArrowLeft' ? 'left' : 'right' });
+      if (!event.repeat) handler({ type: 'look', dir });
     } else if (event.code === 'Space') {
       event.preventDefault();
       if (!event.repeat) handler({ type: 'eyes', closed: true });
@@ -45,6 +46,8 @@ const DEMO_KEYS = {
   KeyF: 'face',          // pretend the app lost the patient's face
   KeyL: 'theme',         // dark or light
   KeyC: 'calibrate',     // recalibrate the camera eye tracker
+  KeyN: 'care',          // open or close the care panel
+  KeyM: 'mic',           // nurse microphone on or off
 };
 export function onDemoKey(handler) {
   window.addEventListener('keydown', (event) => {

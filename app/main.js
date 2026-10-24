@@ -57,17 +57,19 @@ function stopServer() {
 const serverReady = startServer();
 
 // The page reaches the server through here instead of fetch, so the server needs no CORS setup.
-const ROUTES = new Set(['config', 'replies', 'complete', 'speak']);
+const ROUTES = new Set(['config', 'replies', 'complete', 'speak', 'transcribe']);
 ipcMain.handle('conversation', async (_event, { route, body }) => {
   if (!ROUTES.has(route)) throw new Error(`unknown route ${route}`);
   if (!(await serverReady)) throw new Error('conversation server not running');
+  const audio = route === 'transcribe'; // body is WAV bytes
   const res = await fetch(`${SERVER}/${route}`, route === 'config' ? {} : {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body ?? {}),
+    headers: { 'content-type': audio ? 'audio/wav' : 'application/json' },
+    body: audio ? Buffer.from(body) : JSON.stringify(body ?? {}),
     signal: AbortSignal.timeout(15000),
   });
-  if (route === 'speak') return res.status === 200 ? await res.arrayBuffer() : null; // 204: no voice service
+  if (res.status === 204) return null; // no voice or speech service
+  if (route === 'speak') return res.ok ? await res.arrayBuffer() : null;
   if (!res.ok) throw new Error(`${route} failed: ${res.status}`);
   return res.json();
 });

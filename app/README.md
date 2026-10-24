@@ -20,7 +20,7 @@ The keyboard works alongside the camera and stands in for the patient's eyes:
 
 | Key | Stands in for |
 |---|---|
-| Left / Right arrow | Look left / right |
+| Arrow keys | Look at the next box in that direction |
 | Space, held | Eyes closed. Hold about 1 s for a long blink, which selects. |
 | Space, Space | Double blink, which undoes (on Selected or Speaking) |
 
@@ -28,12 +28,14 @@ Operator keys: `D` opens the demo controls (type what the nurse says, sample que
 
 ## Camera eye tracking
 
-The vision module (`../vision`) runs MediaPipe's face model on this machine, in its left/right layout. The first launch calibrates: look at the dot in the center, on the left, on the right, then squint (about 11 s). Press `C` to calibrate again. The calibration is saved for the next launch.
+The vision module (`../vision`) runs MediaPipe's face model on this machine, in its quadrant layout. Choices sit in a 2×2 grid: look at a box to highlight it, and look at the circle in the middle to highlight nothing. The first launch calibrates: look at the dot in the center, then in the middle of each box, then squint (about 15 s). Press `C` to calibrate again. The calibration is saved for the next launch.
+
+The grid holds four boxes, so the reply screen is two pages. Page 1 has Claude's three suggestions and "None of these". "None of these" opens page 2: the conversation server's urgent options ("I'm in pain", "I can't breathe", "Call the nurse") and "Spell it". A double blink goes back to page 1. Listening's "I want to say something" opens page 2 directly.
 
 | The camera sees | The app does |
 |---|---|
-| A glance left or right, held about 0.7 s | Moves the highlight |
-| A long blink or held squint, released after 0.8 s | Selects |
+| Looking at a box for 0.3 s | Highlights it |
+| A long blink or held squint, released after 0.8 s | Selects the highlighted box |
 | Two quick blinks | Undo |
 | No face | Can't see you |
 | Fatigue against the first 5 minutes | Tired mode |
@@ -60,10 +62,9 @@ window.dispatchEvent(new CustomEvent('patient-input', { detail: { type: 'eyes', 
 ## How it uses the conversation server
 
 - `/replies` gets the nurse's words, the last 6 turns, the patient's name, and fatigue. The patient's picks go into the history.
-- "None of these" asks again and tells the model which options didn't fit. The second one opens Spell it.
 - `/complete` fills the predicted-words row in Spell it.
 - `/speak` plays the patient's cloned voice when the server has a Cartesia key, and falls back to the system voice otherwise.
-- The server's urgent options ("I'm in pain", "I can't breathe", "Call the nurse") are on Start a conversation, one long blink from Listening.
+- The server's urgent options ("I'm in pain", "I can't breathe", "Call the nurse") are on page 2, after "None of these" or "I want to say something".
 - The page is loaded from a file, so requests go through the main process (`main.js`) rather than `fetch`.
 
 ## Where the design comes from

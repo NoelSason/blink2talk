@@ -8,6 +8,7 @@ const CHIMES = {
   select: [[659.25, 0], [880, 0.14]],
   undo: [[880, 0], [587.33, 0.14]],
   tick: [[784, 0]],
+  alert: [[987.77, 0], [987.77, 0.2], [1318.5, 0.4]], // urgent pick, for the people in the room
 };
 export function chime(kind = 'select') {
   audio ??= new AudioContext();
