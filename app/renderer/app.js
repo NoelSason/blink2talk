@@ -22,8 +22,9 @@ const TIMING = {
   keyboard: 3000,     // after an arrow key, the camera's focus waits this long before taking over again
   holdShow: 200,      // ignore the ring for ordinary blinks
   longBlink: 1000,    // eyes closed this long selects (keyboard stand-in; the camera has its own)
-  shortBlink: 400,    // closures shorter than this count toward a double blink
-  doubleBlink: 700,   // two short blinks inside this window go back or undo
+  shortBlink: 400,    // closures shorter than this count toward a double blink (keyboard)
+  camShortBlink: 700, // the same for the camera: anything that closes the eyes and falls short of a pick
+  doubleBlink: 1000,  // two short blinks inside this window go back or undo
   selectedMin: 1500,  // "Selected" stays up at least this long,
   selectedSeen: 1000, // and at least this long after the eyes open, so the patient sees it
   afterSpeech: 1200,  // pause before going back to Listening
@@ -37,6 +38,7 @@ const LISTEN_ITEMS = [card('I want to say something', { icon: 'message', action:
 const URGENT_ICONS = { "I'm in pain": 'bandage', "I can't breathe": 'wind', 'Call the nurse': 'bell' };
 // Grid cells in reading order; the vision module names them by quadrant.
 const GRID = { topLeft: 0, topRight: 1, bottomLeft: 2, bottomRight: 3 };
+const QUADRANT = Object.keys(GRID); // cell index -> quadrant name
 
 const memory = createMemory({ name: PATIENT });
 const s = {
@@ -48,7 +50,7 @@ const s = {
   held: [],                   // replies kept back when the speech wasn't meant for the patient
   urgent: FALLBACK_URGENT,
   transcript: '',             // what the nurse last said
-  prevPage: null,             // the replies, while "None of these" shows the urgent options
+  prevPage: null,             // the page a double blink goes back to (it may hold its own prevPage)
   loading: false,
   hl: 0,
   selected: -1,
@@ -65,6 +67,10 @@ const s = {
   practice: null,             // { order, i, hits, times, shownAt } during the practice round
   consent: false,             // the current replies answer a consent or treatment question
   resting: false,             // eyes closed 3 s: the camera treats it as a rest, not a choice
+  gazePoint: null,            // where gaze.js thinks the patient is looking, for the G overlay
+  showGaze: false,
+  moved: false,               // the head or camera moved since calibration: re-center when quiet
+  camPick: null,              // the box the camera picked, taught back to gaze.js once the reply is spoken
   mic: 'off',                 // 'off' | 'starting' | 'on' | 'unavailable'
 };
 
@@ -180,14 +186,14 @@ function select(i) {
   if (!item) return;
   if (item.action === 'start') {
     chime();
+    s.prevPage = page(i);
     s.caption = { kind: 'prompt', text: 'What do you want to say?' };
-    s.prevPage = null;
     setRow('starters', starterItems());
   } else if (item.action === 'more') {
     // "None of these": the grid has room for four boxes, so the urgent options and Spell it are the
     // next page. A double blink goes back to the replies.
     chime();
-    s.prevPage = { caption: s.caption, rowKind: s.rowKind, items: s.items, hl: i };
+    s.prevPage = page(i);
     setRow('starters', starterItems());
   } else if (item.action === 'anyway') {
     chime();
@@ -215,7 +221,7 @@ function select(i) {
 
 function askConfirm(i, text) {
   chime('tick');
-  s.prevPage = { caption: s.caption, rowKind: s.rowKind, items: s.items, hl: i };
+  s.prevPage = page(i);
   s.caption = { kind: 'prompt', text: `You chose “${text}”. Is that right?` };
   setRow('confirm', [card(`Say “${text}”`, { action: 'confirmed', say: text }), card('Go back', { action: 'unconfirm' }), null, null]);
 }
@@ -236,12 +242,15 @@ function showPractice() {
   setRow('practice', [0, 1, 2, 3].map((cell) => (cell === target
     ? card('Look here', { icon: 'eye', action: 'practice', hit: true })
     : card('', { action: 'practice', hit: false }))));
+  p.target = QUADRANT[target];
   p.shownAt = now();
 }
 
 function practicePick(item) {
   const p = s.practice;
   chime(item.hit ? 'select' : 'undo');
+  // The patient was looking at the marked box either way, so a miss teaches the gaze model too.
+  eyes?.label(p.target, 2);
   if (item.hit) p.hits++;
   p.times.push(now() - p.shownAt);
   if (++p.i < p.order.length) return showPractice();
@@ -272,15 +281,30 @@ function toSpeaking(text) {
   care.conversationChanged();
   const token = ++speechToken;
   // The token check also runs before playback starts, so audio that arrives after an undo stays silent.
+  const camPick = s.camPick;
+  s.camPick = null;
   speak(text, voiceAudio, () => token === speechToken).then(() => {
     if (token !== speechToken) return;
+    if (camPick) eyes?.label(camPick, 0.5); // spoken and not undone: the patient meant that box
     micQuietUntil = now() + TIMING.micQuiet;
     later(TIMING.afterSpeech, toListening);
   });
 }
 
-// Double blink: undo a pick (on Selected or Speaking), go up a level in Spell it, or go back from the
-// urgent options to the replies.
+// The current page, to come back to. Its own back page comes along, so double blinks walk back one
+// page at a time: Spell it → the urgent options → the replies.
+function page(hl) {
+  return { caption: s.caption, rowKind: s.rowKind, items: s.items, hl, prevPage: s.prevPage };
+}
+
+function showPage(p) {
+  s.prevPage = p.prevPage ?? null;
+  s.caption = p.caption;
+  setRow(p.rowKind, p.items, { hl: p.hl ?? startHl() });
+}
+
+// Double blink: undo a pick (on Selected or Speaking), go up a level in Spell it, or go back to the
+// previous page (Spell it → where it was opened from, the urgent options → the replies or Listening).
 function goBack() {
   if (s.stage === 'speaking' || s.selected >= 0) return undo();
   if (s.stage !== 'choose') return;
@@ -288,12 +312,11 @@ function goBack() {
     chime('undo');
     s.spell.path.pop();
     showSpell();
+  } else if (s.rowKind === 'spell') {
+    leaveSpell();
   } else if (s.prevPage) {
     chime('undo');
-    const p = s.prevPage;
-    s.prevPage = null;
-    s.caption = p.caption;
-    setRow(p.rowKind, p.items, { hl: p.hl });
+    showPage(s.prevPage);
   }
 }
 
@@ -314,11 +337,17 @@ function undo() {
 
 // ---------- Spell it (speller.js) ----------
 function openSpell() {
-  const back = s.prevPage ?? (s.rowKind === 'replies' ? { caption: s.caption, rowKind: s.rowKind, items: s.items } : null);
+  const back = page(s.hl);
   s.prevPage = null;
   reset();
   s.spell = { message: '', prefix: '', words: [], path: [], back };
   showSpell();
+}
+
+// Back (the action box) or a double blink at the top level: the page Spell it was opened from.
+function leaveSpell() {
+  chime('undo');
+  showPage(s.spell.back);
 }
 
 function spellText() {
@@ -355,12 +384,7 @@ function spellPick(box, i) {
     if (text) choose(i, text);
     return;
   }
-  if (box.pick === 'action' && box.label === 'Back') {
-    chime('undo');
-    if (!sp.back) return toListening();
-    s.caption = sp.back.caption;
-    return setRow(sp.back.rowKind, sp.back.items);
-  }
+  if (box.pick === 'action' && box.label === 'Back') return leaveSpell();
   chime('tick');
   if (box.pick === 'group') sp.path.push({ kind: 'letters', letters: box.letters });
   else if (box.pick === 'words') sp.path.push({ kind: 'words' });
@@ -518,12 +542,15 @@ const camera = {
   calibration: (progress) => { s.calibration = progress; },
   calibrated: () => startPractice(),
   rest: (on) => { s.resting = on; },
+  gaze: (point) => { s.gazePoint = point; },
+  moved: () => { s.moved = true; },
+  recentered: () => { s.moved = false; },
   hold: (b) => {
     const wasEngaged = s.cam.engaged;
     s.cam = { engaged: !!b?.engaged, closed: !!b?.closed, progress: b?.progress ?? 0 };
     if (wasEngaged && !s.cam.engaged) openedAt = now();
   },
-  // The box the patient is looking at gets the highlight; the center (rest circle) highlights nothing.
+  // The box the patient is looking at gets the highlight; the middle band (the question) highlights nothing.
   focus: (quadrant) => {
     eyesOn = true;
     if (!gridShown() || now() < keyboardUntil) return;
@@ -533,7 +560,8 @@ const camera = {
   // Selects the box that had focus when the hold started. Listening has one item, so any hold picks it.
   select: (quadrant) => {
     openedAt = now();
-    if (s.stage !== 'choose' || s.loading || s.selected >= 0 || s.faceLost) return;
+    if (s.stage !== 'choose' || s.loading || s.selected >= 0 || s.faceLost || s.calibration) return;
+    s.camPick = quadrant;
     if (s.rowKind === 'listen') return select(0);
     const i = quadrant ? GRID[quadrant] : -1;
     if (i >= 0 && s.items[i]) {
@@ -541,7 +569,7 @@ const camera = {
       select(i);
     }
   },
-  blink: (ms) => { if (ms < TIMING.shortBlink) shortBlink(now()); },
+  blink: (ms) => { if (ms < TIMING.camShortBlink) shortBlink(now()); },
   face: (found) => runAction('face', !found),
   fatigue: (level) => window.blinkvoice.setFatigue(level === 'elevated' ? 0.8 : 0),
 };
@@ -585,6 +613,11 @@ function tick() {
   } else if (choosing() && s.cam.engaged) {
     hold = s.cam.progress; // the camera's hold; it selects when the eyes open again
   }
+  // The head or camera moved: re-center at the next quiet moment (not mid-pick, not during practice).
+  if (s.moved && s.stage === 'choose' && s.selected < 0 && !s.loading && !s.calibration && s.rowKind !== 'practice' && !s.eyesClosed && !s.cam.engaged) {
+    s.moved = false;
+    eyes?.recenter();
+  }
   // Selected moves on to Speaking once it has been on screen long enough for the patient to see it.
   if (s.selected >= 0 && s.stage === 'choose' && !s.eyesClosed && !s.cam.engaged
       && t - s.selectedAt >= TIMING.selectedMin && t - Math.max(s.selectedAt, openedAt) >= TIMING.selectedSeen) {
@@ -596,6 +629,7 @@ function tick() {
     name: memory.profile.name,
     eyesClosed: s.eyesClosed || s.cam.closed,
     resting: s.resting,
+    gazeDot: s.showGaze && !s.calibration ? s.gazePoint : null,
     calibration: s.calibration,
     faceLost: s.faceLost,
     caption: s.caption,
@@ -609,7 +643,7 @@ function tick() {
     progress: 0,
     hold: Math.min(1, hold),
     cue: null,
-    backHint: s.stage === 'choose' && s.selected < 0 && (!!s.prevPage || (s.rowKind === 'spell' && s.spell.path.length > 0)),
+    backHint: s.stage === 'choose' && s.selected < 0 && (!!s.prevPage || s.rowKind === 'spell'),
     loading: s.loading,
     spoken: s.spoken,
   });
@@ -631,12 +665,35 @@ function runAction(action, arg) {
   if (action === 'mic') setMic(arg ?? !micWanted);
   if (action === 'theme') root.dataset.theme = (arg ?? root.dataset.theme !== 'light') ? 'light' : 'dark';
   if (action === 'calibrate') eyes?.calibrate();
+  if (action === 'recenter') eyes?.recenter();
+  if (action === 'gaze-dot') s.showGaze = !s.showGaze;
+  if (action === 'more-sensitive' || action === 'less-sensitive') {
+    setSensitivity((eyes?.sensitivity ?? savedSensitivity()) + (action === 'more-sensitive' ? 0.1 : -0.1));
+  }
   if (action === 'profile') memory.setProfile(arg);
   if (action === 'clear-history') {
     memory.clearHistory();
     care.conversationChanged();
   }
   syncPanels();
+}
+
+// Eye sensitivity ([ and ]): how small a look reaches a box. Kept between launches on this machine.
+const SENSITIVITY_KEY = 'blink2talk.sensitivity';
+function savedSensitivity() {
+  try {
+    return Number(localStorage.getItem(SENSITIVITY_KEY)) || 1.2;
+  } catch {
+    return 1.2;
+  }
+}
+function setSensitivity(value) {
+  if (!eyes) return;
+  eyes.sensitivity = Math.round(value * 10) / 10;
+  try {
+    localStorage.setItem(SENSITIVITY_KEY, String(eyes.sensitivity));
+  } catch {}
+  demo.setSensitivity(eyes.sensitivity);
 }
 
 function syncPanels() {
@@ -676,4 +733,7 @@ toListening();
 syncPanels();
 loadConfig();
 requestAnimationFrame(tick);
-startEyes(camera).then((handle) => { eyes = handle; });
+startEyes(camera).then((handle) => {
+  eyes = handle;
+  if (eyes) setSensitivity(savedSensitivity());
+});

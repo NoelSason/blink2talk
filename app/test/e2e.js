@@ -27,7 +27,7 @@ app.whenReady().then(async () => {
   const doubleBlink = async () => { for (let i = 0; i < 2; i++) { await key('Space'); await sleep(80); await key('Space', 'keyup'); await sleep(120); } };
   const cam = (call) => js(`window.__test.camera.${call}; 1`);
   const state = (expr) => js(`(s => ${expr})(window.__test.state)`);
-  // Boxes as drawn (the next frame), in reading order; null for an empty cell. The rest circle isn't a box.
+  // Boxes as drawn (the next frame), in reading order; null for an empty cell. The middle band (question and status) isn't a box.
   const labels = async () => {
     await sleep(80);
     return js(`[...document.querySelectorAll('#reply-row > [role=option], #reply-row > .grid-empty')].map(n => n.classList.contains('grid-empty') ? null : n.textContent.replace('Selected', '').trim())`);
@@ -38,20 +38,22 @@ app.whenReady().then(async () => {
   check('listening shows one item', (await labels()).length === 1);
   await hold();
   check('"I want to say something" opens the urgent options', JSON.stringify(await labels()) === JSON.stringify(["I'm in pain", "I can't breathe", 'Call the nurse', 'Spell it']));
+  await doubleBlink();
+  check('double blink goes back to Listening', (await state('s.rowKind')) === 'listen');
 
   // A question: three replies and "None of these" in the 2×2 grid.
   await key('KeyQ');
   check('replies arrive', await waitFor(`s.rowKind === 'replies' && !s.loading`));
   check('grid holds three replies and None of these', (await labels()).length === 4 && (await labels())[3] === 'None of these');
 
-  // Camera contract: focus highlights the looked-at box, the rest circle highlights nothing,
+  // Camera contract: focus highlights the looked-at box, the middle band highlights nothing,
   // and select picks the box the hold started on.
   await cam(`focus('bottomRight')`);
   check('focus(bottomRight) highlights cell 3', (await state('s.hl')) === 3);
   await cam('focus(null)');
   check('focus(null) highlights nothing', (await state('s.hl')) === -1);
   await cam('select(null)');
-  check('select(null) on the rest circle picks nothing', (await state('s.selected')) === -1 && (await state('s.rowKind')) === 'replies');
+  check('select(null) in the middle band picks nothing', (await state('s.selected')) === -1 && (await state('s.rowKind')) === 'replies');
   await cam(`select('bottomRight')`);
   check('select(bottomRight) opens the urgent options', (await state('s.rowKind')) === 'starters');
   await doubleBlink();
@@ -94,6 +96,14 @@ app.whenReady().then(async () => {
   await cam(`select('topLeft')`);
   await cam(`select('topLeft')`);
   check('E in two picks', (await state('s.spell.message + s.spell.prefix')) === 'e');
+  // Double blinks walk back one page at a time: a letter level, Spell it, the urgent options.
+  await cam(`select('topLeft')`);
+  await doubleBlink();
+  check('double blink goes up a letter level', (await state(`s.rowKind === 'spell' && s.spell.path.length === 0`)) === true);
+  await doubleBlink();
+  check('double blink leaves Spell it for the urgent options', (await state('s.rowKind')) === 'starters');
+  await doubleBlink();
+  check('another double blink goes back to the replies', (await state('s.rowKind')) === 'replies');
 
   // Calibration dots follow the grid: the top-left dot sits up and to the left of the center one.
   const dot = async (phase) => { await cam(`calibration({ phase: '${phase}', remainingMs: 1500 })`); await sleep(50); return js(`[parseFloat(document.getElementById('calib-dot').style.left), parseFloat(document.getElementById('calib-dot').style.top)]`); };

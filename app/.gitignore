@@ -4,3 +4,5 @@ out/
 renderer/vendor/
 renderer/mediapipe/
 renderer/models/
+# Eye-tracker session recordings (main.js)
+logs/

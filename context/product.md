@@ -1,6 +1,6 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-24 15:26 PDT
+Updated: 2026-10-24 16:05 PDT
 
 ## Now
 - Working on: the full loop on one laptop (`./start`): mic → Claude → 2x2 → squint → cloned voice, with eye onboarding every launch.
@@ -8,7 +8,7 @@ Updated: 2026-10-24 15:26 PDT
 - Blocked on: Presage vitals feed for the care panel tiles (Marco).
 
 ## Build-order status
-- Step 1 (main loop): runs end to end. Samarth's Ink-2 streaming mic, Claude replies, Julian's quadrant tracker, Sonic cloned voice. `app/test/e2e.js` (21 checks) passes.
+- Step 1 (main loop): runs end to end. Samarth's Ink-2 streaming mic, Claude replies, Julian's quadrant tracker, Sonic cloned voice. `app/test/e2e.js` (25 checks) and `app/test/gaze.test.mjs` (6) pass.
 - Step 2 (mocks): no env flags yet. Without a server the app falls back to sample replies and the system voice; the demo panel (`D`) shows which sources are live.
 - Step 3 (nurse window): care drawer in the same window (alerts, conversation, notes, settings). Vitals tiles say "Not connected yet".
 - Step 4 ("none of these"): differs from CLAUDE.md (see Deviations).
@@ -20,10 +20,10 @@ Input: the renderer imports `../vision` (`npm run eyes` bundles it) in its quadr
 
 | Vision output | App does |
 | --- | --- |
-| `out.quadrant.focus`: `topLeft`\|`topRight`\|`bottomLeft`\|`bottomRight`\|null, after 300 ms | Highlights that box; null (center) highlights nothing |
+| `out.quadrant.focus`: `topLeft`\|`topRight`\|`bottomLeft`\|`bottomRight`\|null, after 300 ms | Fallback only. `app/renderer/gaze.js` picks the box from the same frames (150 ms dwell); the middle band highlights nothing |
 | `out.blink { engaged, closed, progress }` | Fill ring |
 | `quadrantSelect { quadrant }`: box at hold start, hold ≥ 800 ms, fires on reopen, refractory 1.2 s | Selects the box |
-| `blink { durationMs }` | Two < 400 ms within 700 ms: back or undo |
+| `blink { durationMs }` | Two < 700 ms within 1 s: back one page or undo |
 | `rest` / `restEnd` (closed ≥ 3 s; that hold can't select) | "Resting" eye status |
 | `faceLost` / `faceFound` | "Can't see you"; input ignored |
 | `fatigue { level }` | `elevated` turns on tired mode |
@@ -50,11 +50,16 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Distress alerts cut | The patient picking "I'm in pain" / "I can't breathe" / "Call the nurse" badges the care button, chimes, and sends a desktop notification | It's the patient asking, not a distress detector | Nobody | No. Needs a team OK (see Open questions). |
 | 2026-10-24 | `gaze` / `confirm` / `rest` / `fatigue` over `ipcRenderer` | Renderer reads the vision pipeline's own events (table above) | Tracker and screen share one renderer; IPC adds a hop for nothing | Input | No. Julian's rows to restate. |
 | 2026-10-24 | `transcript` / `options` / `speak` as IPC; `{ text, intent }`, exactly 3, `highStakes` | HTTP via `main.js`; plain strings; high stakes = `source: "consent-rule"`; STT runs in the renderer on a server-issued token | Matches Samarth's server; the API key stays in the server | Conversation | No. Samarth's rows to restate. |
-| 2026-10-24 | Dwell ≥ 700 ms highlights a corner | Highlight after 300 ms (vision quadrant default) | Not tuned yet | Input | No. See Open questions. |
+| 2026-10-24 | Dwell ≥ 700 ms highlights a corner | Highlight after 150 ms (gaze.js) | Noel found the highlight slow; the pick still needs an 800 ms hold | Input | No. See Open questions. |
 | 2026-10-24 | Closure ≥ 3 s toggles `PAUSED` | Closure ≥ 3 s cancels that hold and shows "Resting"; no paused state | Vision emits rest per closure, not as a toggle | Input | No. |
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-24: The camera loop runs once per camera frame (`requestVideoFrameCallback`), and the window keeps running when covered (`backgroundThrottling: false`). Why: a `requestAnimationFrame` loop ran the face model ~110 times a second on a 120 Hz MacBook (`video.currentTime` advances every refresh), which lagged the page and shrank the 3-frame blink filter to ~28 ms. Measured: 33 ms between frames after, ~9 ms before. @Julian: `vision/src/cv/input.ts` has the same loop.
+- 2026-10-24: Boxes sit in the screen's corners with the question in the middle band (gaze.js targets at x ±0.6, y ±0.62 of the area below the top bar); calibration dots go to the same points. Sensitivity `[` / `]` (default 1.2, saved locally). Why: Noel had to exaggerate looks; a laptop screen spans only a few degrees of eye movement, so the targets need all of it. Rejected: the rest circle in the middle.
+- 2026-10-24: Double blink walks back one page at a time, including out of Spell it and back to Listening from the urgent options. Why: Noel expected back to work there; it did nothing at the top of Spell it.
+- 2026-10-24: Each launch records per-frame eye and head numbers plus calibration and practice labels to `app/logs/` (git-ignored, no images). Why: tune the tracker on real sessions instead of guessing.
+- 2026-10-24: Which box the patient looks at comes from `app/renderer/gaze.js` (head pose + eye features, ridge regression, refit from practice picks, spoken replies, and re-centers; auto re-center when the head or camera moves), not the vision module's quadrant classifier. Picks use the most-looked box in the 0.5 s before the hold. Why: Noel found boxes misselected, and the classifier is eye-in-head only and fit once. Rejected: editing `vision/` (Julian's). @Julian: calibration, holds, rest, fatigue still come from your pipeline.
 - 2026-10-24: Eye onboarding on every launch: calibration, then 4 practice picks (one per corner, random order); the hit count shows in the demo panel. Why: lighting and posture change; gives measured accuracy. Rejected: reusing a saved calibration.
 - 2026-10-24: Yes/No on a consent question asks "Is that right?" before speaking (the high-stakes second confirm). Why: CLAUDE.md allows it on high stakes only.
 - 2026-10-24: Replies checked client-side (≤ 10 words, ≤ 80 chars, no duplicates; else Yes / No / Please say that again). Why: the prompt alone doesn't guarantee it.
@@ -69,11 +74,11 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 ## Open questions / needs from others
 - @Marco: Presage preload from `preload.js` and `worker-src blob:` in the CSP are fine. Send `vitals` over IPC and the care panel tiles will show them.
 - @team: keep Spell it, or switch "none" to the 4-category flow? And are patient-picked urgent alerts OK under the "distress alerts" cut? Both are on the Cut list.
-- @Julian: the app uses the vision defaults. Focus comes after 300 ms (CLAUDE.md: 700), and the squint calibration step sets a per-patient closed threshold (Cut list: "per-patient blink aperture calibration"). Keep or change?
+- @Julian: your `input.ts` webcam loop runs per display refresh, not per camera frame (see Decisions). The app has its own loop now, so nothing is blocked. Separately, the app uses the vision defaults for holds. Focus comes after 150 ms in gaze.js (CLAUDE.md: 700), and the squint calibration step sets a per-patient closed threshold (Cut list: "per-patient blink aperture calibration"). Keep or change?
 
 ## Run and check
 ```sh
 ./start                          # repo root; calibration + practice, then Listening
 BLINK2TALK_WINDOWED=1 ./start    # 1440×900 window
-cd app && npm test               # 21 end-to-end checks, off-screen, no camera or server
+cd app && npm test               # 6 gaze unit tests + 25 end-to-end checks, off-screen, no camera or server
 ```

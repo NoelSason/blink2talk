@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, net, protocol, session } = require('electro
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
+const fs = require('node:fs');
 
 const windowed = Boolean(process.env.BLINK2TALK_WINDOWED);
 const RENDERER = path.join(__dirname, 'renderer');
@@ -75,6 +76,20 @@ ipcMain.handle('conversation', async (_event, { route, body }) => {
 });
 
 // ---------- Window ----------
+// ---------- Eye-tracker recordings ----------
+// One file per launch in app/logs/ (git-ignored): the eye and head numbers from each camera frame,
+// with what calibration, practice, and picks say the patient was looking at. No images. Used to tune
+// renderer/gaze.js on real sessions.
+let gazeLogFile = null;
+ipcMain.on('gaze-log', (_event, lines) => {
+  if (!gazeLogFile) {
+    const dir = path.join(__dirname, 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    gazeLogFile = path.join(dir, `gaze-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`);
+  }
+  fs.appendFile(gazeLogFile, String(lines), (err) => { if (err) console.error('gaze log:', err.message); });
+});
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
@@ -91,6 +106,9 @@ function createWindow() {
       sandbox: true,
       // The selection chime and the voice play without a click; the patient never clicks.
       autoplayPolicy: 'no-user-gesture-required',
+      // The eye tracker keeps running if another window covers this one (a notification, the
+      // nurse's app); otherwise Chromium pauses the camera loop until it's uncovered.
+      backgroundThrottling: false,
     },
   });
   win.loadURL('app://blink2talk/index.html');

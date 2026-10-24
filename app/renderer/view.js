@@ -2,11 +2,13 @@
 // DOM when a value changed. Nothing here changes overall screen brightness: state changes only
 // restyle the highlighted item.
 
+import { TARGETS } from './gaze.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const byId = (id) => document.getElementById(id);
 const FIT_STEPS = ['', 'reply-card__label--fit-1', 'reply-card__label--fit-2'];
 const CALIBRATION_TEXT = {
-  ready: 'Get ready to look at the dot',
+  ready: 'Get ready to look at each dot. Turning your head a little is fine',
   center: 'Look at the dot',
   topLeft: 'Look at the dot',
   topRight: 'Look at the dot',
@@ -14,9 +16,8 @@ const CALIBRATION_TEXT = {
   bottomRight: 'Look at the dot',
   squint: 'Squint a little, still looking at the dot',
 };
-// The vision module's TARGET_POSITIONS: the center and the middle of each box of the 2×2 grid,
-// in [-1, 1] across the grid's area.
-const DOT_AT = { center: [0, 0], topLeft: [-0.5, -0.5], topRight: [0.5, -0.5], bottomLeft: [-0.5, 0.5], bottomRight: [0.5, 0.5] };
+// Calibration dots sit where the boxes will be (gaze.js TARGETS, matched by the .reply-grid layout).
+const DOT_AT = TARGETS;
 
 function icon(name, extra = '') {
   const el = document.createElement('span');
@@ -96,6 +97,7 @@ export function createView() {
     calibDot: byId('calib-dot'),
     calibText: byId('calib-text'),
     calibCount: byId('calib-count'),
+    gazeDot: byId('gaze-dot'),
     screen: byId('screen'),
     eyeIcon: byId('eye-icon'),
     eyeLabel: byId('eye-label'),
@@ -104,6 +106,8 @@ export function createView() {
     captionSpeaker: byId('caption-speaker'),
     captionText: byId('caption-text'),
     stageChoose: byId('stage-choose'),
+    gazeArea: byId('gaze-area'),
+    statusLine: byId('status-line'),
     roomMessage: byId('room-message'),
     row: byId('reply-row'),
     cue: byId('cue'),
@@ -143,9 +147,8 @@ export function createView() {
     if (model.items !== rowItems) {
       rowItems = model.items;
       rowEls = model.items.map(buildItem);
-      // The rest circle where the four boxes meet: looking there highlights nothing (vision module).
-      const rest = model.grid ? [span('rest-mark')] : [];
-      els.row.replaceChildren(...rowEls, ...rest);
+      // On the 2×2 screens the middle band (the question) is where the patient rests: no box.
+      els.row.replaceChildren(...rowEls, ...(model.grid ? [middle] : []));
       els.row.classList.toggle('reply-row--single', model.single);
       els.row.classList.toggle('reply-grid', model.grid);
       for (const key of [...last.keys()]) if (key.startsWith('item')) last.delete(key);
@@ -175,24 +178,54 @@ export function createView() {
     }
   }
 
+  // The caption and status line live in the grid's middle band on the 2×2 screens, and above the
+  // stage everywhere else (Listening, Speaking).
+  const middle = document.createElement('div');
+  middle.className = 'grid-middle';
+  function placeCaption(inGrid) {
+    if (inGrid) {
+      middle.append(els.caption, els.statusLine);
+      if (middle.parentNode !== els.row) els.row.append(middle);
+    } else {
+      els.gazeArea.prepend(els.caption);
+      els.stageChoose.append(els.statusLine);
+      middle.remove();
+    }
+  }
+
+  // A point on the gaze area (x and y in [-1, 1]; gaze.js TARGETS) placed in screen coordinates.
+  function placeOnGrid(node, x, y) {
+    const screen = els.screen.getBoundingClientRect();
+    let area = els.gazeArea.getBoundingClientRect();
+    if (!area.width) area = screen;
+    node.style.left = `${area.left - screen.left + area.width * (0.5 + x / 2)}px`;
+    node.style.top = `${area.top - screen.top + area.height * (0.5 + y / 2)}px`;
+  }
+
   function renderCalibration(c) {
     const seconds = c ? Math.max(1, Math.ceil(c.remainingMs / 1000)) : 0;
     if (!changed('calibration', c ? `${c.phase}|${seconds}` : '')) return;
     els.calibration.hidden = !c;
     if (!c) return;
     // Dots go where the grid's boxes are, so calibration matches what the patient will look at.
-    const screen = els.screen.getBoundingClientRect();
-    let area = els.stageChoose.getBoundingClientRect();
-    if (!area.width) area = screen;
     const [x, y] = DOT_AT[c.phase] ?? DOT_AT.center;
-    els.calibDot.style.left = `${area.left - screen.left + area.width * (0.5 + x / 2)}px`;
-    els.calibDot.style.top = `${area.top - screen.top + area.height * (0.5 + y / 2)}px`;
+    placeOnGrid(els.calibDot, x, y);
     els.calibText.textContent = CALIBRATION_TEXT[c.phase] ?? CALIBRATION_TEXT.center;
     els.calibCount.textContent = String(seconds);
   }
 
+  function placeCaptionIfChanged(inGrid) {
+    if (changed('caption-in-grid', inGrid)) placeCaption(inGrid);
+    else if (inGrid && middle.parentNode !== els.row) els.row.append(middle); // the row was rebuilt
+  }
+
   function render(model) {
     renderCalibration(model.calibration);
+    const g = model.gazeDot;
+    if (changed('gaze-dot', g ? `${g[0].toFixed(3)},${g[1].toFixed(3)}` : '')) {
+      els.gazeDot.hidden = !g;
+      if (g) placeOnGrid(els.gazeDot, Math.max(-1, Math.min(1, g[0])), Math.max(-1, Math.min(1, g[1])));
+    }
     if (changed('screen-lost', model.faceLost)) els.screen.toggleAttribute('data-lost', model.faceLost);
     const eye = model.faceLost ? 'lost' : model.resting ? 'rest' : model.eyesClosed ? 'closed' : 'open';
     if (changed('eye', eye)) {
@@ -221,10 +254,12 @@ export function createView() {
       fitNeeded = true;
     }
     if (model.stage === 'speaking' && changed('spoken', model.spoken)) els.spoken.textContent = model.spoken;
+    if (model.stage !== 'choose' || !model.grid) placeCaptionIfChanged(false);
     if (model.stage !== 'choose') return;
 
     if (changed('lost', model.faceLost)) els.roomMessage.hidden = !model.faceLost;
     renderRow(model);
+    placeCaptionIfChanged(model.grid);
 
     if (changed('cue', model.cue ?? '')) {
       els.cue.hidden = !model.cue;

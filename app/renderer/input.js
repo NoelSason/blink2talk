@@ -48,6 +48,10 @@ const DEMO_KEYS = {
   KeyC: 'calibrate',     // recalibrate the camera eye tracker
   KeyN: 'care',          // open or close the care panel
   KeyM: 'mic',           // nurse microphone on or off
+  KeyE: 'recenter',      // quick eye re-center (center + each box, about 6 s)
+  KeyG: 'gaze-dot',      // show where the gaze model thinks the patient is looking
+  BracketRight: 'more-sensitive', // smaller eye movements reach a box
+  BracketLeft: 'less-sensitive',  // bigger eye movements needed (fewer accidental highlights)
 };
 export function onDemoKey(handler) {
   window.addEventListener('keydown', (event) => {
