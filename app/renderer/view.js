@@ -2,7 +2,6 @@
 // DOM when a value changed. Nothing here changes overall screen brightness: state changes only
 // restyle the highlighted item.
 
-import { TARGETS } from './gaze.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const byId = (id) => document.getElementById(id);
@@ -16,8 +15,15 @@ const CALIBRATION_TEXT = {
   bottomRight: 'Look at the dot',
   squint: 'Squint a little, still looking at the dot',
 };
-// Calibration dots sit where the boxes will be (gaze.js TARGETS, matched by the .reply-grid layout).
-const DOT_AT = TARGETS;
+// Calibration dots sit where the boxes will be (x and y in [-1, 1] over the gaze area, +y down;
+// matched by the .reply-grid layout in app.css).
+const DOT_AT = {
+  center: [0, 0],
+  topLeft: [-0.6, -0.62],
+  topRight: [0.6, -0.62],
+  bottomLeft: [-0.6, 0.62],
+  bottomRight: [0.6, 0.62],
+};
 
 function icon(name, extra = '') {
   const el = document.createElement('span');
@@ -97,7 +103,6 @@ export function createView() {
     calibDot: byId('calib-dot'),
     calibText: byId('calib-text'),
     calibCount: byId('calib-count'),
-    gazeDot: byId('gaze-dot'),
     screen: byId('screen'),
     eyeIcon: byId('eye-icon'),
     eyeLabel: byId('eye-label'),
@@ -193,7 +198,7 @@ export function createView() {
     }
   }
 
-  // A point on the gaze area (x and y in [-1, 1]; gaze.js TARGETS) placed in screen coordinates.
+  // A point on the gaze area (x and y in [-1, 1]; DOT_AT) placed in screen coordinates.
   function placeOnGrid(node, x, y) {
     const screen = els.screen.getBoundingClientRect();
     let area = els.gazeArea.getBoundingClientRect();
@@ -221,11 +226,6 @@ export function createView() {
 
   function render(model) {
     renderCalibration(model.calibration);
-    const g = model.gazeDot;
-    if (changed('gaze-dot', g ? `${g[0].toFixed(3)},${g[1].toFixed(3)}` : '')) {
-      els.gazeDot.hidden = !g;
-      if (g) placeOnGrid(els.gazeDot, Math.max(-1, Math.min(1, g[0])), Math.max(-1, Math.min(1, g[1])));
-    }
     if (changed('screen-lost', model.faceLost)) els.screen.toggleAttribute('data-lost', model.faceLost);
     const eye = model.faceLost ? 'lost' : model.resting ? 'rest' : model.eyesClosed ? 'closed' : 'open';
     if (changed('eye', eye)) {

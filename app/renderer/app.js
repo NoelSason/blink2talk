@@ -64,13 +64,8 @@ const s = {
   faceLost: false,
   cam: { engaged: false, closed: false, progress: 0 }, // camera hold: a long blink or held squint in progress
   calibration: null,          // calibration progress while the camera calibrates
-  practice: null,             // { order, i, hits, times, shownAt } during the practice round
   consent: false,             // the current replies answer a consent or treatment question
   resting: false,             // eyes closed 3 s: the camera treats it as a rest, not a choice
-  gazePoint: null,            // where gaze.js thinks the patient is looking, for the G overlay
-  showGaze: false,
-  moved: false,               // the head or camera moved since calibration: re-center when quiet
-  camPick: null,              // the box the camera picked, taught back to gaze.js once the reply is spoken
   mic: 'off',                 // 'off' | 'starting' | 'on' | 'unavailable'
 };
 
@@ -206,8 +201,6 @@ function select(i) {
     openSpell();
   } else if (item.action === 'spell-pick') {
     spellPick(item.box, i);
-  } else if (item.action === 'practice') {
-    practicePick(item);
   } else if (item.action === 'confirmed') {
     choose(i, item.say);
   } else if (item.action === 'unconfirm') {
@@ -224,42 +217,6 @@ function askConfirm(i, text) {
   s.prevPage = page(i);
   s.caption = { kind: 'prompt', text: `You chose “${text}”. Is that right?` };
   setRow('confirm', [card(`Say “${text}”`, { action: 'confirmed', say: text }), card('Go back', { action: 'unconfirm' }), null, null]);
-}
-
-// ---------- Practice, right after calibration ----------
-// Four boxes; one is marked at a time, each corner once in random order. It shows the patient how
-// choosing works, and gives the team a measured hit count (demo controls) instead of a guess.
-function startPractice() {
-  reset();
-  s.practice = { order: [0, 1, 2, 3].sort(() => Math.random() - 0.5), i: 0, hits: 0, times: [], shownAt: 0 };
-  showPractice();
-}
-
-function showPractice() {
-  const p = s.practice;
-  const target = p.order[p.i];
-  s.caption = { kind: 'prompt', text: `Practice ${p.i + 1} of ${p.order.length}: look at the marked box, then close your eyes for a moment` };
-  setRow('practice', [0, 1, 2, 3].map((cell) => (cell === target
-    ? card('Look here', { icon: 'eye', action: 'practice', hit: true })
-    : card('', { action: 'practice', hit: false }))));
-  p.target = QUADRANT[target];
-  p.shownAt = now();
-}
-
-function practicePick(item) {
-  const p = s.practice;
-  chime(item.hit ? 'select' : 'undo');
-  // The patient was looking at the marked box either way, so a miss teaches the gaze model too.
-  eyes?.label(p.target, 2);
-  if (item.hit) p.hits++;
-  p.times.push(now() - p.shownAt);
-  if (++p.i < p.order.length) return showPractice();
-  const seconds = p.times.reduce((a, b) => a + b, 0) / p.times.length / 1000;
-  demo.setPractice(`Practice: ${p.hits} of ${p.order.length} correct, ${seconds.toFixed(1)} s each${p.hits < p.order.length - 1 ? '. Press C to calibrate again.' : ''}`);
-  s.practice = null;
-  s.caption = { kind: 'prompt', text: "You're all set" };
-  setRow('practice', [null, null, null, null]);
-  later(1500, toListening);
 }
 
 // Selected: the card turns green with a check and a chime; Speaking follows (see tick).
@@ -281,11 +238,8 @@ function toSpeaking(text) {
   care.conversationChanged();
   const token = ++speechToken;
   // The token check also runs before playback starts, so audio that arrives after an undo stays silent.
-  const camPick = s.camPick;
-  s.camPick = null;
   speak(text, voiceAudio, () => token === speechToken).then(() => {
     if (token !== speechToken) return;
-    if (camPick) eyes?.label(camPick, 0.5); // spoken and not undone: the patient meant that box
     micQuietUntil = now() + TIMING.micQuiet;
     later(TIMING.afterSpeech, toListening);
   });
@@ -438,7 +392,7 @@ function alertCare(text) {
 }
 
 // ---------- Nurse mic (mic.js, Cartesia Ink-2 through the conversation server's token) ----------
-const hearingNurse = () => s.stage === 'choose' && !['spell', 'practice', 'confirm'].includes(s.rowKind) && s.selected < 0 && !s.calibration;
+const hearingNurse = () => s.stage === 'choose' && !['spell', 'confirm'].includes(s.rowKind) && s.selected < 0 && !s.calibration;
 
 async function startNurseMic() {
   if (mic || !micWanted) return;
@@ -540,11 +494,8 @@ function pickHighlighted() {
 const camera = {
   status: (text) => demo.setEyes(text),
   calibration: (progress) => { s.calibration = progress; },
-  calibrated: () => startPractice(),
+  calibrated: () => toListening(),
   rest: (on) => { s.resting = on; },
-  gaze: (point) => { s.gazePoint = point; },
-  moved: () => { s.moved = true; },
-  recentered: () => { s.moved = false; },
   hold: (b) => {
     const wasEngaged = s.cam.engaged;
     s.cam = { engaged: !!b?.engaged, closed: !!b?.closed, progress: b?.progress ?? 0 };
@@ -561,7 +512,6 @@ const camera = {
   select: (quadrant) => {
     openedAt = now();
     if (s.stage !== 'choose' || s.loading || s.selected >= 0 || s.faceLost || s.calibration) return;
-    s.camPick = quadrant;
     if (s.rowKind === 'listen') return select(0);
     const i = quadrant ? GRID[quadrant] : -1;
     if (i >= 0 && s.items[i]) {
@@ -613,11 +563,6 @@ function tick() {
   } else if (choosing() && s.cam.engaged) {
     hold = s.cam.progress; // the camera's hold; it selects when the eyes open again
   }
-  // The head or camera moved: re-center at the next quiet moment (not mid-pick, not during practice).
-  if (s.moved && s.stage === 'choose' && s.selected < 0 && !s.loading && !s.calibration && s.rowKind !== 'practice' && !s.eyesClosed && !s.cam.engaged) {
-    s.moved = false;
-    eyes?.recenter();
-  }
   // Selected moves on to Speaking once it has been on screen long enough for the patient to see it.
   if (s.selected >= 0 && s.stage === 'choose' && !s.eyesClosed && !s.cam.engaged
       && t - s.selectedAt >= TIMING.selectedMin && t - Math.max(s.selectedAt, openedAt) >= TIMING.selectedSeen) {
@@ -629,7 +574,6 @@ function tick() {
     name: memory.profile.name,
     eyesClosed: s.eyesClosed || s.cam.closed,
     resting: s.resting,
-    gazeDot: s.showGaze && !s.calibration ? s.gazePoint : null,
     calibration: s.calibration,
     faceLost: s.faceLost,
     caption: s.caption,
@@ -665,35 +609,12 @@ function runAction(action, arg) {
   if (action === 'mic') setMic(arg ?? !micWanted);
   if (action === 'theme') root.dataset.theme = (arg ?? root.dataset.theme !== 'light') ? 'light' : 'dark';
   if (action === 'calibrate') eyes?.calibrate();
-  if (action === 'recenter') eyes?.recenter();
-  if (action === 'gaze-dot') s.showGaze = !s.showGaze;
-  if (action === 'more-sensitive' || action === 'less-sensitive') {
-    setSensitivity((eyes?.sensitivity ?? savedSensitivity()) + (action === 'more-sensitive' ? 0.1 : -0.1));
-  }
   if (action === 'profile') memory.setProfile(arg);
   if (action === 'clear-history') {
     memory.clearHistory();
     care.conversationChanged();
   }
   syncPanels();
-}
-
-// Eye sensitivity ([ and ]): how small a look reaches a box. Kept between launches on this machine.
-const SENSITIVITY_KEY = 'blink2talk.sensitivity';
-function savedSensitivity() {
-  try {
-    return Number(localStorage.getItem(SENSITIVITY_KEY)) || 1.2;
-  } catch {
-    return 1.2;
-  }
-}
-function setSensitivity(value) {
-  if (!eyes) return;
-  eyes.sensitivity = Math.round(value * 10) / 10;
-  try {
-    localStorage.setItem(SENSITIVITY_KEY, String(eyes.sensitivity));
-  } catch {}
-  demo.setSensitivity(eyes.sensitivity);
 }
 
 function syncPanels() {
@@ -735,5 +656,4 @@ loadConfig();
 requestAnimationFrame(tick);
 startEyes(camera).then((handle) => {
   eyes = handle;
-  if (eyes) setSensitivity(savedSensitivity());
 });

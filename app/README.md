@@ -34,16 +34,7 @@ Every launch starts with eye onboarding, because lighting, posture, and the lapt
 
 ## How the gaze works
 
-`renderer/gaze.js` decides which box the patient is looking at; the vision module still handles calibration, blink and squint holds, rest, and fatigue. The vision module's own box guess uses eye-in-head features only, fit once, so it drifts when the head turns toward a box or the head or camera moves. gaze.js:
-
-- **Head-aware:** adds head turn, head tilt, and face position (from the same face landmarks) to the eye features, and maps them to a point on the grid with a ridge regression.
-- **Self-correcting:** refits whenever it learns where the patient really looked: calibration, every practice pick (the marked box, even on a miss), every reply spoken without an undo, and every re-center.
-- **Re-centers on its own:** if the head or camera moves away from where it was calibrated for 2 s, it runs a 6 s re-center (center, then each box) at the next quiet moment. `E` runs one by hand.
-- **Steady picks:** a pick is the box looked at most in the 0.5 s before the eyes closed, so closing lids can't drag it to the bottom row.
-- **Responsive:** it runs once per camera frame (about 30 a second), with an adaptive filter that smooths a resting gaze and follows a moving one with little lag. A new box takes the highlight after 150 ms.
-- **Sensitivity:** `]` makes smaller eye movements reach a box, `[` needs bigger ones. It starts at 1.2 and is kept between launches.
-- **See it:** `G` shows a dot where it thinks the patient is looking. The demo panel's Eyes line ends with the camera's frame rate; under about 20 fps the highlight will feel slow.
-- **Recordings:** each launch writes the eye and head numbers from every camera frame, with what calibration and practice say the patient was looking at, to `app/logs/` (git-ignored, no images). They're for tuning gaze.js on real sessions.
+The vision module (`../vision`) owns the eyes: calibration (3 s countdown, then 2 s on the center, each box, and a squint), which box the patient is looking at (nearest calibrated target with a 300 ms focus dwell), blink and squint holds, rest, face found or lost, and fatigue. `renderer/eyes.js` only maps its output onto the screen; `renderer/view.js` places the calibration dots on the same box centers the grid uses. Nothing about the eyes is decided in the app. To tune the gaze, change the vision module and its tests.
 
 ## For the nurse or family
 
@@ -61,8 +52,7 @@ Every launch starts with eye onboarding, because lighting, posture, and the lapt
 | `N` | Care panel |
 | `D` | Demo controls: type what the nurse says, sample questions, sources |
 | `Q` / `R` | Next sample question / back to Listening |
-| `M` / `C` / `E` / `G` | Mic on or off / calibrate again / re-center the eyes / show the gaze dot |
-| `[` / `]` | Eyes less / more sensitive |
+| `M` / `C` | Mic on or off / calibrate again |
 | `T` / `F` / `L` | Tired mode / pretend the face is lost / light theme |
 
 ## Tests
@@ -71,7 +61,7 @@ Every launch starts with eye onboarding, because lighting, posture, and the lapt
 npm test   # in app/: gaze model unit tests, then the real page off-screen (about 30 s)
 ```
 
-It runs on sample replies with the camera and mic blocked, so it gives the same result every time. Camera events go straight into the handlers the vision module calls, so a broken tracker-to-screen contract fails the test. It covers the grid, the middle band, selecting each corner, "None of these" and back, double blinks walking back out of Spell it, Can't see you, tired mode (including while replies load), consent confirmation, undo while speaking, Spell it, and where the calibration dots land. The vision module has its own unit tests (`cd ../vision && npm test`). Neither measures real-camera accuracy; the practice round does that.
+It runs on sample replies with the camera and mic blocked, so it gives the same result every time. Camera events go straight into the handlers the vision module calls, so a broken tracker-to-screen contract fails the test. It covers the grid, the middle band, selecting each corner, "None of these" and back, double blinks walking back out of Spell it, Can't see you, tired mode (including while replies load), consent confirmation, undo while speaking, Spell it, and where the calibration dots land. The vision module has its own unit tests (`cd ../vision && npm test`). Neither measures real-camera accuracy.
 
 ## For other eye trackers
 

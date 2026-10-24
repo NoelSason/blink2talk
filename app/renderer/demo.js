@@ -49,8 +49,6 @@ export function createDemoPanel({ questions, onAction }) {
     voice: el('span', { textContent: 'Voice: checking…' }),
     eyes: el('span', { textContent: 'Eyes: starting the camera…' }),
     mic: el('span', { textContent: 'Mic: starting…' }),
-    practice: el('span', { textContent: 'Practice: runs after calibration' }),
-    sensitivity: el('span', { textContent: 'Eye sensitivity: 1.2' }),
   };
 
   panel.append(
@@ -62,20 +60,13 @@ export function createDemoPanel({ questions, onAction }) {
       ...questions.map((q, i) => button(`Ask: ${q.text}`, i === 0 ? 'Q' : '', 'question', i)),
       button('Back to listening', 'R', 'listen')),
     section('Patient', tired.row, face.row,
-      button('Calibrate eyes', 'C', 'calibrate'),
-      button('Re-center eyes', 'E', 'recenter'),
-      button('Show where the eyes are', 'G', 'gaze-dot'),
-      el('div', { className: 'demo__pair' },
-        button('Less sensitive', '[', 'less-sensitive'),
-        button('More sensitive', ']', 'more-sensitive'))),
+      button('Calibrate eyes', 'C', 'calibrate')),
     section('Display', light.row),
     section('Sources',
       status.replies,
       status.voice,
       status.mic,
       status.eyes,
-      status.practice,
-      status.sensitivity,
       el('span', { textContent: 'Keyboard also works: arrows, hold Space' }),
       el('span', { textContent: 'Vitals: not connected' })),
   );
@@ -89,8 +80,6 @@ export function createDemoPanel({ questions, onAction }) {
     },
     setEyes(text) { status.eyes.textContent = text; },
     setMic(text) { status.mic.textContent = text; },
-    setPractice(text) { status.practice.textContent = text; },
-    setSensitivity(value) { status.sensitivity.textContent = `Eye sensitivity: ${value.toFixed(1)}`; },
     // config comes from the conversation server's /config, or null when it isn't running.
     setStatus(config) {
       status.replies.textContent = !config ? 'Replies: sample (conversation server not running)'
