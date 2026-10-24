@@ -263,7 +263,7 @@ export function createView() {
     if (model.stage !== 'choose' || !model.grid) placeCaptionIfChanged(false);
     if (model.stage !== 'choose') return;
 
-    if (changed('lost', model.faceLost)) els.roomMessage.hidden = !model.faceLost;
+    if (changed('lost', model.faceLost)) els.roomMessage.toggleAttribute('data-shown', model.faceLost);
     renderRow(model);
     placeCaptionIfChanged(model.grid);
 

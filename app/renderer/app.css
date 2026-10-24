@@ -105,7 +105,7 @@ p { margin: 0; }
 .caption--empty .caption__text { color: var(--text-muted); font-weight: 400; }
 
 /* ---------- Choosing: the reply row ---------- */
-.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-4); }
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-4); position: relative; }
 .reply-row { display: flex; align-items: center; gap: var(--sp-3); }
 /* Listening: the single item takes the middle third of the row. */
 .reply-row--single { justify-content: center; }
@@ -125,6 +125,16 @@ p { margin: 0; }
 
 /* Can't see you: speaks to the room. Calm surface, no alarm styling (Figma screen 6). */
 .room-message {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: min(90%, 640px);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 250ms ease, visibility 250ms;
   display: flex;
   align-items: center;
   gap: var(--sp-3);
@@ -537,3 +547,43 @@ p { margin: 0; }
   border: 1px solid var(--border);
   border-radius: 4px;
 }
+
+/* The "can't see you" message fades over the grid. It never changes the layout. */
+.room-message[data-shown] { opacity: 1; visibility: visible; }
+@media (prefers-reduced-motion: reduce) { .room-message { transition: none; } }
+
+/* Dev mode (backtick). Operator tuning panel; never shown to the patient. */
+.dev {
+  position: fixed; top: 16px; right: 16px; bottom: 16px; z-index: 60;
+  width: min(360px, calc(100vw - 32px)); overflow: auto;
+  display: flex; flex-direction: column; gap: 14px; padding: 14px;
+  border-radius: 12px; border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text); font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.dev[hidden], .dev-target[hidden] { display: none; }
+.dev__head { display: flex; justify-content: space-between; align-items: baseline; }
+.dev__title { font-weight: 600; font-size: 15px; }
+.dev__note, .dev__heading, .dev__value { color: var(--text-muted); }
+.dev__heading { margin: 0 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.dev__section { display: flex; flex-direction: column; gap: 6px; }
+.dev__row { display: grid; grid-template-columns: 1fr 110px 74px; align-items: center; gap: 8px; }
+.dev__row:has(input[type="checkbox"]) { grid-template-columns: auto 1fr; }
+.dev__value { text-align: right; font-variant-numeric: tabular-nums; }
+.dev__live { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-variant-numeric: tabular-nums; }
+.dev button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; }
+.dev button:disabled { opacity: 0.4; cursor: default; }
+.dev__primary { background: var(--selected); color: #151A24; border-color: transparent; font-weight: 600; }
+.dev__results { white-space: pre-wrap; font-size: 12px; margin: 0; padding: 8px; border-radius: 8px; background: var(--bg); }
+
+/* The accuracy test's corner prompt, placed where each box sits. */
+.dev-target {
+  position: fixed; z-index: 55; transform: translate(-50%, -50%);
+  padding: 14px 22px; border-radius: 999px; background: var(--highlight); color: #151A24;
+  font-size: 22px; font-weight: 600; pointer-events: none; white-space: nowrap;
+}
+.dev-target[data-at="topLeft"] { left: 25%; top: 40%; }
+.dev-target[data-at="topRight"] { left: 75%; top: 40%; }
+.dev-target[data-at="bottomLeft"] { left: 25%; top: 78%; }
+.dev-target[data-at="bottomRight"] { left: 75%; top: 78%; }
+

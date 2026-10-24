@@ -15,6 +15,8 @@ import { onPatientInput, onDemoKey } from './input.js';
 import { chime, speak, stopSpeaking } from './sound.js';
 import { FALLBACK_URGENT, completeWord, getConfig, getReplies, getSummary, identifySpeaker, prefetchVoice, sttToken, voiceAudio } from './conversation.js';
 import { startEyes } from './eyes.js';
+import { loadSettings } from './devsettings.js';
+import { createDevPanel } from './devpanel.js';
 import { startMic } from './mic.js';
 
 const TIMING = {
@@ -721,6 +723,8 @@ syncPanels();
 loadConfig();
 if (memory.history.length) refreshSummary(); // the conversation from before this launch
 requestAnimationFrame(tick);
-startEyes(camera).then((handle) => {
+const eyeSettings = loadSettings();
+createDevPanel({ settings: eyeSettings, onRebuild: () => eyes?.rebuild() });
+startEyes(camera, eyeSettings).then((handle) => {
   eyes = handle;
 });

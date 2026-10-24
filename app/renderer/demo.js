@@ -32,14 +32,18 @@ export function createDemoPanel({ questions, onAction }) {
 
   // For when the microphone is off or the room is too loud.
   const said = el('input', { type: 'text', className: 'demo__input', placeholder: 'Type what the nurse says, then Enter' });
+  const send = el('button', { type: 'button', textContent: 'Send' });
+  const submit = () => {
+    if (!said.value.trim()) return;
+    onAction('say', said.value.trim());
+    said.value = '';
+    said.blur();
+  };
   said.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && said.value.trim()) {
-      onAction('say', said.value.trim());
-      said.value = '';
-      said.blur();
-    }
+    if (event.key === 'Enter') submit();
     if (event.key === 'Escape') said.blur();
   });
+  send.addEventListener('click', submit);
 
   const tired = toggle('Tired mode', 'T', 'tired');
   const face = toggle("Can't see the face", 'F', 'face');
@@ -56,7 +60,7 @@ export function createDemoPanel({ questions, onAction }) {
       el('span', { className: 'demo__title', textContent: 'Demo controls' }),
       el('span', { className: 'demo__note', textContent: 'D hides this' })),
     section('Conversation',
-      said,
+      el('div', { className: 'demo__pair' }, said, send),
       ...questions.map((q, i) => button(`Ask: ${q.text}`, i === 0 ? 'Q' : '', 'question', i)),
       button('Back to listening', 'R', 'listen')),
     section('Patient', tired.row, face.row,
