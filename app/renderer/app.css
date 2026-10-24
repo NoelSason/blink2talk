@@ -459,7 +459,8 @@ p { margin: 0; }
 .care__button--quiet { color: var(--text-muted); }
 
 /* ---------- Eye calibration (vision module, quadrant layout) ---------- */
-.calibration { position: absolute; inset: 0; z-index: 5; background: var(--bg); }
+/* Covers the whole window, translucent, so the patient can still see the screen behind the dot. */
+.calibration { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 78%, transparent); }
 .calibration__dot {
   position: absolute;
   top: 50%;
@@ -475,16 +476,17 @@ p { margin: 0; }
   position: absolute;
   left: 0;
   right: 0;
-  top: var(--sp-8);
+  top: 8vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--sp-2);
-  font-size: var(--fs-caption);
+  font-size: clamp(32px, 3.6vw, 56px);
+  font-weight: 600;
   text-align: center;
   color: var(--text);
 }
-.calibration__count { font-size: var(--fs-body); color: var(--text-muted); }
+.calibration__count { font-size: clamp(72px, 9vw, 140px); font-weight: 700; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
 
 /* Operator overlay (G): where the gaze model thinks the patient is looking. */
 

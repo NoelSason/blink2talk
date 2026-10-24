@@ -19,6 +19,7 @@ CLAUDE.md table says `gaze { corner, t }`, `confirm { t }`, `rest { t }`, `fatig
 | --- | --- | --- | --- | --- | --- |
 
 ## Decisions (newest first)
+- 2026-10-24 (Marco, for Julian to check): `CalibrationConfig.leadMs` (default 0, so your defaults are unchanged) adds a pause before each dot and the squint. The progress reports `leadRemainingMs` during it and takes no samples. The app sets 2000. `totalMs` now includes the lead-in. Tests added in `test/calibration.test.ts` (54 pass). Why: the patient needs to read which dot comes next before it appears.
 
 ## Open questions / needs from others
 - @Marco asks: can `vision/` expose the camera `MediaStream` so Presage reads the same stream?

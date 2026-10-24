@@ -6,6 +6,14 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const byId = (id) => document.getElementById(id);
 const FIT_STEPS = ['', 'reply-card__label--fit-1', 'reply-card__label--fit-2'];
+const CALIBRATION_NEXT = {
+  center: 'the middle',
+  topLeft: 'the top left',
+  topRight: 'the top right',
+  bottomLeft: 'the bottom left',
+  bottomRight: 'the bottom right',
+  squint: 'a squint',
+};
 const CALIBRATION_TEXT = {
   ready: 'Get ready to look at each dot. Turning your head a little is fine',
   center: 'Look at the dot',
@@ -210,15 +218,20 @@ export function createView() {
     node.style.top = `${area.top - screen.top + area.height * (0.5 + y / 2)}px`;
   }
 
+  // Before each dot the screen names the next one and counts down; the dot appears when the count ends.
   function renderCalibration(c) {
-    const seconds = c ? Math.max(1, Math.ceil(c.remainingMs / 1000)) : 0;
-    if (!changed('calibration', c ? `${c.phase}|${seconds}` : '')) return;
+    const lead = c?.leadRemainingMs > 0;
+    const seconds = c ? Math.max(1, Math.ceil((lead ? c.leadRemainingMs : c.remainingMs) / 1000)) : 0;
+    if (!changed('calibration', c ? `${c.phase}|${lead}|${seconds}` : '')) return;
     els.calibration.hidden = !c;
     if (!c) return;
     // Dots go where the grid's boxes are, so calibration matches what the patient will look at.
     const [x, y] = DOT_AT[c.phase] ?? DOT_AT.center;
     placeOnGrid(els.calibDot, x, y);
-    els.calibText.textContent = CALIBRATION_TEXT[c.phase] ?? CALIBRATION_TEXT.center;
+    els.calibDot.hidden = lead;
+    els.calibText.textContent = lead
+      ? `Next: look at ${CALIBRATION_NEXT[c.phase] ?? 'the dot'}`
+      : CALIBRATION_TEXT[c.phase] ?? CALIBRATION_TEXT.center;
     els.calibCount.textContent = String(seconds);
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Calibrator, type CalibrationPhase } from "../src/cv/calibration";
+import { Calibrator, DEFAULT_CALIBRATION, type CalibrationPhase } from "../src/cv/calibration";
 import { EyePipeline } from "../src/cv/pipeline";
 import type { EyeFrame } from "../src/cv/types";
 
@@ -95,5 +95,33 @@ describe("EyePipeline", () => {
     feed(0.3, 1000, 0.6); // held squint, eyes still open
     feed(0.3, 500);
     expect(events.filter((e) => e.type === "select").map((e) => e.via)).toEqual(["blink", "squint"]);
+  });
+});
+
+describe("lead-in before each dot", () => {
+  it("shows the countdown first and takes no samples during it", () => {
+    const c = new Calibrator({ ...DEFAULT_CALIBRATION, layout: "quadrants", readyMs: 0, leadMs: 1000, phaseMs: 1000, settleMs: 0 });
+    const leads: boolean[] = [];
+    let t = 0;
+    let sawLead = false;
+    while (c.phase !== "done" && t < 60_000) {
+      const phase = c.phase;
+      const p = c.add(frame(t, 0.3, 0, 0.1, true));
+      if (phase === "center" && p.leadRemainingMs !== undefined) {
+        sawLead = true;
+        leads.push(p.leadRemainingMs > 0);
+      }
+      t += FRAME;
+    }
+    expect(sawLead).toBe(true);
+    expect(leads.every(Boolean)).toBe(true);
+    expect(c.totalMs).toBe(0 + 6 * (1000 + 1000));
+    expect(c.phase).toBe("done");
+  });
+
+  it("with no lead-in, behaves as before", () => {
+    const c = new Calibrator({ ...DEFAULT_CALIBRATION, layout: "quadrants", readyMs: 0, leadMs: 0, phaseMs: 1000, settleMs: 0 });
+    const p = c.add(frame(0, 0.3, 0));
+    expect(p.leadRemainingMs).toBeUndefined();
   });
 });

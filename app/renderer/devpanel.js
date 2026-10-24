@@ -14,6 +14,7 @@ const SAMPLE_FROM_MS = 800; // ignore the first part of a trial: the eyes are st
 const SCHEMA = [
   { group: 'Calibration', rows: [
     { key: 'calibration.readyMs', label: 'Countdown', min: 1000, max: 6000, step: 250, unit: 'ms' },
+    { key: 'calibration.leadMs', label: 'Read time before each dot', min: 0, max: 6000, step: 250, unit: 'ms' },
     { key: 'calibration.phaseMs', label: 'Time per dot', min: 1000, max: 5000, step: 250, unit: 'ms' },
     { key: 'calibration.settleMs', label: 'Ignore after dot moves', min: 0, max: 1000, step: 50, unit: 'ms' },
   ] },

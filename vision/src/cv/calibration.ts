@@ -21,6 +21,8 @@ export interface CalibrationConfig {
   readyMs: number;
   /** Length of every dot phase. */
   phaseMs: number;
+  /** Pause before each dot (and the squint) so the patient can read what comes next. No samples are taken. 0 = none. */
+  leadMs: number;
   /** Ignored at the start of each phase while the eyes move to the new dot. */
   settleMs: number;
   /** Closed threshold as a fraction of the narrowest normal open-eye EAR (report: 60–70%). */
@@ -40,6 +42,7 @@ export const DEFAULT_CALIBRATION: CalibrationConfig = {
   layout: "leftRight",
   readyMs: 3000,
   phaseMs: 2000,
+  leadMs: 0,
   settleMs: 500,
   closedFraction: 0.65,
   hysteresis: 0.05,
@@ -76,6 +79,8 @@ export interface CalibrationProgress {
   progress: number;
   /** Time left in the current phase, for a countdown. */
   remainingMs: number;
+  /** Set during the lead-in before a dot: time until the dot appears. Absent otherwise. */
+  leadRemainingMs?: number;
 }
 
 /** Per-user calibration instead of training: a countdown, a couple of seconds on each dot, then a squint. */
@@ -94,7 +99,7 @@ export class Calibrator {
   }
 
   get totalMs(): number {
-    return this.cfg.readyMs + (this.phases.length - 2) * this.cfg.phaseMs;
+    return this.cfg.readyMs + (this.phases.length - 2) * (this.cfg.leadMs + this.cfg.phaseMs);
   }
 
   add(frame: EyeFrame): CalibrationProgress {
@@ -102,16 +107,23 @@ export class Calibrator {
     if (phase === "done") return { phase, progress: 1, remainingMs: 0 };
     this.phaseStart ??= frame.t;
     const elapsed = frame.t - this.phaseStart;
-    const duration = phase === "ready" ? this.cfg.readyMs : this.cfg.phaseMs;
+    // The lead-in (before each dot or the squint) is waited out first; the dot's own time follows it.
+    const lead = phase === "ready" ? 0 : this.cfg.leadMs;
+    const duration = phase === "ready" ? this.cfg.readyMs : lead + this.cfg.phaseMs;
+    const inLead = elapsed < lead;
 
-    if (phase !== "ready" && frame.faceFound && elapsed >= this.cfg.settleMs) this.samples.set(phase, [...this.frames(phase), frame]);
+    if (phase !== "ready" && !inLead && frame.faceFound && elapsed - lead >= this.cfg.settleMs) {
+      this.samples.set(phase, [...this.frames(phase), frame]);
+    }
 
     if (elapsed >= duration) {
       this.step++;
       this.phaseStart = frame.t;
       const next = this.phase;
-      return { phase: next, progress: next === "done" ? 1 : 0, remainingMs: next === "done" ? 0 : this.cfg.phaseMs };
+      const nextLead = next === "done" || next === "ready" ? 0 : this.cfg.leadMs;
+      return { phase: next, progress: next === "done" ? 1 : 0, remainingMs: next === "done" ? 0 : nextLead + this.cfg.phaseMs, ...(nextLead > 0 ? { leadRemainingMs: nextLead } : {}) };
     }
+    if (inLead) return { phase, progress: elapsed / duration, remainingMs: duration - elapsed, leadRemainingMs: lead - elapsed };
     return { phase, progress: Math.min(1, elapsed / duration), remainingMs: duration - elapsed };
   }
 
