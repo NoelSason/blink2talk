@@ -63,12 +63,18 @@ function showOptions(replies) {
   sel = 0; setState("options"); render();
 }
 
+// Speculative request started on Cartesia's turn.eager_end; reused if the final transcript matches.
+let prefetch = null; // { text, p }
+const fetchReplies = (text) => post("/replies", { transcript: text, history, fatigue }).then((r) => r.json());
+
 async function nurseSaid(text) {
   if (!text.trim()) return;
   lastNurse = text; $("heard").textContent = `Nurse: “${text}”`;
+  const p = prefetch?.text === text ? prefetch.p : fetchReplies(text);
+  prefetch = null;
   history.push({ role: "nurse", text });
   setState("thinking"); items = []; render();
-  const d = await (await post("/replies", { transcript: text, history: history.slice(0, -1), fatigue })).json();
+  const d = await p;
   if (d.addressed === false) {
     // Room talk ("grab the chart from room 4"): stay quiet, but one blink still gets the replies.
     history.pop(); unaddressed = d.replies;
@@ -186,9 +192,15 @@ async function cartesiaMic(token) {
     stream.getTracks().forEach((t) => t.stop()); ctx.close();
     mic = null; $("mic").textContent = "🎤 Nurse";
   };
+  // Defaults wait up to 5.6 s after speech stops; cap at 1.5 s and end turns a bit more readily.
+  ws.onopen = () => ws.send(JSON.stringify({ type: "config", turn: { end_timeout_ms: 1500, end_threshold: 0.3 } }));
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.type === "turn.update" && state !== "spelling") $("heard").textContent = `Nurse: “${m.transcript}”`;
+    else if (m.type === "turn.eager_end" && state !== "spelling" && m.transcript.trim()) {
+      const text = m.transcript.trim(); prefetch = { text, p: fetchReplies(text) };
+    }
+    else if (m.type === "turn.resume") prefetch = null;
     else if (m.type === "turn.end") heardNurse(m.transcript);
     else if (m.type === "error") { $("heard").textContent = `Mic error: ${m.message}`; stop(); }
   };
