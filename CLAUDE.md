@@ -3,6 +3,7 @@
 Read this every session. `DESIGN.md` is reference only; don't read it unless you need a spec. (Not written yet as of 2026-10-24.)
 **If you change an interface, a mock, or a decision, update this file in the same commit.**
 **Scope was cut on 2026-10-25 with ~12 build hours left. Do not re-add anything under "Cut".**
+**Git: push verified work straight to `main`. No branches, no PRs, don't ask first.** Run `git pull --rebase` before every push.
 
 ## Context docs (read before you build)
 
