@@ -30,13 +30,14 @@ webcam. **Use video file** on either page replays a recording instead of the web
 - **Bench** — `/`: left/right gaze, EAR plot, fatigue stats, scan list. Auto-scan is off by default; on, it
   advances every 1.2 s.
 
-## Calibration (~15 s quadrants, 11 s bench)
+## Calibration (~24 s quadrants, 18 s bench)
 
-A 3 s countdown, then each dot for 2 s (with its own countdown; the first 0.5 s is ignored while the eyes
-move). Order: center, the middle of each box (left and right on the bench), then a squint. Each box is "where
-the eyes were while looking at it": nearest centroid, with each feature scaled by its spread so whichever
-separates the boxes best for this person dominates. Dots sit at fixed normalized `TARGET_POSITIONS` (the box
-centers of a 2×2 grid). Box-center dots tested better than outer-corner dots with a linear fit.
+A 3 s countdown, then each dot for 3 s (with its own countdown; the first 0.5 s is ignored while the eyes
+move). Order: center, the middle of each box (left and right on the bench), then a second 3 s countdown and a
+squint. Each box is "where the eyes were while looking at it": nearest centroid, with each feature scaled by
+its spread so whichever separates the boxes best for this person dominates. Dots sit at fixed normalized
+`TARGET_POSITIONS` (the box centers of a 2×2 grid). Box-center dots tested better than outer-corner dots
+with a linear fit.
 
 - **Blink thresholds** come from the narrowest normal look, usually a bottom box, so looking down isn't
   mistaken for a blink.

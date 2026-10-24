@@ -32,11 +32,11 @@ function calibrate(c: Calibrator, make: (t: number, phase: CalibrationPhase) => 
 }
 
 describe("Calibrator", () => {
-  it("derives blink thresholds, gaze targets and squint in ~11 s", () => {
+  it("derives blink thresholds, gaze targets and squint in ~18 s", () => {
     const c = new Calibrator();
     const t = calibrate(c, user({ center: 0.5, left: 0.42, right: 0.58 }));
-    expect(t).toBeGreaterThan(10_900);
-    expect(t).toBeLessThan(11_200);
+    expect(t).toBeGreaterThan(17_900);
+    expect(t).toBeLessThan(18_200);
 
     const r = c.result();
     expect(r.openBaseline).toBeCloseTo(0.3);

@@ -10,6 +10,7 @@ const CALIBRATION_TEXT = {
   center: 'Look at the dot',
   left: 'Look at the dot on the left',
   right: 'Look at the dot on the right',
+  squintReady: 'Get ready to squint',
   squint: 'Squint a little, still looking at the dot',
 };
 

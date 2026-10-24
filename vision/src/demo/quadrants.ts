@@ -241,11 +241,13 @@ function renderCalibration(out: PipelineOutput): void {
   calibText.textContent =
     c.phase === "ready"
       ? "Get ready: look at the center dot"
-      : c.phase === "squint"
-        ? "Squint as if reading small print, and keep looking at the dot"
-        : box
-          ? `Look at the dot in the ${LABEL[box]} box`
-          : "Look at the center dot";
+      : c.phase === "squintReady"
+        ? "Get ready: squint at the center dot"
+        : c.phase === "squint"
+          ? "Squint as if reading small print, and keep looking at the dot"
+          : box
+            ? `Look at the dot in the ${LABEL[box]} box`
+            : "Look at the center dot";
   calibCount.textContent = String(Math.max(1, Math.ceil(c.remainingMs / 1000)));
   calibBar.style.width = `${c.progress * 100}%`;
 }

@@ -6,18 +6,23 @@ import type { EyeFrame } from "./types";
 
 /** "leftRight": scan list driven by left/right glances. "quadrants": four boxes picked by where you look. */
 export type CalibrationLayout = "leftRight" | "quadrants";
-/** "ready" is a countdown before the first dot; no samples are taken during it. */
-export type CalibrationPhase = "ready" | "center" | "left" | "right" | Quadrant | "squint" | "done";
-type SamplePhase = Exclude<CalibrationPhase, "ready" | "done">;
+/** "ready" and "squintReady" are countdowns before the dots and before the squint; no samples are taken during them. */
+export type CalibrationPhase = "ready" | "center" | "left" | "right" | Quadrant | "squintReady" | "squint" | "done";
+type SamplePhase = Exclude<CalibrationPhase, "ready" | "squintReady" | "done">;
+const COUNTDOWNS: readonly CalibrationPhase[] = ["ready", "squintReady"];
 
 const PHASES: Record<CalibrationLayout, readonly CalibrationPhase[]> = {
-  leftRight: ["ready", "center", "left", "right", "squint", "done"],
-  quadrants: ["ready", "center", "topLeft", "topRight", "bottomRight", "bottomLeft", "squint", "done"],
+  leftRight: ["ready", "center", "left", "right", "squintReady", "squint", "done"],
+  quadrants: ["ready", "center", "topLeft", "topRight", "bottomRight", "bottomLeft", "squintReady", "squint", "done"],
 };
+
+export function isCountdown(phase: CalibrationPhase): boolean {
+  return COUNTDOWNS.includes(phase);
+}
 
 export interface CalibrationConfig {
   layout: CalibrationLayout;
-  /** Countdown before the first dot. */
+  /** Length of each countdown. */
   readyMs: number;
   /** Length of every dot phase. */
   phaseMs: number;
@@ -39,7 +44,7 @@ export interface CalibrationConfig {
 export const DEFAULT_CALIBRATION: CalibrationConfig = {
   layout: "leftRight",
   readyMs: 3000,
-  phaseMs: 2000,
+  phaseMs: 3000,
   settleMs: 500,
   closedFraction: 0.65,
   hysteresis: 0.05,
@@ -78,7 +83,7 @@ export interface CalibrationProgress {
   remainingMs: number;
 }
 
-/** Per-user calibration instead of training: a countdown, a couple of seconds on each dot, then a squint. */
+/** Per-user calibration instead of training: a countdown, a few seconds on each dot, another countdown, then a squint. */
 export class Calibrator {
   private step = 0;
   private phaseStart: number | null = null;
@@ -94,7 +99,7 @@ export class Calibrator {
   }
 
   get totalMs(): number {
-    return this.cfg.readyMs + (this.phases.length - 2) * this.cfg.phaseMs;
+    return this.phases.reduce((s, p) => s + this.duration(p), 0);
   }
 
   add(frame: EyeFrame): CalibrationProgress {
@@ -102,17 +107,23 @@ export class Calibrator {
     if (phase === "done") return { phase, progress: 1, remainingMs: 0 };
     this.phaseStart ??= frame.t;
     const elapsed = frame.t - this.phaseStart;
-    const duration = phase === "ready" ? this.cfg.readyMs : this.cfg.phaseMs;
+    const duration = this.duration(phase);
 
-    if (phase !== "ready" && frame.faceFound && elapsed >= this.cfg.settleMs) this.samples.set(phase, [...this.frames(phase), frame]);
+    if (!isCountdown(phase) && frame.faceFound && elapsed >= this.cfg.settleMs) {
+      this.samples.set(phase as SamplePhase, [...this.frames(phase as SamplePhase), frame]);
+    }
 
     if (elapsed >= duration) {
       this.step++;
       this.phaseStart = frame.t;
       const next = this.phase;
-      return { phase: next, progress: next === "done" ? 1 : 0, remainingMs: next === "done" ? 0 : this.cfg.phaseMs };
+      return { phase: next, progress: next === "done" ? 1 : 0, remainingMs: this.duration(next) };
     }
     return { phase, progress: Math.min(1, elapsed / duration), remainingMs: duration - elapsed };
+  }
+
+  private duration(phase: CalibrationPhase): number {
+    return phase === "done" ? 0 : isCountdown(phase) ? this.cfg.readyMs : this.cfg.phaseMs;
   }
 
   /** Throws if calibration isn't finished or the face wasn't visible while looking at the center. */
@@ -122,7 +133,7 @@ export class Calibrator {
     if (ears("center").length < this.cfg.minSamples) throw new Error("face was not visible while looking at the center");
 
     const warnings: string[] = [];
-    const normal = this.phases.filter((p): p is SamplePhase => p !== "ready" && p !== "done" && p !== "squint");
+    const normal = this.phases.filter((p): p is SamplePhase => !isCountdown(p) && p !== "done" && p !== "squint");
     const openBaseline = median(ears("center"));
     // Looking down lowers the upper lid, so thresholds come from the narrowest normal look, not the
     // center. Otherwise a look at a bottom box could register as a closed eye.

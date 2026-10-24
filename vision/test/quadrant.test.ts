@@ -113,7 +113,7 @@ describe("box-center calibration and selection", () => {
     let t = 0;
     while (p.mode === "calibrating") {
       const phase = cal.phase;
-      const target: QuadrantTarget = phase === "ready" || phase === "squint" || phase === "done" ? "center" : (phase as QuadrantTarget);
+      const target: QuadrantTarget = phase === "ready" || phase === "squintReady" || phase === "squint" || phase === "done" ? "center" : (phase as QuadrantTarget);
       const f = phase === "squint" ? frame(t, 0, 0, { ear: 0.22, squint: 0.6 }) : at(target, t);
       cal.add(f);
       p.process(f);
@@ -122,18 +122,22 @@ describe("box-center calibration and selection", () => {
     return { p, t };
   }
 
-  it("counts down 3 s, then takes 2 s per dot", () => {
+  it("counts down 3 s before the dots and before the squint, with 3 s per dot", () => {
     const c = new Calibrator({ ...new EyePipeline().cfg.calibration, layout: "quadrants" });
     const first = c.add(at("center", 0));
     expect(first).toMatchObject({ phase: "ready", remainingMs: 3000 });
     expect(c.add(at("center", 1500)).remainingMs).toBe(1500);
     expect(c.add(at("center", 3000)).phase).toBe("center");
-    expect(c.totalMs).toBe(15_000);
+    expect(c.totalMs).toBe(24_000);
+
+    const seen = ["ready", "center"];
+    for (let t = 3100; c.phase !== "done"; t += 100) if (c.add(at("center", t)).phase !== seen.at(-1)) seen.push(c.phase);
+    expect(seen).toEqual(["ready", "center", "topLeft", "topRight", "bottomRight", "bottomLeft", "squintReady", "squint", "done"]);
   });
 
   it("calibrates without warnings", () => {
     const { p, t } = calibrated();
-    expect(t).toBeLessThan(15_200);
+    expect(t).toBeLessThan(24_200);
     expect(p.calibration?.quadrants).not.toBeNull();
     expect(p.calibration?.squint?.feature).toBe("squint");
     expect(p.calibration?.warnings).toEqual([]);

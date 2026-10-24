@@ -28,7 +28,7 @@ Operator keys: `D` opens the demo controls (type what the nurse says, sample que
 
 ## Camera eye tracking
 
-The vision module (`../vision`) runs MediaPipe's face model on this machine, in its left/right layout. The first launch calibrates: look at the dot in the center, on the left, on the right, then squint (about 11 s). Press `C` to calibrate again. The calibration is saved for the next launch.
+The vision module (`../vision`) runs MediaPipe's face model on this machine, in its left/right layout. The first launch calibrates: look at the dot in the center, on the left, on the right, then squint (about 18 s). Press `C` to calibrate again. The calibration is saved for the next launch.
 
 | The camera sees | The app does |
 |---|---|
