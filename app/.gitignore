@@ -6,3 +6,5 @@ renderer/mediapipe/
 renderer/models/
 # Eye-tracker session recordings (main.js)
 logs/
+# Speaker-recognition model (npm run voices)
+models/

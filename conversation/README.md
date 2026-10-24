@@ -29,7 +29,8 @@ window.blinkvoice.setFatigue(f)  // 0..1; sent to Claude so tired patients get f
 These do exactly what ←, →, Space do, so test with the keyboard first. Debounce and long-blink detection happen on your side: call `select()` once per intended selection.
 
 ## API
-- `POST /replies {transcript, history?, patientProfile?, fatigue?}` -> `{replies[], addressed, urgent[], spellOption, source, ms}`. `addressed: false` = speech wasn't meant for the patient (screen stays quiet, offers "Reply anyway").
+- `POST /replies {transcript, history?, patientProfile?, fatigue?, speaker?}` -> `{replies[], addressed, speaker, urgent[], spellOption, source, ms}`. `addressed: false` = speech wasn't meant for the patient (screen stays quiet, offers "Reply anyway"). `speaker` in: `{voice, label?, isNew?}` from the app's voice model; out: `{label, role}` ("Dr. Lee", doctor), or null for the consent rule, mock, and fallback. History lines may carry `speaker`.
+- `POST /summary {history, patientProfile?}` -> `{forPatient, forCaregiver[], source}`. Uses `SUMMARY_MODEL` (default `claude-opus-5-5`), 30 s timeout. 204 in mock mode, 502 on failure (the app writes a plain one).
 - `POST /complete {prefix, sentenceSoFar?, context?}` -> `{words[]}`
 - `POST /speak {text}` -> `audio/wav` (204 in mock mode)
 - `GET /stt-token` -> `{token}`: 1-hour, STT-only Cartesia access token for the browser mic (204 in mock mode)

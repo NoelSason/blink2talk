@@ -8,7 +8,8 @@ cd "$(dirname "$0")"
 
 [ -d conversation/node_modules ] || (cd conversation && npm install)
 [ -d vision/node_modules ] || (cd vision && npm install --legacy-peer-deps)
-[ -d app/node_modules ] || (cd app && npm install)
+# Reinstall when package.json changed since the last install (a teammate added a dependency).
+[ -d app/node_modules ] && [ app/node_modules/.package-lock.json -nt app/package.json ] || (cd app && npm install)
 if [ ! -f conversation/.env ] && [ -f .env ]; then
   echo "Note: keys are read from conversation/.env, not the repo root .env."
 fi

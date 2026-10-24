@@ -13,7 +13,7 @@ BLINK2TALK_WINDOWED=1 ./start    # 1440×900 window
 
 Keys go in `conversation/.env` (see `conversation/README.md`): `ANTHROPIC_API_KEY`, `CARTESIA_API_KEY`, and `CARTESIA_VOICE_ID` for the patient's cloned voice. Without them the app still runs, with sample replies, the system voice, and no mic.
 
-`npm start` (here in `app/`) does the same as `./start` once everything is installed. It bundles `../vision` into `renderer/vendor/`, starts the conversation server if nothing answers on `http://localhost:8787`, and stops it on quit.
+`npm start` (here in `app/`) does the same as `./start` once everything is installed. It bundles `../vision` into `renderer/vendor/`, downloads the speaker-recognition model into `models/` the first time (~100 MB), starts the conversation server if nothing answers on `http://localhost:8787`, and stops it on quit.
 
 ## How the patient uses it
 
@@ -41,6 +41,8 @@ The vision module (`../vision`) owns the eyes: calibration (3 s countdown, then 
 - **Talk:** the mic streams to Cartesia Ink-2, the caption updates as the nurse speaks, and replies appear when they finish. It mutes itself while the patient's voice plays.
 - **Care panel:** the small button in the bottom-right corner, or `N`. It holds alerts, vitals (not connected yet), the conversation, notes about the patient, and settings. Urgent picks badge the button, play a sound, and send a desktop notification.
 - **Memory:** the notes, and the phrases the patient picks most, go to Claude with every question. They're stored on this machine only.
+- **Who said what:** every line in the conversation is labeled with who said it ("Dr. Lee", "Your daughter"). A speaker-recognition model on this laptop (NVIDIA TitaNet-Large, run by sherpa-onnx in `speakers.js`) tells voices apart, so the same person keeps the same label; Claude names each voice from what it says. Voice prints stay in memory for one launch and never leave the laptop. Typed or sample questions skip the voice model.
+- **Summary:** a couple of seconds after each exchange, Claude (Opus 5.5) summarizes the conversation twice: a few plain sentences for the patient, shown as "So far" on Listening, and bullet points for the care panel's Summary, including anything still unanswered. Without the conversation server, both show the last few lines as said.
 
 ## Keys
 
@@ -58,10 +60,10 @@ The vision module (`../vision`) owns the eyes: calibration (3 s countdown, then 
 ## Tests
 
 ```sh
-npm test   # in app/: gaze model unit tests, then the real page off-screen (about 30 s)
+npm test   # in app/: voice-matching unit tests, then the real page off-screen (about 40 s)
 ```
 
-It runs on sample replies with the camera and mic blocked, so it gives the same result every time. Camera events go straight into the handlers the vision module calls, so a broken tracker-to-screen contract fails the test. It covers the grid, the middle band, selecting each corner, "None of these" and back, double blinks walking back out of Spell it, Can't see you, tired mode (including while replies load), consent confirmation, undo while speaking, Spell it, and where the calibration dots land. The vision module has its own unit tests (`cd ../vision && npm test`). Neither measures real-camera accuracy.
+It runs on sample replies with the camera and mic blocked, so it gives the same result every time. Camera events go straight into the handlers the vision module calls, so a broken tracker-to-screen contract fails the test. It covers the grid, the middle band, the summary on Listening and in the care panel, selecting each corner, "None of these" and back, double blinks walking back out of Spell it, Can't see you, tired mode (including while replies load), consent confirmation, undo while speaking, Spell it, and where the calibration dots land. The vision module has its own unit tests (`cd ../vision && npm test`). Neither measures real-camera accuracy.
 
 ## For other eye trackers
 

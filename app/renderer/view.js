@@ -112,6 +112,8 @@ export function createView() {
     captionText: byId('caption-text'),
     stageChoose: byId('stage-choose'),
     gazeArea: byId('gaze-area'),
+    summary: byId('summary'),
+    summaryText: byId('summary-text'),
     statusLine: byId('status-line'),
     roomMessage: byId('room-message'),
     row: byId('reply-row'),
@@ -252,6 +254,10 @@ export function createView() {
       els.stageSpeaking.hidden = model.stage !== 'speaking';
       els.undoHint.hidden = model.stage !== 'speaking';
       fitNeeded = true;
+    }
+    if (changed('summary', model.summary ?? '')) {
+      els.summary.hidden = !model.summary;
+      els.summaryText.textContent = model.summary ?? '';
     }
     if (model.stage === 'speaking' && changed('spoken', model.spoken)) els.spoken.textContent = model.spoken;
     if (model.stage !== 'choose' || !model.grid) placeCaptionIfChanged(false);

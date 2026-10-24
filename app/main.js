@@ -4,7 +4,7 @@ const { app, BrowserWindow, ipcMain, net, protocol, session } = require('electro
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
-const fs = require('node:fs');
+const speakers = require('./speakers');
 
 const windowed = Boolean(process.env.BLINK2TALK_WINDOWED);
 const RENDERER = path.join(__dirname, 'renderer');
@@ -58,7 +58,7 @@ function stopServer() {
 const serverReady = startServer();
 
 // The page reaches the server through here instead of fetch, so the server needs no CORS setup.
-const ROUTES = new Set(['config', 'stt-token', 'replies', 'complete', 'speak']);
+const ROUTES = new Set(['config', 'stt-token', 'replies', 'complete', 'speak', 'summary']);
 const GET_ROUTES = new Set(['config', 'stt-token']);
 ipcMain.handle('conversation', async (_event, { route, body }) => {
   if (!ROUTES.has(route)) throw new Error(`unknown route ${route}`);
@@ -76,6 +76,10 @@ ipcMain.handle('conversation', async (_event, { route, body }) => {
 });
 
 // ---------- Window ----------
+// ---------- Who is speaking (speakers.js) ----------
+// One nurse-mic turn in, the voice it matches (or a new one) out. About 50 ms for a few seconds of speech.
+ipcMain.handle('speaker', (_event, pcm) => speakers.identify(pcm));
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
@@ -103,6 +107,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   serveRenderer();
+  speakers.load(); // load the voice model now, not on the first turn
   // The webcam watches the patient's eyes; nothing else gets a permission.
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     callback(permission === 'media');

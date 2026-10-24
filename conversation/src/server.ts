@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { completeWord, getReplies } from "./claude.js";
+import { completeWord, getReplies, summarize } from "./claude.js";
 import { CONSENT_REPLIES, SPELL_OPTION, URGENT } from "./safety.js";
 import { sttToken, synthesize, usingClone, warm } from "./voice.js";
 
@@ -24,14 +24,14 @@ app.get("/config", (_req, res) => {
 
 // Always responds: on any model failure, falls back to safe generic options.
 app.post("/replies", async (req, res) => {
-  const { transcript, history, patientProfile, fatigue } = req.body ?? {};
+  const { transcript, history, patientProfile, fatigue, speaker } = req.body ?? {};
   if (typeof transcript !== "string" || !transcript.trim()) {
     res.status(400).json({ error: "transcript required" });
     return;
   }
   const t0 = Date.now();
   try {
-    const out = await getReplies({ transcript, history, patientProfile, fatigue });
+    const out = await getReplies({ transcript, history, patientProfile, fatigue, speaker });
     res.json({ ...out, urgent: URGENT, spellOption: SPELL_OPTION, ms: Date.now() - t0 });
   } catch (err) {
     console.error("replies failed:", err);
@@ -39,10 +39,29 @@ app.post("/replies", async (req, res) => {
       replies: CONSENT_REPLIES, // yes / no / explain: safe when the model is down
       source: "fallback",
       addressed: true,
+      speaker: null,
       urgent: URGENT,
       spellOption: SPELL_OPTION,
       ms: Date.now() - t0,
     });
+  }
+});
+
+// A summary of the conversation for the patient and for a caregiver. 204 in mock mode, 502 on failure:
+// the app writes a plain summary itself either way.
+app.post("/summary", async (req, res) => {
+  const { history, patientProfile } = req.body ?? {};
+  if (!Array.isArray(history) || history.length === 0) {
+    res.status(400).json({ error: "history required" });
+    return;
+  }
+  try {
+    const out = await summarize({ history, patientProfile });
+    if (out) res.json(out);
+    else res.status(204).end();
+  } catch (err) {
+    console.error("summary failed:", err);
+    res.status(502).json({ error: "summary failed" });
   }
 });
 

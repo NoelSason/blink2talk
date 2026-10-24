@@ -97,6 +97,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-24 — Product (Noel): conversation lines are labeled with who said them (on-device TitaNet voice prints + Claude names them in `/replies` → `speaker`), and a new `/summary` (Opus 5.5) feeds "So far" on Listening and the care panel. @Samarth: `conversation/` changed, see context/conversation.md.
 - 2026-10-24 — Marco: Presage vitals cut. Redundant with ICU monitors; not worth bending the product for one sponsor track. Owner 3 becomes submission, evidence, and doc reconciliation.
 - 2026-10-25 — Input: 2x2 gaze with 20 s calibration + squint confirm. Scanning/blink mode cut.
 - 2026-10-25 — Scope cut to build order above; scanning keyboard, alerts, Spacetime, Figma dropped.

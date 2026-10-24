@@ -2,8 +2,8 @@
 //   Listening -> (nurse speaks) -> Loading -> Suggested replies -> Selected -> Speaking -> Listening
 // Every choice sits in a 2×2 grid the eye tracker can hit (the vision module's quadrants): look at a
 // box, then hold a long blink or squint. "None of these" opens the urgent options and Spell it; a
-// double blink goes back. Replies, word suggestions, the patient's voice, and the nurse mic come from
-// the conversation server.
+// double blink goes back. Replies, word suggestions, the patient's voice, the nurse mic, and the
+// conversation summary come from the conversation server; which voice spoke comes from speakers.js.
 
 import { PATIENT, QUESTIONS } from './samples.js';
 import { createView } from './view.js';
@@ -13,7 +13,7 @@ import { createMemory } from './memory.js';
 import { spellBoxes } from './speller.js';
 import { onPatientInput, onDemoKey } from './input.js';
 import { chime, speak, stopSpeaking } from './sound.js';
-import { FALLBACK_URGENT, completeWord, getConfig, getReplies, prefetchVoice, sttToken, voiceAudio } from './conversation.js';
+import { FALLBACK_URGENT, completeWord, getConfig, getReplies, getSummary, identifySpeaker, prefetchVoice, sttToken, voiceAudio } from './conversation.js';
 import { startEyes } from './eyes.js';
 import { startMic } from './mic.js';
 
@@ -29,6 +29,7 @@ const TIMING = {
   selectedSeen: 1000, // and at least this long after the eyes open, so the patient sees it
   afterSpeech: 1200,  // pause before going back to Listening
   micQuiet: 800,      // the mic stays muted this long after the voice stops, so it doesn't hear the tail
+  summaryWait: 2000,  // the summary is redone this long after the conversation last changed
   micRetry: 3000,
 };
 
@@ -67,7 +68,13 @@ const s = {
   consent: false,             // the current replies answer a consent or treatment question
   resting: false,             // eyes closed 3 s: the camera treats it as a rest, not a choice
   mic: 'off',                 // 'off' | 'starting' | 'on' | 'unavailable'
+  turn: null,                 // who said the current question: { speaker, voice, given }
+  summary: null,              // { forPatient, forCaregiver, source, t }: the conversation so far
 };
+// Claude's name for each voice the speaker-recognition model has heard ("voice key" -> "Dr. Lee").
+// Voice ids last one launch, so keys carry the launch, and saved lines from earlier launches keep theirs.
+const LAUNCH = Date.now().toString(36);
+const voiceNames = new Map();
 
 const now = () => performance.now();
 let closedAt = null;          // start of the current keyboard closure; cleared once a long blink fires
@@ -134,39 +141,64 @@ function playQuestion(q) {
   later(TIMING.word * words.length + 400, () => nurseSaid(q.text, q.speaker));
 }
 
-function nurseSaid(text, speaker = 'Nurse') {
+// speaker: a known label (the sample questions say "Nurse"); otherwise Claude names whoever spoke.
+// audio: the turn's speech from the mic, for the speaker-recognition model.
+function nurseSaid(text, speaker = null, audio = null) {
   reset();
-  s.caption = { kind: 'question', speaker, text };
+  s.turn = { speaker, voice: null, given: !!speaker };
+  s.caption = { kind: 'question', speaker: speaker ?? 'Someone', text };
   s.transcript = text;
   s.prevPage = null;
-  memory.addTurn('nurse', text);
-  care.conversationChanged();
-  requestReplies();
+  requestReplies(audio);
 }
 
 // Shows the loading outlines until replies arrive. Stale answers are ignored.
-async function requestReplies() {
+async function requestReplies(audio = null) {
   const token = ++requestToken;
+  const turn = s.turn;
   Object.assign(s, { stage: 'choose', rowKind: 'replies', items: replyItems(['', '', '']), loading: true, hl: -1, selected: -1 });
+  // Which voice it was (about 50 ms). A voice Claude has named before gets that name right away.
+  const v = await identifySpeaker(audio);
+  if (token !== requestToken) return;
+  if (v) {
+    turn.voice = `${LAUNCH}/${v.voice}`;
+    if (!turn.given) turn.speaker = voiceNames.get(turn.voice) ?? null;
+    s.caption = { ...s.caption, speaker: turn.speaker ?? 'Someone' };
+  }
+  memory.addTurn('nurse', s.transcript, { speaker: turn.speaker, voice: turn.voice });
+  conversationChanged();
   const d = await getReplies({
     transcript: s.transcript,
     history: memory.turns().slice(0, -1).slice(-6),
     patientProfile: memory.forClaude(),
     fatigue: s.tired ? Math.max(s.fatigue, 0.8) : s.fatigue,
+    speaker: v ? { voice: v.voice, label: turn.speaker ?? undefined, isNew: v.isNew } : undefined,
   });
   if (token !== requestToken) return;
+  nameSpeaker(turn, d.speaker);
   s.urgent = d.urgent;
   s.consent = d.source === 'consent-rule';
   if (!d.addressed) {
     // Room talk ("grab the chart from room 4"): stay quiet, but one blink still gets the replies.
     memory.popTurn('nurse');
-    care.conversationChanged();
+    conversationChanged();
     s.held = d.replies;
     s.caption = { kind: 'question', speaker: 'In the room', text: s.transcript };
     setRow('unaddressed', [card('Reply anyway', { icon: 'message', action: 'anyway' }), ...starterItems().slice(0, 3)]);
     return;
   }
   showReplies(d.replies);
+}
+
+// Claude's guess at who spoke ({ label, role }): it names this line, the caption, and every line of
+// the same voice this launch. A label given up front (sample questions) stays.
+function nameSpeaker(turn, guess) {
+  if (!guess || guess.label === 'Someone' || turn.given || guess.label === turn.speaker) return;
+  turn.speaker = guess.label;
+  if (turn.voice) voiceNames.set(turn.voice, guess.label);
+  memory.relabel(guess.label, turn.voice);
+  if (s.turn === turn && s.caption.kind === 'question') s.caption = { ...s.caption, speaker: guess.label };
+  conversationChanged();
 }
 
 function showReplies(replies) {
@@ -192,9 +224,9 @@ function select(i) {
     setRow('starters', starterItems());
   } else if (item.action === 'anyway') {
     chime();
-    memory.addTurn('nurse', s.transcript);
-    care.conversationChanged();
-    s.caption = { kind: 'question', speaker: 'Nurse', text: s.transcript };
+    memory.addTurn('nurse', s.transcript, { speaker: s.turn?.speaker, voice: s.turn?.voice });
+    conversationChanged();
+    s.caption = { kind: 'question', speaker: s.turn?.speaker ?? 'Someone', text: s.transcript };
     showReplies(s.held);
   } else if (item.action === 'spell') {
     chime();
@@ -235,7 +267,7 @@ function toSpeaking(text) {
   s.selected = -1;
   memory.addTurn('patient', text);
   memory.picked(text);
-  care.conversationChanged();
+  conversationChanged();
   const token = ++speechToken;
   // The token check also runs before playback starts, so audio that arrives after an undo stays silent.
   speak(text, voiceAudio, () => token === speechToken).then(() => {
@@ -282,7 +314,7 @@ function undo() {
   beforeSelect = null;
   if (s.stage === 'speaking') {
     memory.popTurn('patient');
-    care.conversationChanged();
+    conversationChanged();
   }
   s.spell = b.spell;
   s.caption = b.caption;
@@ -409,11 +441,11 @@ async function startNurseMic() {
       token,
       muted: () => s.stage === 'speaking' || now() < micQuietUntil,
       onPartial: (text) => {
-        if (text && hearingNurse()) s.caption = { kind: 'question', speaker: 'Nurse', text };
+        if (text && hearingNurse()) s.caption = { kind: 'question', speaker: 'Someone', text };
       },
-      onTurn: (text) => {
+      onTurn: (text, audio) => {
         // Don't wipe a half-spelled message or a pick in progress.
-        if (text && hearingNurse()) nurseSaid(text);
+        if (text && hearingNurse()) nurseSaid(text, null, audio);
       },
       onError: (message) => {
         mic = null;
@@ -588,10 +620,43 @@ function tick() {
     hold: Math.min(1, hold),
     cue: null,
     backHint: s.stage === 'choose' && s.selected < 0 && (!!s.prevPage || s.rowKind === 'spell'),
+    summary: s.stage === 'choose' && s.rowKind === 'listen' ? s.summary?.forPatient ?? null : null,
     loading: s.loading,
     spoken: s.spoken,
   });
   requestAnimationFrame(tick);
+}
+
+// ---------- Summary ----------
+// A couple of seconds after the conversation changes, Claude summarizes it twice: for the patient
+// (on Listening) and for a caregiver (care panel). Without the server, the last few lines as said.
+let summaryTimer = 0;
+let summaryToken = 0;
+
+function conversationChanged() {
+  care.conversationChanged();
+  clearTimeout(summaryTimer);
+  summaryTimer = setTimeout(refreshSummary, TIMING.summaryWait);
+}
+
+async function refreshSummary() {
+  const token = ++summaryToken;
+  const turns = memory.turns().slice(-40);
+  const summary = turns.length
+    ? (await getSummary({ history: turns, patientProfile: memory.forClaude() })) ?? plainSummary(turns)
+    : null;
+  if (token !== summaryToken) return;
+  s.summary = summary && { ...summary, t: Date.now() };
+  care.summaryChanged(s.summary);
+}
+
+function plainSummary(turns) {
+  const line = (t, you) => `${t.role === 'patient' ? (you ? 'You' : memory.profile.name) : t.speaker ?? 'Someone'} said “${t.text}”`;
+  return {
+    forPatient: turns.slice(-3).map((t) => `${line(t, true)}.`).join(' '),
+    forCaregiver: turns.slice(-5).map((t) => line(t, false)),
+    source: 'plain',
+  };
 }
 
 // ---------- Panels and start ----------
@@ -610,9 +675,10 @@ function runAction(action, arg) {
   if (action === 'theme') root.dataset.theme = (arg ?? root.dataset.theme !== 'light') ? 'light' : 'dark';
   if (action === 'calibrate') eyes?.calibrate();
   if (action === 'profile') memory.setProfile(arg);
+  if (action === 'summary') refreshSummary();
   if (action === 'clear-history') {
     memory.clearHistory();
-    care.conversationChanged();
+    conversationChanged();
   }
   syncPanels();
 }
@@ -653,6 +719,7 @@ if (new URLSearchParams(location.search).has('test')) window.__test = { camera, 
 toListening();
 syncPanels();
 loadConfig();
+if (memory.history.length) refreshSummary(); // the conversation from before this launch
 requestAnimationFrame(tick);
 startEyes(camera).then((handle) => {
   eyes = handle;

@@ -1,5 +1,6 @@
-// Care panel: the drawer behind the small corner button, for the nurse or family. Alerts, vitals (not
-// connected yet), the conversation, what the app knows about the patient, and a few settings. It never
+// Care panel: the drawer behind the small corner button, for the nurse or family. Alerts, a summary
+// of the conversation, vitals (not connected yet), the conversation with who said each line, what the
+// app knows about the patient, and a few settings. It never
 // opens on its own, because the patient screen belongs to the patient; urgent picks badge the button
 // and send a desktop notification instead.
 
@@ -38,6 +39,8 @@ export function createCarePanel({ memory, onAction }) {
   close.addEventListener('click', () => api.close());
   const alertList = el('div', { className: 'care__alerts' });
   const history = el('ol', { className: 'care__history' });
+  const summaryList = el('ul', { className: 'care__summary' });
+  const summaryNote = el('p', { className: 'care__note', textContent: 'Appears after the first exchange.' });
   const often = el('p', { className: 'care__note' });
 
   const name = el('input', { type: 'text', className: 'care__input', value: memory.profile.name });
@@ -63,6 +66,7 @@ export function createCarePanel({ memory, onAction }) {
   panel.append(
     el('header', { className: 'care__head' }, el('div', {}, title, el('p', { className: 'care__note', textContent: 'Care panel' })), close),
     alertList,
+    section('Summary', summaryList, summaryNote, button('Refresh summary', 'summary', 'care__button--quiet')),
     section('Vitals', el('div', { className: 'care__tiles' }, tile('Heart rate (estimated)'), tile('Breathing (estimated)'))),
     section('Conversation', history, button('Clear conversation', 'clear-history', 'care__button--quiet')),
     section('About the patient',
@@ -93,7 +97,7 @@ export function createCarePanel({ memory, onAction }) {
     const who = memory.profile.name;
     const turns = memory.history.slice(-30).reverse();
     history.replaceChildren(...(turns.length ? turns.map((turn) => el('li', {},
-      el('span', { className: 'care__note', textContent: `${clock(turn.t)} · ${turn.role === 'nurse' ? 'Nurse' : who}` }),
+      el('span', { className: 'care__note', textContent: `${clock(turn.t)} · ${turn.role === 'nurse' ? turn.speaker ?? 'Someone' : who}` }),
       el('span', { textContent: turn.text }))) : [el('li', { className: 'care__note', textContent: 'Nothing yet.' })]));
     const said = memory.oftenSays();
     often.textContent = said.length ? `Often says: ${said.join(' · ')}` : '';
@@ -128,6 +132,12 @@ export function createCarePanel({ memory, onAction }) {
     },
     conversationChanged() {
       if (api.isOpen) renderHistory();
+    },
+    // summary: { forCaregiver: string[], source, t } or null
+    summaryChanged(summary) {
+      summaryList.replaceChildren(...(summary?.forCaregiver ?? []).map((line) => el('li', { textContent: line })));
+      summaryNote.textContent = !summary ? 'Appears after the first exchange.'
+        : `Updated ${clock(summary.t)}${summary.source === 'plain' ? ' · the last few lines (summaries need the conversation server)' : ''}`;
     },
   };
   opener.addEventListener('click', () => {

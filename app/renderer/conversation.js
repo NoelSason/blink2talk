@@ -31,17 +31,50 @@ function checkReplies(replies) {
   return ok.length ? ok.slice(0, 4) : SAFE_REPLIES;
 }
 
-// body: { transcript, history, patientProfile, fatigue }. `addressed: false` means Claude judged the
-// speech wasn't meant for the patient (staff talking to each other); the replies are kept for "Reply anyway".
+// body: { transcript, history, patientProfile, fatigue, speaker }. `addressed: false` means Claude judged
+// the speech wasn't meant for the patient (staff talking to each other); the replies are kept for "Reply
+// anyway". `speaker` is Claude's { label, role } for who said it ("Dr. Lee", doctor), or null.
 export async function getReplies(body) {
   if (call) {
     try {
       const d = await call('replies', body);
-      return { replies: checkReplies(d.replies), urgent: d.urgent ?? FALLBACK_URGENT, addressed: d.addressed !== false, source: d.source };
+      const label = typeof d.speaker?.label === 'string' ? d.speaker.label.trim().slice(0, 40) : '';
+      return {
+        replies: checkReplies(d.replies),
+        urgent: d.urgent ?? FALLBACK_URGENT,
+        addressed: d.addressed !== false,
+        source: d.source,
+        speaker: label ? { label, role: d.speaker.role ?? 'unknown' } : null,
+      };
     } catch {}
   }
   const sample = QUESTIONS.find((q) => q.text === body.transcript);
-  return { replies: sample?.replySets[0] ?? ['Yes', 'No', "I'm not sure"], urgent: FALLBACK_URGENT, addressed: true, source: 'sample' };
+  return { replies: sample?.replySets[0] ?? ['Yes', 'No', "I'm not sure"], urgent: FALLBACK_URGENT, addressed: true, source: 'sample', speaker: null };
+}
+
+// Which voice said a nurse-mic turn (the speaker-recognition model in the main process):
+// { voice: 'voice-2', similarity, isNew }, or null without the model or for a very short turn.
+export async function identifySpeaker(audio) {
+  if (!audio || !window.blink2talk?.speaker) return null;
+  try {
+    return await window.blink2talk.speaker(audio);
+  } catch {
+    return null;
+  }
+}
+
+// A summary of the conversation: { forPatient: string, forCaregiver: string[] }, or null when the
+// server has no model or isn't running (the app then writes a plain one).
+// body: { history: [{ role, text, speaker }], patientProfile }
+export async function getSummary(body) {
+  if (!call) return null;
+  try {
+    const d = await call('summary', body);
+    if (typeof d?.forPatient !== 'string' || !Array.isArray(d.forCaregiver)) return null;
+    return { forPatient: d.forPatient, forCaregiver: d.forCaregiver.map(String), source: d.source };
+  } catch {
+    return null;
+  }
 }
 
 // Whole-word suggestions for Spell it. body: { prefix, sentenceSoFar, context }

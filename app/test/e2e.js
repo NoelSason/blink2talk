@@ -105,6 +105,15 @@ app.whenReady().then(async () => {
   await doubleBlink();
   check('another double blink goes back to the replies', (await state('s.rowKind')) === 'replies');
 
+  // Summary: back on Listening, the conversation so far shows for the patient and in the care panel.
+  // No server here, so it's the plain version: the last few lines as said, with who said them.
+  await key('KeyR');
+  check('Listening shows the conversation so far', await waitFor(`!document.getElementById('summary').hidden && document.getElementById('summary-text').textContent.includes('said')`, 5000));
+  check('the care panel has the summary', (await js(`document.querySelectorAll('.care__summary li').length`)) > 0);
+  check('saved lines keep who said them', await js(`JSON.parse(localStorage.getItem('blink2talk.memory')).history.some((h) => h.role === 'nurse' && h.speaker === 'Nurse')`));
+  await key('KeyQ');
+  check('the summary hides while replies are up', await waitFor(`s.rowKind === 'replies' && document.getElementById('summary').hidden`));
+
   // Calibration dots follow the grid: the top-left dot sits up and to the left of the center one.
   const dot = async (phase) => { await cam(`calibration({ phase: '${phase}', remainingMs: 1500 })`); await sleep(50); return js(`[parseFloat(document.getElementById('calib-dot').style.left), parseFloat(document.getElementById('calib-dot').style.top)]`); };
   const center = await dot('center');

@@ -18,7 +18,7 @@ export function createMemory({ name }) {
   const saved = load();
   const m = {
     profile: { name, notes: '', ...saved.profile },
-    history: Array.isArray(saved.history) ? saved.history : [], // { role: 'nurse' | 'patient', text, t }
+    history: Array.isArray(saved.history) ? saved.history : [], // { role: 'nurse' | 'patient', text, t, speaker?, voice? }
     picks: saved.picks ?? {},
   };
   const save = () => {
@@ -36,8 +36,9 @@ export function createMemory({ name }) {
       Object.assign(m.profile, patch);
       save();
     },
-    addTurn(role, text) {
-      m.history.push({ role, text, t: Date.now() });
+    // speaker: who said a nurse-side line ("Dr. Lee"); voice: the voice model's id for them this launch.
+    addTurn(role, text, { speaker, voice } = {}) {
+      m.history.push({ role, text, t: Date.now(), ...(speaker && { speaker }), ...(voice && { voice }) });
       if (m.history.length > MAX_TURNS) m.history.splice(0, m.history.length - MAX_TURNS);
       save();
     },
@@ -48,6 +49,12 @@ export function createMemory({ name }) {
       if (last?.role !== role) return;
       m.history.pop();
       if (role === 'patient' && m.picks[last.text] > 0) m.picks[last.text]--;
+      save();
+    },
+    // Claude named a voice: relabel this launch's lines from that voice, or just the last line.
+    relabel(speaker, voice) {
+      const lines = voice ? m.history.filter((h) => h.voice === voice) : m.history.slice(-1);
+      for (const h of lines) if (h.role === 'nurse') h.speaker = speaker;
       save();
     },
     picked(text) {
@@ -62,7 +69,7 @@ export function createMemory({ name }) {
       save();
     },
     // The conversation server's `history` and `patientProfile` fields.
-    turns: () => m.history.map(({ role, text }) => ({ role, text })),
+    turns: () => m.history.map(({ role, text, speaker }) => (speaker ? { role, text, speaker } : { role, text })),
     forClaude() {
       const often = this.oftenSays();
       const notes = [m.profile.notes.trim(), often.length ? `Often says: ${often.join('; ')}` : ''].filter(Boolean).join('. ');

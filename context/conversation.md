@@ -14,7 +14,8 @@ Updated: 2026-10-24 23:30 PDT
 
 ## Interfaces as built
 HTTP on `localhost:8787` (Noel's `main.js` proxies it over IPC):
-- `POST /replies {transcript, history?, patientProfile?, fatigue?}` -> `{replies: string[3-4], addressed, urgent[], spellOption, source, ms}`
+- `POST /replies {transcript, history?, patientProfile?, fatigue?, speaker?}` -> `{replies: string[3-4], addressed, speaker, urgent[], spellOption, source, ms}`. `speaker` in: `{voice, label?, isNew?}` (app's voice model); out: `{label, role}` or null.
+- `POST /summary {history, patientProfile?}` -> `{forPatient, forCaregiver[], source}` (`SUMMARY_MODEL`, default `claude-opus-5-5`; 204 = mock, 502 = failed)
 - `POST /complete {prefix, sentenceSoFar?, context?}` -> `{words[]}`
 - `POST /speak {text}` -> `audio/wav` (204 = mock, client uses system voice)
 - `GET /stt-token` -> `{token}` (1 h, STT-only; 204 = mock)
@@ -36,6 +37,7 @@ HTTP on `localhost:8787` (Noel's `main.js` proxies it over IPC):
 `POST /complete` and the spelling mode in `patient.html` are the scanning keyboard / free text that CLAUDE.md cuts. Noel's app also still has Spell it. Proposal: stop using both in the demo, keep the code dormant, say "we don't do free text yet." Not removed yet.
 
 ## Decisions (newest first)
+- 2026-10-24 (Noel, for the patient app; Samarth please review): `/replies` takes `speaker {voice, label?, isNew}` and returns `speaker {label, role}` from the same call (no added latency). New `POST /summary` → `{forPatient, forCaregiver[]}` on `SUMMARY_MODEL` (default `claude-opus-5-5`, background, 30 s). Why: Noel wants who-said-what and summaries for the patient and caregiver. Rejected: a separate labeling call (adds a round trip).
 - 2026-10-24: Ink-2 turn config `end_timeout_ms: 1500`, `end_threshold: 0.3`; Claude request starts on `turn.eager_end`, discarded on `turn.resume`. Why: default waits up to 5.6 s. Rejected: Web Speech (Google servers, Chrome-only, fails in Electron/Brave).
 - 2026-10-24: Mic sends silence while the patient's voice plays. Why: stop the patient being transcribed as the nurse. Rejected: pausing the mic.
 - 2026-10-24: Browser gets a short-lived STT-only token, never the API key. Rejected: key in the page.
