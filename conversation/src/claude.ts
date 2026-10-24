@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { isConsentQuestion, CONSENT_REPLIES } from "./safety.js";
 import { mockComplete, mockReplies } from "./mock.js";
 
-const MODEL = process.env.CLAUDE_MODEL ?? "claude-opus-5-5";
+const MODEL = process.env.CLAUDE_MODEL ?? "claude-haiku-5-5";
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY
 // Past this the patient gets safe fallback options instead of waiting.
 const REPLIES_TIMEOUT_MS = Number(process.env.REPLIES_TIMEOUT_MS ?? 3000);
