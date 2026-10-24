@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; media-src blob:">
+  <title>Blink2Talk</title>
+  <!-- Google Fonts for now; the brief says we bundle the font later. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@300;400;600;700&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <!-- Container for the cqi units in tokens.css. -->
+  <div class="app">
+    <main class="screen" id="screen">
+      <header class="top-bar">
+        <p class="patient-name" id="patient-name">Rosa</p>
+        <p class="eye-status" role="status">
+          <span class="icon icon--eye" id="eye-icon"></span><span id="eye-label">I can see you</span>
+        </p>
+      </header>
+
+      <section class="caption" id="caption" aria-live="polite" aria-label="What was said">
+        <p class="caption__waiting" id="caption-waiting"><span class="icon icon--ear"></span>Listening</p>
+        <p class="caption__speaker" id="caption-speaker"></p>
+        <p class="caption__text" id="caption-text"></p>
+      </section>
+
+      <div class="stage" id="stage-choose">
+        <div class="room-message" id="room-message" role="status" hidden>
+          <span class="icon icon--l icon--eye-off"></span>
+          <p class="room-message__text">
+            <span class="room-message__lead">I can't see their face.</span>
+            <span>Move the laptop so their eyes are visible.</span>
+          </p>
+        </div>
+        <div class="reply-row" role="listbox" aria-label="Replies" id="reply-row"></div>
+        <div class="status-line">
+          <p class="cue" id="cue" hidden><span id="cue-label"></span><span class="icon" id="cue-icon"></span></p>
+          <p id="loading-note" role="status" hidden>Getting replies ready</p>
+        </div>
+      </div>
+
+      <div class="stage stage--speaking" id="stage-speaking" hidden>
+        <p class="spoken" id="spoken"></p>
+        <p class="speaking-indicator"><span class="icon icon--l icon--volume"></span>Speaking</p>
+      </div>
+      <div class="stage stage--spell" id="stage-spell" hidden>
+        <p class="message-bar" aria-live="polite">
+          <span id="message-text"></span><span class="message-bar__caret" aria-hidden="true"></span>
+        </p>
+        <div class="keyboard" id="keyboard" aria-label="Keyboard"></div>
+      </div>
+
+      <p class="undo-hint" id="undo-hint" hidden>Blink twice to undo</p>
+
+      <button type="button" class="care-button" aria-label="Open care panel">
+        <span class="icon icon--care icon--panel"></span>
+      </button>
+
+      <!-- Eye calibration: the patient looks at a dot in the center, on the left, on the right, then squints. -->
+      <div class="calibration" id="calibration" hidden>
+        <span class="calibration__dot" id="calib-dot"></span>
+        <div class="calibration__text">
+          <p id="calib-text">Look at the dot</p>
+          <p class="calibration__count" id="calib-count"></p>
+        </div>
+      </div>
+    </main>
+    <!-- Camera frames for the eye tracker. Never shown to the patient. -->
+    <video class="camera" id="camera" playsinline muted></video>
+  </div>
+
+  <!-- Operator panel for demos. Hidden until D is pressed; patients never see it. -->
+  <aside class="demo" id="demo" aria-label="Demo controls" hidden></aside>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "blink2talk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Blink2Talk patient screen, as a full-screen desktop app",
+  "main": "main.js",
+  "scripts": {
+    "eyes": "cd ../vision && npx --no-install rolldown src/cv/index.ts -f esm -p browser -o ../app/renderer/vendor/eyes.js && node scripts/fetch-assets.mjs ../app/renderer",
+    "prestart": "npm run eyes || echo 'Eye tracking not built (run npm install --legacy-peer-deps in ../vision). Keyboard only.'",
+    "start": "electron .",
+    "prewindowed": "npm run prestart",
+    "windowed": "BLINK2TALK_WINDOWED=1 electron ."
+  },
+  "devDependencies": {
+    "electron": "^45.0.0"
+  }
+}

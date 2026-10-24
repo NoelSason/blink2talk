@@ -1,0 +1,6 @@
+node_modules/
+out/
+# Built from ../vision by `npm run eyes`
+renderer/vendor/
+renderer/mediapipe/
+renderer/models/

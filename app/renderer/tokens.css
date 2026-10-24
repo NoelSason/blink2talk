@@ -1,0 +1,93 @@
+/* Blink2Talk tokens. Fluid sizes use container-inline units (cqi): the patient screen root sets
+   container-type: inline-size, so 1cqi = 1% of the screen width (in the full-screen app, cqi == vw).
+   Baseline frame: 1440 x 900. */
+:root {
+  color-scheme: dark;
+  --bg: #0F1521;
+  --surface: #1B2333;
+  --surface-dim: #151B28;
+  --caption-bg: #1B2333;
+  --border: #3B475D;
+  --border-strong: #6A7690;
+  --text: #F4F1EA;
+  --text-muted: #C4BFB4;
+  --text-dim: #9AA0AC;
+  --text-faint: #5C667A;
+  --highlight: #FFC857;
+  --on-highlight: #151A24;
+  --highlight-track: #D9A53F;
+  --focus-ring: #F4F1EA;
+  --selected: #3FC1A5;
+  --on-selected: #151A24;
+  --alert: #E5484D;
+  --alert-surface: #3A1C22;
+  --on-alert-surface: #FFE9E9;
+  --soft-surface: #232B3B;
+  --tile: #1B2333;
+
+  --font-patient: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-care: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --fs-speaking: clamp(72px, 6.667cqi, 128px);
+  --fs-reply-tired: clamp(52px, 4.722cqi, 92px);
+  --fs-reply: clamp(40px, 3.611cqi, 72px);
+  --fs-caption: clamp(32px, 2.778cqi, 54px);
+  --fs-name: clamp(26px, 2.222cqi, 43px);
+  --fs-body: clamp(24px, 1.945cqi, 38px);
+  --fs-care-value: 44px;
+  --fs-care-title: 20px;
+  --fs-care-body: 16px;
+  --fs-care-small: 14px;
+
+  --sp-1: clamp(6px, 0.556cqi, 11px);
+  --sp-2: clamp(12px, 1.111cqi, 22px);
+  --sp-3: clamp(18px, 1.667cqi, 32px);
+  --sp-4: clamp(24px, 2.222cqi, 43px);
+  --sp-6: clamp(36px, 3.333cqi, 64px);
+  --sp-8: clamp(48px, 4.444cqi, 86px);
+
+  --r-card: clamp(24px, 1.945cqi, 38px);
+  --r-end: clamp(18px, 1.389cqi, 27px);
+  --r-tile: 16px;
+  --r-pill: 999px;
+
+  --icon-l: clamp(32px, 2.778cqi, 54px);
+  --icon-m: clamp(24px, 2.222cqi, 43px);
+
+  --card-h: clamp(230px, 18cqi, 346px);
+  --end-w: clamp(128px, 10cqi, 192px);
+  --end-h: clamp(166px, 13cqi, 250px);
+
+  --hl-outline: 6px;
+  --hl-offset: 3px;
+  --hl-scale: 1.05;
+  --progress-h: 8px;
+  --motion: 160ms;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F6F3EE;
+  --surface: #FFFFFF;
+  --surface-dim: #ECE8E1;
+  --caption-bg: #FFFFFF;
+  --border: #C9C3B8;
+  --border-strong: #7A808B;
+  --text: #151A24;
+  --text-muted: #434956;
+  --text-dim: #5C6370;
+  --text-faint: #A39E95;
+  --highlight: #FFC857;
+  --on-highlight: #151A24;
+  --highlight-track: #D9A53F;
+  --focus-ring: #151A24;
+  --selected: #0A5F4F;
+  --on-selected: #FFFFFF;
+  --alert: #D93036;
+  --alert-surface: #FDECEC;
+  --on-alert-surface: #5A1A1D;
+  --soft-surface: #EFEBE4;
+  --tile: #FFFFFF;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion: 0ms; }
+}

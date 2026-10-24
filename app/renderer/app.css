@@ -1,0 +1,470 @@
+/* Patient screen styles. Values come from tokens.css. Layout follows RepliesScreen, ReplyCard, and
+   EndOption in the Claude Design project; Listening and Speaking follow the Figma frames. */
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); }
+p { margin: 0; }
+
+.app { container-type: inline-size; width: 100%; height: 100%; }
+
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-patient);
+}
+
+/* ---------- Icons: local Lucide SVGs used as masks, so they take the text color ---------- */
+.icon {
+  display: inline-block;
+  flex: none;
+  width: var(--icon-m);
+  height: var(--icon-m);
+  background-color: currentColor;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+.icon--l { width: var(--icon-l); height: var(--icon-l); }
+.icon--care { width: 24px; height: 24px; }
+.icon--eye { mask-image: url(icons/eye.svg); }
+.icon--eye-closed { mask-image: url(icons/eye-closed.svg); }
+.icon--eye-off { mask-image: url(icons/eye-off.svg); }
+.icon--ear { mask-image: url(icons/ear.svg); }
+.icon--arrow-right { mask-image: url(icons/arrow-right.svg); }
+.icon--arrow-left { mask-image: url(icons/arrow-left.svg); }
+.icon--check { mask-image: url(icons/check.svg); }
+.icon--refresh { mask-image: url(icons/refresh-cw.svg); }
+.icon--keyboard { mask-image: url(icons/keyboard.svg); }
+.icon--message { mask-image: url(icons/message-square.svg); }
+.icon--volume { mask-image: url(icons/volume-2.svg); }
+.icon--panel { mask-image: url(icons/panel-right.svg); }
+.icon--hand { mask-image: url(icons/hand.svg); }
+.icon--bandage { mask-image: url(icons/bandage.svg); }
+.icon--glass { mask-image: url(icons/glass-water.svg); }
+.icon--bell { mask-image: url(icons/bell.svg); }
+.icon--wind { mask-image: url(icons/wind.svg); }
+
+/* ---------- Top bar ---------- */
+.top-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.patient-name { font-size: var(--fs-name); font-weight: 300; line-height: 1.2; }
+.eye-status {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-body);
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+/* ---------- Caption ---------- */
+.caption {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-card);
+  background: var(--caption-bg);
+}
+.caption__speaker { font-size: var(--fs-body); font-weight: 600; color: var(--text-muted); line-height: 1.2; }
+.caption__text { font-size: var(--fs-caption); font-weight: 400; line-height: 1.2; text-wrap: pretty; }
+/* Live caption words settle in instead of popping. Short, and only the new word changes. */
+.word--new { animation: word-in 180ms ease-out; }
+@keyframes word-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .word--new { animation: none; } }
+.caption__waiting {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+/* "What do you want to say?" on Start a conversation: a prompt, not something someone said. */
+.caption--prompt { background: none; padding-inline: 0; }
+.caption--prompt .caption__text { font-weight: 600; }
+
+/* ---------- Choosing: the reply row ---------- */
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-4); }
+.reply-row { display: flex; align-items: center; gap: var(--sp-3); }
+/* Listening: the single item takes the middle third of the row. */
+.reply-row--single { justify-content: center; }
+.reply-row--single .reply-card { flex: 0 0 calc((100% - 2 * var(--sp-3)) / 3); }
+
+.status-line {
+  min-height: calc(var(--fs-body) * 1.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-body);
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+.cue { display: flex; align-items: center; gap: var(--sp-1); }
+.cue[data-dir="left"] { flex-direction: row-reverse; }
+
+/* Can't see you: speaks to the room. Calm surface, no alarm styling (Figma screen 6). */
+.room-message {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--text);
+}
+.room-message__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--fs-caption);
+  line-height: 1.2;
+  color: var(--text-muted);
+}
+.room-message__lead { font-weight: 600; color: var(--text); }
+
+/* Tired mode: 2 replies and larger text (Figma screen 5). */
+.reply-row--tired .reply-card { font-size: var(--fs-reply-tired); }
+
+/* ---------- ReplyCard ---------- */
+.reply-card {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--card-h);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  text-align: center;
+  padding: var(--sp-2);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--border);
+  font-weight: 600;
+  font-size: var(--fs-reply);
+  line-height: 1.1;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  transition: transform var(--motion) ease-out;
+}
+.reply-card[data-state="highlighted"],
+.reply-card[data-state="progress"],
+.reply-card[data-state="hold"],
+.reply-card[data-state="selected"],
+.end-option[data-state="highlighted"],
+.end-option[data-state="hold"] {
+  outline: var(--hl-outline) solid var(--focus-ring);
+  outline-offset: var(--hl-offset);
+  transform: scale(var(--hl-scale));
+}
+.reply-card[data-state="highlighted"],
+.reply-card[data-state="progress"],
+.reply-card[data-state="hold"] {
+  background: var(--highlight);
+  color: var(--on-highlight);
+  border-color: var(--highlight);
+}
+.reply-card[data-state="selected"] {
+  background: var(--selected);
+  color: var(--on-selected);
+  border-color: var(--selected);
+}
+.reply-card[data-state="dimmed"] {
+  background: var(--surface-dim);
+  color: var(--text-dim);
+  border-color: var(--surface-dim);
+}
+.reply-card[data-state="loading"] { background: var(--bg); border: 3px solid var(--border-strong); }
+.reply-card[data-state="loading"] > * { visibility: hidden; }
+/* Where the highlight paused while the app can't see the patient. */
+.reply-card[data-paused],
+.end-option[data-paused] { outline: 4px solid var(--border-strong); outline-offset: var(--hl-offset); }
+
+/* Replies wrap to at most 2 lines and never truncate: long ones step down in size. */
+.reply-card__label--fit-1 { font-size: 0.86em; }
+.reply-card__label--fit-2 { font-size: 0.74em; }
+
+.reply-card__badge {
+  display: none;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-body);
+  font-weight: 700;
+  line-height: 1;
+}
+.reply-card[data-state="selected"] .reply-card__badge { display: flex; }
+.reply-card[data-state="selected"] .reply-card__icon { display: none; }
+
+.reply-card__progress {
+  display: none;
+  position: absolute;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  bottom: var(--sp-2);
+  height: var(--progress-h);
+  border-radius: var(--r-pill);
+  background: var(--highlight-track);
+  overflow: hidden;
+}
+.reply-card[data-state="progress"] .reply-card__progress { display: block; }
+.reply-card__progress-fill {
+  height: 100%;
+  width: calc(var(--progress, 0) * 100%);
+  background: var(--on-highlight);
+  border-radius: var(--r-pill);
+}
+
+.reply-card__hold {
+  display: none;
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  width: var(--icon-l);
+  height: var(--icon-l);
+}
+.reply-card[data-state="hold"] .reply-card__hold { display: block; }
+.reply-card__hold-track { fill: none; stroke: var(--highlight-track); stroke-width: 6; }
+.reply-card__hold-fill {
+  fill: none;
+  stroke: var(--on-highlight);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 119.38;
+  stroke-dashoffset: calc(119.38px * (1 - var(--hold, 0)));
+}
+
+/* ---------- EndOption ---------- */
+.end-option {
+  flex: 0 0 var(--end-w);
+  width: var(--end-w);
+  height: var(--end-h);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  text-align: center;
+  padding: var(--sp-2);
+  border-radius: var(--r-end);
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--border);
+  font-weight: 600;
+  font-size: var(--fs-body);
+  line-height: 1.15;
+  text-wrap: balance;
+  transition: transform var(--motion) ease-out;
+}
+.end-option[data-state="highlighted"],
+.end-option[data-state="hold"] {
+  background: var(--highlight);
+  color: var(--on-highlight);
+  border-color: var(--highlight);
+}
+.end-option[data-state="dimmed"] {
+  background: var(--surface-dim);
+  color: var(--text-dim);
+  border-color: var(--surface-dim);
+}
+
+/* ---------- Speaking ---------- */
+.stage--speaking { align-items: center; gap: var(--sp-3); }
+.spoken {
+  font-size: var(--fs-speaking);
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  text-wrap: balance;
+}
+.speaking-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-body);
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+.undo-hint { font-size: var(--fs-body); color: var(--text-muted); line-height: 1.2; text-align: center; }
+
+/* ---------- Spell it (Figma screen 4, KeyboardKey component) ---------- */
+.app {
+  /* Not in tokens.css yet. Figma size/key 88 px and type/key 48 px at 1440, scaled like the rest. */
+  --key-h: clamp(72px, 6.111cqi, 118px);
+  --fs-key: clamp(40px, 3.333cqi, 64px);
+}
+.stage--spell { justify-content: flex-start; gap: var(--sp-3); }
+.message-bar {
+  min-height: calc(var(--fs-caption) * 1.2 + 2 * var(--sp-3));
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-card);
+  background: var(--caption-bg);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  line-height: 1.2;
+}
+.message-bar__caret {
+  display: inline-block;
+  width: 4px;
+  height: 1em;
+  margin-left: 4px;
+  vertical-align: -0.12em;
+  background: var(--highlight);
+}
+.keyboard { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-2); }
+.key-row {
+  display: flex;
+  gap: var(--sp-2);
+  min-height: calc(var(--key-h) + 2 * var(--sp-1));
+  padding: var(--sp-1);
+  border-radius: var(--r-card);
+}
+.key-row[data-state="row"] { outline: var(--hl-outline) solid var(--highlight); }
+.key-row[data-state="active"] { outline: 2px solid var(--border-strong); }
+.key {
+  min-width: var(--key-h);
+  height: var(--key-h);
+  padding: 0 var(--sp-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-end);
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--border);
+  font-weight: 600;
+  font-size: var(--fs-key);
+  line-height: 1;
+  transition: transform var(--motion) ease-out;
+}
+.key-row[data-state="row"] .key { border: 4px solid var(--highlight); }
+.key[data-state="key"] {
+  background: var(--highlight);
+  color: var(--on-highlight);
+  border-color: var(--highlight);
+  outline: var(--hl-outline) solid var(--focus-ring);
+  outline-offset: var(--hl-offset);
+  transform: scale(var(--hl-scale));
+}
+.screen[data-lost] .key { background: var(--surface-dim); color: var(--text-dim); border-color: var(--surface-dim); }
+
+/* ---------- Care panel button: small and low contrast on purpose ---------- */
+.care-button {
+  position: absolute;
+  right: var(--sp-3);
+  bottom: var(--sp-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+/* ---------- Eye calibration (vision module, "leftRight" layout) ---------- */
+.calibration { position: absolute; inset: 0; z-index: 5; background: var(--bg); }
+.calibration__dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--icon-l);
+  height: var(--icon-l);
+  border-radius: 50%;
+  background: var(--highlight);
+  outline: var(--hl-outline) solid var(--focus-ring);
+  translate: -50% -50%;
+}
+/* Same spots as the calibration dots in vision/src/demo/style.css. */
+.calibration__dot[data-at="left"] { left: 4%; }
+.calibration__dot[data-at="right"] { left: 96%; }
+.calibration__text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% + var(--sp-8));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-caption);
+  text-align: center;
+  color: var(--text);
+}
+.calibration__count { font-size: var(--fs-body); color: var(--text-muted); }
+
+/* The tracker reads frames from this video; it stays off screen. */
+.camera { position: fixed; left: -10000px; top: 0; width: 640px; height: 360px; }
+
+/* ---------- Demo controls: operator only, compact and plain. Patient copy rules don't apply. ---------- */
+.demo {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-tile);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-care);
+  font-size: var(--fs-care-small);
+  line-height: 1.4;
+}
+.demo__head { display: flex; align-items: baseline; justify-content: space-between; }
+.demo__title { font-size: var(--fs-care-body); font-weight: 600; }
+.demo__note { color: var(--text-muted); }
+.demo__section { display: flex; flex-direction: column; gap: 6px; }
+.demo__heading { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.demo button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--soft-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.demo button:hover { border-color: var(--border-strong); }
+.demo label { display: flex; align-items: center; gap: 8px; }
+.demo__input {
+  width: 100%;
+  padding: 7px 10px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+}
+.demo kbd {
+  margin-left: auto;
+  padding: 0 5px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
