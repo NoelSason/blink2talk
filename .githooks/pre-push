@@ -9,7 +9,7 @@ map() {
     vision/*)              echo context/input.md ;;
     conversation/*)        echo context/conversation.md ;;
     vitals/*)              echo context/patient-state.md ;;
-    app/*|design/*|docs/*) echo context/product.md ;;
+    app/*|design/*)        echo context/product.md ;;   # docs/ is shared, not gated
   esac
 }
 
