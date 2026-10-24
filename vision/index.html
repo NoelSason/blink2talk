@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>blink_to_talk bench</title>
+    <link rel="stylesheet" href="/src/demo/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>blink_to_talk bench</h1>
+      <nav><a href="/" class="current">Bench</a><a href="/quadrants.html">Quadrants</a></nav>
+      <span id="status">Loading face model…</span>
+    </header>
+
+    <main>
+      <section>
+        <div id="stage" class="stage">
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <canvas id="trace"></canvas>
+        <p class="hint">Eye openness (EAR), last 10 s. Dashed lines: close / open thresholds, plus squint when it uses EAR. Shaded: hold in progress.</p>
+      </section>
+
+      <aside>
+        <div class="row">
+          <button id="btn-cam">Start webcam</button>
+          <label class="button">Use video file<input id="file" type="file" accept="video/*" hidden /></label>
+          <button id="btn-calib" disabled>Calibrate</button>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h2>Blink</h2>
+            <svg viewBox="0 0 100 100" class="ring">
+              <circle cx="50" cy="50" r="40" class="track" />
+              <circle id="ring" cx="50" cy="50" r="40" class="fill" />
+            </svg>
+            <div id="blink-state" class="mono">—</div>
+          </div>
+          <div class="card">
+            <h2>Gaze</h2>
+            <div class="gaze">
+              <div id="g-left">◀</div>
+              <div id="g-center">●</div>
+              <div id="g-right">▶</div>
+            </div>
+            <div id="gaze-state" class="mono">—</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Fatigue</h2>
+          <div id="fatigue" class="mono">—</div>
+        </div>
+
+        <div class="card">
+          <h2>Scan test</h2>
+          <ol id="options">
+            <li>Yes</li>
+            <li>No</li>
+            <li>I'm in pain</li>
+            <li>None of these</li>
+          </ol>
+          <p class="hint">A long blink or held squint selects the highlighted option. Look left to step back, right to step forward.</p>
+        </div>
+
+        <div class="card settings">
+          <h2>Settings</h2>
+          <label>Select hold <input id="select-ms" type="range" min="600" max="1500" step="50" value="800" /><span id="select-ms-val" class="mono">800 ms</span></label>
+          <label><input id="scan-on" type="checkbox" /> Auto-scan (steps every 1.2 s on its own)</label>
+        </div>
+
+        <div class="card">
+          <h2>Events</h2>
+          <div id="counts" class="mono"></div>
+          <ul id="log" class="mono"></ul>
+        </div>
+      </aside>
+    </main>
+
+    <div id="calib" class="calib hidden">
+      <div id="calib-target"></div>
+      <div id="calib-count" class="calib-count"></div>
+      <p id="calib-text"></p>
+      <div class="bar"><div id="calib-bar"></div></div>
+    </div>
+
+    <script type="module" src="/src/demo/main.ts"></script>
+  </body>
+</html>

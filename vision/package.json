@@ -1,0 +1,27 @@
+{
+  "name": "blink-to-talk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Blink selection, coarse gaze and fatigue signals for the Blink-to-Speak ICU Communicator",
+  "main": "src/cv/index.ts",
+  "exports": {
+    ".": "./src/cv/index.ts",
+    "./core": "./src/cv/core.ts"
+  },
+  "scripts": {
+    "assets": "node scripts/fetch-assets.mjs",
+    "predev": "npm run assets",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.35"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bench",
+      "runtimeExecutable": "wsl.exe",
+      "runtimeArgs": ["-d", "Ubuntu", "-e", "bash", "-lc", "cd ~/research/blink2talk/vision && npx --no-install vite --port 5173 --strictPort"],
+      "port": 5173
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+# Copied/downloaded by `npm run assets`
+public/mediapipe/
+public/models/
+# Test recordings of people stay local
+recordings/

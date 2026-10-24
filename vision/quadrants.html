@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>blink_to_talk quadrants</title>
+    <link rel="stylesheet" href="/src/demo/style.css" />
+  </head>
+  <body class="quad-page">
+    <header>
+      <h1>blink_to_talk quadrants</h1>
+      <nav><a href="/">Bench</a><a href="/quadrants.html" class="current">Quadrants</a></nav>
+      <span id="status">Loading face model…</span>
+    </header>
+
+    <div class="toolbar">
+      <button id="btn-cam">Start webcam</button>
+      <label class="button">Use video file<input id="file" type="file" accept="video/*" hidden /></label>
+      <button id="btn-calib" disabled>Calibrate</button>
+      <button id="btn-edit">Edit options</button>
+      <label>Select hold <input id="select-ms" type="range" min="600" max="1500" step="50" value="800" /><span id="select-ms-val" class="mono">800 ms</span></label>
+      <label><input id="show-cam" type="checkbox" checked /> Camera panel</label>
+      <span id="last" class="last"></span>
+    </div>
+
+    <div id="layout" class="quad-layout">
+      <main id="quads" class="quads">
+        <div class="quad" data-q="topLeft"><span class="text">Yes</span><div class="hold"><div class="hold-bar"></div></div></div>
+        <div class="quad" data-q="topRight"><span class="text">No</span><div class="hold"><div class="hold-bar"></div></div></div>
+        <div class="quad" data-q="bottomLeft"><span class="text">I'm in pain</span><div class="hold"><div class="hold-bar"></div></div></div>
+        <div class="quad" data-q="bottomRight"><span class="text">None of these</span><div class="hold"><div class="hold-bar"></div></div></div>
+        <div id="rest-zone" class="rest-zone" title="Look here to rest your eyes without choosing anything"><div class="center-mark"></div></div>
+      </main>
+
+      <aside class="side">
+        <div id="stage" class="stage mirror">
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div id="readout" class="mono">—</div>
+        <div class="card">
+          <h2>How it works</h2>
+          <p class="hint">Look at a box to focus it; reading inside a box changes nothing. Hold a long blink or a squint to choose the focused box. Looking at the center circle focuses nothing.</p>
+        </div>
+        <div class="card">
+          <h2>Events</h2>
+          <ul id="log" class="mono"></ul>
+        </div>
+      </aside>
+    </div>
+
+    <div id="rest" class="rest hidden">Resting. Eyes closed.</div>
+
+    <div id="calib" class="calib light hidden">
+      <div id="calib-target"></div>
+      <div id="calib-count" class="calib-count"></div>
+      <p id="calib-text"></p>
+      <div class="bar"><div id="calib-bar"></div></div>
+    </div>
+
+    <script type="module" src="/src/demo/quadrants.ts"></script>
+  </body>
+</html>
