@@ -1,5 +1,5 @@
 // Client for the conversation server (../conversation): Claude replies, word completion, the patient's
-// voice, and the nurse's speech-to-text. When the server isn't reachable, sample data keeps the screen working.
+// voice, and a token for the nurse mic. When the server isn't reachable, sample data keeps the screen working.
 
 import { QUESTIONS } from './samples.js';
 
@@ -17,16 +17,31 @@ export async function getConfig() {
   }
 }
 
-// body: { transcript, history, patientProfile, fatigue }
+// The server asks Claude for short first-person replies; this checks before anything becomes selectable.
+// Long, empty, or repeated replies are dropped, and if none are left the patient gets safe basics.
+const SAFE_REPLIES = ['Yes', 'No', 'Please say that again'];
+function checkReplies(replies) {
+  const seen = new Set();
+  const ok = (Array.isArray(replies) ? replies : []).map((r) => String(r).trim()).filter((r) => {
+    const key = r.toLowerCase();
+    if (!r || r.length > 80 || r.split(/\s+/).length > 10 || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return ok.length ? ok.slice(0, 4) : SAFE_REPLIES;
+}
+
+// body: { transcript, history, patientProfile, fatigue }. `addressed: false` means Claude judged the
+// speech wasn't meant for the patient (staff talking to each other); the replies are kept for "Reply anyway".
 export async function getReplies(body) {
   if (call) {
     try {
       const d = await call('replies', body);
-      return { replies: d.replies.slice(0, 4), urgent: d.urgent ?? FALLBACK_URGENT, source: d.source };
+      return { replies: checkReplies(d.replies), urgent: d.urgent ?? FALLBACK_URGENT, addressed: d.addressed !== false, source: d.source };
     } catch {}
   }
   const sample = QUESTIONS.find((q) => q.text === body.transcript);
-  return { replies: sample?.replySets[0] ?? ['Yes', 'No', "I'm not sure"], urgent: FALLBACK_URGENT, source: 'sample' };
+  return { replies: sample?.replySets[0] ?? ['Yes', 'No', "I'm not sure"], urgent: FALLBACK_URGENT, addressed: true, source: 'sample' };
 }
 
 // Whole-word suggestions for Spell it. body: { prefix, sentenceSoFar, context }
@@ -39,11 +54,11 @@ export async function completeWord(body) {
   }
 }
 
-// Text of one WAV clip of the nurse speaking, or null when it can't be transcribed.
-export async function transcribe(wav) {
+// A short-lived, speech-to-text-only Cartesia token for the nurse mic, or null without a Cartesia key.
+export async function sttToken() {
   if (!call) return null;
   try {
-    return (await call('transcribe', wav))?.text ?? null;
+    return (await call('stt-token'))?.token ?? null;
   } catch {
     return null;
   }

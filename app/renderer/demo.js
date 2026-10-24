@@ -30,7 +30,7 @@ export function createDemoPanel({ questions, onAction }) {
   };
   const section = (title, ...rows) => el('section', { className: 'demo__section' }, el('h2', { className: 'demo__heading', textContent: title }), ...rows);
 
-  // Stands in for the nurse's microphone, which needs a speech-to-text service that works in Electron.
+  // For when the microphone is off or the room is too loud.
   const said = el('input', { type: 'text', className: 'demo__input', placeholder: 'Type what the nurse says, then Enter' });
   said.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && said.value.trim()) {
@@ -48,6 +48,8 @@ export function createDemoPanel({ questions, onAction }) {
     replies: el('span', { textContent: 'Replies: checking…' }),
     voice: el('span', { textContent: 'Voice: checking…' }),
     eyes: el('span', { textContent: 'Eyes: starting the camera…' }),
+    mic: el('span', { textContent: 'Mic: starting…' }),
+    practice: el('span', { textContent: 'Practice: runs after calibration' }),
   };
 
   panel.append(
@@ -63,7 +65,9 @@ export function createDemoPanel({ questions, onAction }) {
     section('Sources',
       status.replies,
       status.voice,
+      status.mic,
       status.eyes,
+      status.practice,
       el('span', { textContent: 'Keyboard also works: arrows, hold Space' }),
       el('span', { textContent: 'Vitals: not connected' })),
   );
@@ -76,6 +80,8 @@ export function createDemoPanel({ questions, onAction }) {
       light.input.checked = flags.light;
     },
     setEyes(text) { status.eyes.textContent = text; },
+    setMic(text) { status.mic.textContent = text; },
+    setPractice(text) { status.practice.textContent = text; },
     // config comes from the conversation server's /config, or null when it isn't running.
     setStatus(config) {
       status.replies.textContent = !config ? 'Replies: sample (conversation server not running)'

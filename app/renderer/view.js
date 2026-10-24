@@ -97,9 +97,6 @@ export function createView() {
     calibText: byId('calib-text'),
     calibCount: byId('calib-count'),
     screen: byId('screen'),
-    stageSpell: byId('stage-spell'),
-    messageText: byId('message-text'),
-    keyboard: byId('keyboard'),
     eyeIcon: byId('eye-icon'),
     eyeLabel: byId('eye-label'),
     caption: byId('caption'),
@@ -178,35 +175,6 @@ export function createView() {
     }
   }
 
-  // Spell it: rows of keys. Rows highlight first; a long blink then steps through that row's keys.
-  let spellSig = null;
-  let keyRows = [];
-  function renderSpell(sp) {
-    const sig = sp.rows.map((r) => r.join('|')).join('/');
-    if (sig !== spellSig) {
-      spellSig = sig;
-      keyRows = sp.rows.map((labels) => {
-        const row = document.createElement('div');
-        row.className = 'key-row';
-        const keys = labels.map((label) => span('key', label));
-        row.append(...keys);
-        return { row, keys };
-      });
-      els.keyboard.replaceChildren(...keyRows.map((r) => r.row));
-      for (const key of [...last.keys()]) if (key.startsWith('key')) last.delete(key);
-    }
-    keyRows.forEach(({ row, keys }, i) => {
-      const active = i === sp.row;
-      const rowState = active ? (sp.level === 'rows' ? 'row' : 'active') : 'default';
-      if (changed(`keyrow${i}`, rowState)) row.dataset.state = rowState;
-      keys.forEach((key, j) => {
-        const state = active && sp.level === 'keys' && j === sp.key ? 'key' : 'default';
-        if (changed(`key${i}-${j}`, state)) key.dataset.state = state;
-      });
-    });
-    if (changed('message', sp.text)) els.messageText.textContent = sp.text;
-  }
-
   function renderCalibration(c) {
     const seconds = c ? Math.max(1, Math.ceil(c.remainingMs / 1000)) : 0;
     if (!changed('calibration', c ? `${c.phase}|${seconds}` : '')) return;
@@ -226,32 +194,33 @@ export function createView() {
   function render(model) {
     renderCalibration(model.calibration);
     if (changed('screen-lost', model.faceLost)) els.screen.toggleAttribute('data-lost', model.faceLost);
-    const eye = model.faceLost ? 'lost' : model.eyesClosed ? 'closed' : 'open';
+    const eye = model.faceLost ? 'lost' : model.resting ? 'rest' : model.eyesClosed ? 'closed' : 'open';
     if (changed('eye', eye)) {
-      els.eyeIcon.className = `icon icon--${{ lost: 'eye-off', closed: 'eye-closed', open: 'eye' }[eye]}`;
-      els.eyeLabel.textContent = { lost: "Can't see you", closed: 'Eyes closed', open: 'I can see you' }[eye];
+      els.eyeIcon.className = `icon icon--${{ lost: 'eye-off', rest: 'eye-closed', closed: 'eye-closed', open: 'eye' }[eye]}`;
+      els.eyeLabel.textContent = { lost: "Can't see you", rest: 'Resting', closed: 'Eyes closed', open: 'I can see you' }[eye];
     }
 
+    // Caption kinds: waiting (Listening), question (what was said), prompt, and message (what the
+    // patient is spelling, with a caret; the placeholder shows while it's empty).
     const cap = model.caption;
     if (changed('caption', `${cap.kind}|${cap.speaker ?? ''}|${cap.text ?? ''}`)) {
-      els.caption.classList.toggle('caption--prompt', cap.kind === 'prompt');
+      els.caption.classList.toggle('caption--prompt', cap.kind === 'prompt' || cap.kind === 'message');
+      els.caption.classList.toggle('caption--message', cap.kind === 'message');
+      els.caption.classList.toggle('caption--empty', cap.kind === 'message' && !cap.text);
       els.captionWaiting.hidden = cap.kind !== 'waiting';
       els.captionSpeaker.hidden = cap.kind !== 'question';
       els.captionText.hidden = cap.kind === 'waiting';
       els.captionSpeaker.textContent = cap.speaker ?? '';
-      renderCaptionText(cap.text ?? '', cap.kind === 'question');
+      renderCaptionText(cap.text || cap.placeholder || '', cap.kind === 'question');
     }
 
     if (changed('stage', model.stage)) {
-      els.caption.hidden = model.stage === 'spell';
       els.stageChoose.hidden = model.stage !== 'choose';
       els.stageSpeaking.hidden = model.stage !== 'speaking';
-      els.stageSpell.hidden = model.stage !== 'spell';
       els.undoHint.hidden = model.stage !== 'speaking';
       fitNeeded = true;
     }
     if (model.stage === 'speaking' && changed('spoken', model.spoken)) els.spoken.textContent = model.spoken;
-    if (model.stage === 'spell') renderSpell(model.spell);
     if (model.stage !== 'choose') return;
 
     if (changed('lost', model.faceLost)) els.roomMessage.hidden = !model.faceLost;
@@ -267,6 +236,7 @@ export function createView() {
     }
     if (changed('loading', model.loading)) els.loadingNote.hidden = !model.loading;
     if (changed('back', model.backHint)) els.backHint.hidden = !model.backHint;
+    if (changed('name', model.name)) byId('patient-name').textContent = model.name;
   }
 
   return { render };

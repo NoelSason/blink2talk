@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Starts Blink2Talk: installs whatever is missing, then opens the app full screen.
+# The app starts the conversation server and builds the eye tracker itself.
+#   ./start                          full screen
+#   BLINK2TALK_WINDOWED=1 ./start    1440×900 window
+set -euo pipefail
+cd "$(dirname "$0")"
+
+[ -d conversation/node_modules ] || (cd conversation && npm install)
+[ -d vision/node_modules ] || (cd vision && npm install --legacy-peer-deps)
+[ -d app/node_modules ] || (cd app && npm install)
+if [ ! -f conversation/.env ] && [ -f .env ]; then
+  echo "Note: keys are read from conversation/.env, not the repo root .env."
+fi
+
+cd app
+exec npm start

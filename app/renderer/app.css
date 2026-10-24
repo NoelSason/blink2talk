@@ -91,6 +91,18 @@ p { margin: 0; }
 /* "What do you want to say?" on Start a conversation: a prompt, not something someone said. */
 .caption--prompt { background: none; padding-inline: 0; }
 .caption--prompt .caption__text { font-weight: 600; }
+/* Spell it: the message being built, with a caret. */
+.caption--message { background: var(--caption-bg); padding-inline: var(--sp-4); }
+.caption--message .caption__text::after {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 1em;
+  margin-left: 4px;
+  vertical-align: -0.12em;
+  background: var(--highlight);
+}
+.caption--empty .caption__text { color: var(--text-muted); font-weight: 400; }
 
 /* ---------- Choosing: the reply row ---------- */
 .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-4); }
@@ -324,67 +336,6 @@ p { margin: 0; }
 }
 .undo-hint { font-size: var(--fs-body); color: var(--text-muted); line-height: 1.2; text-align: center; }
 
-/* ---------- Spell it (Figma screen 4, KeyboardKey component) ---------- */
-.app {
-  /* Not in tokens.css yet. Figma size/key 88 px and type/key 48 px at 1440, scaled like the rest. */
-  --key-h: clamp(72px, 6.111cqi, 118px);
-  --fs-key: clamp(40px, 3.333cqi, 64px);
-}
-.stage--spell { justify-content: flex-start; gap: var(--sp-3); }
-.message-bar {
-  min-height: calc(var(--fs-caption) * 1.2 + 2 * var(--sp-3));
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--r-card);
-  background: var(--caption-bg);
-  font-size: var(--fs-caption);
-  font-weight: 600;
-  line-height: 1.2;
-}
-.message-bar__caret {
-  display: inline-block;
-  width: 4px;
-  height: 1em;
-  margin-left: 4px;
-  vertical-align: -0.12em;
-  background: var(--highlight);
-}
-.keyboard { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-2); }
-.key-row {
-  display: flex;
-  gap: var(--sp-2);
-  min-height: calc(var(--key-h) + 2 * var(--sp-1));
-  padding: var(--sp-1);
-  border-radius: var(--r-card);
-}
-.key-row[data-state="row"] { outline: var(--hl-outline) solid var(--highlight); }
-.key-row[data-state="active"] { outline: 2px solid var(--border-strong); }
-.key {
-  min-width: var(--key-h);
-  height: var(--key-h);
-  padding: 0 var(--sp-3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-end);
-  background: var(--surface);
-  color: var(--text);
-  border: 2px solid var(--border);
-  font-weight: 600;
-  font-size: var(--fs-key);
-  line-height: 1;
-  transition: transform var(--motion) ease-out;
-}
-.key-row[data-state="row"] .key { border: 4px solid var(--highlight); }
-.key[data-state="key"] {
-  background: var(--highlight);
-  color: var(--on-highlight);
-  border-color: var(--highlight);
-  outline: var(--hl-outline) solid var(--focus-ring);
-  outline-offset: var(--hl-offset);
-  transform: scale(var(--hl-scale));
-}
-.screen[data-lost] .key { background: var(--surface-dim); color: var(--text-dim); border-color: var(--surface-dim); }
-
 /* ---------- Care panel button: small and low contrast on purpose ---------- */
 .care-button {
   position: absolute;
@@ -403,7 +354,84 @@ p { margin: 0; }
   cursor: pointer;
 }
 
-/* ---------- Eye calibration (vision module, "leftRight" layout) ---------- */
+/* An urgent pick waiting in the care panel. */
+.care-button--alert::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--alert);
+}
+
+/* ---------- Care panel: the 440 px drawer from the brief, for the nurse or family ---------- */
+.care {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: 440px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-care);
+  font-size: var(--fs-care-body);
+  line-height: 1.4;
+  transform: translateX(100%);
+  transition: transform var(--motion) ease-out;
+}
+.care[data-open="true"] { transform: none; }
+.care p { margin: 0; }
+.care__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.care__title { margin: 0; font-size: var(--fs-care-title); font-weight: 600; }
+.care__note { color: var(--text-muted); font-size: var(--fs-care-small); }
+.care__section { display: flex; flex-direction: column; gap: 10px; }
+.care__heading { margin: 0; font-size: var(--fs-care-small); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.care__alerts { display: flex; flex-direction: column; gap: 10px; }
+.care-alert { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: var(--r-tile); background: var(--soft-surface); }
+.care-alert--strong { background: var(--alert-surface); color: var(--on-alert-surface); border-left: 6px solid var(--alert); font-weight: 600; }
+.care-alert--strong .care__note { color: inherit; font-weight: 400; }
+.care__tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.care__tile { display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: var(--r-tile); background: var(--tile); border: 1px solid var(--border); }
+.care__tile-label { font-size: var(--fs-care-small); color: var(--text-muted); }
+.care__tile-value { font-size: var(--fs-care-value); font-weight: 600; line-height: 1.1; }
+.care__history { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow-y: auto; }
+.care__history li { display: flex; flex-direction: column; gap: 2px; }
+.care__field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-care-small); color: var(--text-muted); }
+.care__input {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: var(--fs-care-body);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+}
+.care__notes { resize: vertical; }
+.care__toggle { display: flex; align-items: center; gap: 8px; }
+.care__button {
+  align-self: flex-start;
+  padding: 7px 12px;
+  font: inherit;
+  color: inherit;
+  background: var(--soft-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.care__button:hover { border-color: var(--border-strong); }
+.care__button--quiet { color: var(--text-muted); }
+
+/* ---------- Eye calibration (vision module, quadrant layout) ---------- */
 .calibration { position: absolute; inset: 0; z-index: 5; background: var(--bg); }
 .calibration__dot {
   position: absolute;

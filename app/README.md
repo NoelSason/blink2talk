@@ -1,80 +1,66 @@
 # Blink2Talk app
 
-The patient screen as a full-screen desktop app (Electron). Plain HTML, CSS, and JavaScript, with no framework. Replies, word suggestions, and the patient's voice come from the conversation server in `../conversation`.
+The patient screen as a full-screen desktop app (Electron). Plain HTML, CSS, and JavaScript, with no framework. It brings together the conversation server (`../conversation`: Claude replies, Cartesia voice and speech-to-text) and the eye tracker (`../vision`: MediaPipe gaze and blinks).
+
+## Run it
+
+From the repo root:
 
 ```sh
-(cd ../conversation && npm install)                   # once; add keys to ../conversation/.env (see its README)
-(cd ../vision && npm install --legacy-peer-deps)      # once; the camera eye tracker
-npm install
-npm start          # full screen
-npm run windowed   # 1440×900 window, easier while building
+./start                          # installs what's missing, then opens full screen
+BLINK2TALK_WINDOWED=1 ./start    # 1440×900 window
 ```
 
-`npm start` first runs `npm run eyes`, which bundles `../vision` into `renderer/vendor/eyes.js` and copies MediaPipe's runtime and face model into `renderer/`. Without them, the app runs on the keyboard only.
+Keys go in `conversation/.env` (see `conversation/README.md`): `ANTHROPIC_API_KEY`, `CARTESIA_API_KEY`, and `CARTESIA_VOICE_ID` for the patient's cloned voice. Without them the app still runs, with sample replies, the system voice, and no mic.
 
-`npm start` also starts the conversation server if nothing is answering on `http://localhost:8787`, and stops it on quit. If the server can't start, the screen keeps working on sample replies and the system voice.
+`npm start` (here in `app/`) does the same as `./start` once everything is installed. It bundles `../vision` into `renderer/vendor/`, starts the conversation server if nothing answers on `http://localhost:8787`, and stops it on quit.
+
+## How the patient uses it
+
+Every choice sits in a 2×2 grid, so each target is a big box the eye tracker can hit. Look at a box to highlight it, then close your eyes or squint for about a second and open them to choose it. The circle in the middle is a rest spot: looking there highlights nothing.
+
+- **Listening:** "I want to say something" opens the urgent options and Spell it.
+- **Replies:** Claude's three suggestions and "None of these", which opens the urgent options ("I'm in pain", "I can't breathe", "Call the nurse") and Spell it.
+- **Spell it:** each pick narrows the letters until one is left. E, T, A, and O take two picks; every other letter takes three. The bottom-right box holds Claude's suggested words, then Space, Delete, Speak, and Back.
+- **Blink twice:** undoes a pick, goes up a level in Spell it, or goes back from the urgent options.
+- **Room talk:** when Claude judges the speech wasn't meant for the patient ("grab the chart from room 4"), the screen stays quiet and offers "Reply anyway" next to the urgent options.
+
+The first launch calibrates the camera (about 15 s): look at the dot in the center, then in the middle of each box, then squint. Press `C` to calibrate again.
+
+## For the nurse or family
+
+- **Talk:** the mic streams to Cartesia Ink-2, the caption updates as the nurse speaks, and replies appear when they finish. It mutes itself while the patient's voice plays.
+- **Care panel:** the small button in the bottom-right corner, or `N`. It holds alerts, vitals (not connected yet), the conversation, notes about the patient, and settings. Urgent picks badge the button, play a sound, and send a desktop notification.
+- **Memory:** the notes, and the phrases the patient picks most, go to Claude with every question. They're stored on this machine only.
 
 ## Keys
 
-The keyboard works alongside the camera and stands in for the patient's eyes:
-
-| Key | Stands in for |
+| Key | What it does |
 |---|---|
-| Arrow keys | Look at the next box in that direction |
-| Space, held | Eyes closed. Hold about 1 s for a long blink, which selects. |
-| Space, Space | Double blink, which undoes (on Selected or Speaking) |
+| Arrow keys | Move the highlight around the grid |
+| Space, held about 1 s | Long blink: choose |
+| Space, Space | Double blink |
+| `N` | Care panel |
+| `D` | Demo controls: type what the nurse says, sample questions, sources |
+| `Q` / `R` | Next sample question / back to Listening |
+| `M` / `C` / `T` / `F` / `L` | Mic on or off / calibrate / tired mode / pretend the face is lost / light theme |
 
-Operator keys: `D` opens the demo controls (type what the nurse says, sample questions, sources). `Q` plays the next sample question, `R` goes back to Listening, `T` switches tired mode, `F` pretends the app lost the face, `C` recalibrates the camera, and `L` switches dark and light.
-
-## Camera eye tracking
-
-The vision module (`../vision`) runs MediaPipe's face model on this machine, in its quadrant layout. Choices sit in a 2×2 grid: look at a box to highlight it, and look at the circle in the middle to highlight nothing. The first launch calibrates: look at the dot in the center, then in the middle of each box, then squint (about 15 s). Press `C` to calibrate again. The calibration is saved for the next launch.
-
-The grid holds four boxes, so the reply screen is two pages. Page 1 has Claude's three suggestions and "None of these". "None of these" opens page 2: the conversation server's urgent options ("I'm in pain", "I can't breathe", "Call the nurse") and "Spell it". A double blink goes back to page 1. Listening's "I want to say something" opens page 2 directly.
-
-| The camera sees | The app does |
-|---|---|
-| Looking at a box for 0.3 s | Highlights it |
-| A long blink or held squint, released after 0.8 s | Selects the highlighted box |
-| Two quick blinks | Undo |
-| No face | Can't see you |
-| Fatigue against the first 5 minutes | Tired mode |
-
-## Connecting another eye tracker
-
-Either API works from the page.
-
-The blink/gaze module contract from `conversation/public/patient.html`, where the module detects the long blink itself:
+## For other eye trackers
 
 ```js
 window.blinkvoice.gazeLeft(); window.blinkvoice.gazeRight();
 window.blinkvoice.select();          // picks what's highlighted
 window.blinkvoice.setFatigue(0.8);   // 0..1; 0.6 and up turns on tired mode
-```
-
-Raw events, where the app works out long blinks and double blinks from the timing:
-
-```js
-window.dispatchEvent(new CustomEvent('patient-input', { detail: { type: 'look', dir: 'right' } }));
 window.dispatchEvent(new CustomEvent('patient-input', { detail: { type: 'eyes', closed: true } }));
 ```
-
-## How it uses the conversation server
-
-- `/replies` gets the nurse's words, the last 6 turns, the patient's name, and fatigue. The patient's picks go into the history.
-- `/complete` fills the predicted-words row in Spell it.
-- `/speak` plays the patient's cloned voice when the server has a Cartesia key, and falls back to the system voice otherwise.
-- The server's urgent options ("I'm in pain", "I can't breathe", "Call the nurse") are on page 2, after "None of these" or "I want to say something".
-- The page is loaded from a file, so requests go through the main process (`main.js`) rather than `fetch`.
 
 ## Where the design comes from
 
 - `renderer/tokens.css` is copied unchanged from the Claude Design project. Paste a newer copy over it to update.
-- Suggested replies (moments 2a–2e) follow `RepliesScreen`, `ReplyCard`, and `EndOption` in the Claude Design project.
-- Listening, Speaking, Spell it, tired mode, Can't see you, and Start a conversation follow the Figma file's screens: https://www.figma.com/design/qhB3qvr3odYDYNlIcyNwy3
-- Icons are Lucide SVGs in `renderer/icons/`. They are used as CSS masks, so they take the text color in both themes.
+- The reply cards and end options follow `ReplyCard` and `EndOption` in the Claude Design project. Listening, Speaking, tired mode, and Can't see you follow the Figma file: https://www.figma.com/design/qhB3qvr3odYDYNlIcyNwy3
+- The 2×2 grid replaces the original single row so the camera can target each box (the vision module's quadrant layout).
+- Icons are Lucide SVGs in `renderer/icons/`, used as CSS masks so they take the text color in both themes.
 
 ## Not built yet
 
-- The nurse's microphone. The browser speech recognition in `patient.html` works in Chrome, not Electron, so type in the demo controls for now.
-- The care panel. The corner button does nothing yet.
+- Vitals: the care panel tiles wait for the Presage feed.

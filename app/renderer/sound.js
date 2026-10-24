@@ -82,9 +82,11 @@ function systemVoice(text) {
 // Speaks in the patient's own voice when the conversation server has one (getAudio returns WAV
 // bytes), otherwise with the system voice. Resolves when speech ends, or after a fallback delay
 // if the platform never reports an end.
-export async function speak(text, getAudio) {
+// `isCurrent` is checked once the audio is ready: if the patient undid the pick meanwhile, nothing plays.
+export async function speak(text, getAudio, isCurrent = () => true) {
   const fallbackMs = Math.max(2500, text.split(/\s+/).length * 450);
   const bytes = getAudio ? await getAudio(text) : null;
+  if (!isCurrent()) return;
   const spoken = bytes ? playWav(bytes) : systemVoice(text);
   return Promise.race([spoken, new Promise((resolve) => setTimeout(resolve, fallbackMs + (bytes ? 4000 : 0)))]);
 }

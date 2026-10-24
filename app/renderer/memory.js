@@ -41,12 +41,13 @@ export function createMemory({ name }) {
       if (m.history.length > MAX_TURNS) m.history.splice(0, m.history.length - MAX_TURNS);
       save();
     },
-    // Undo takes back what the patient said and the pick it counted.
-    undoPatientTurn() {
+    // Takes back the last turn if it was `role`: an undone reply (and the pick it counted), or speech
+    // that wasn't meant for the patient.
+    popTurn(role) {
       const last = m.history.at(-1);
-      if (last?.role !== 'patient') return;
+      if (last?.role !== role) return;
       m.history.pop();
-      if (m.picks[last.text] > 0) m.picks[last.text]--;
+      if (role === 'patient' && m.picks[last.text] > 0) m.picks[last.text]--;
       save();
     },
     picked(text) {

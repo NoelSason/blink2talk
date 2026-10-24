@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { completeWord, getReplies } from "./claude.js";
 import { CONSENT_REPLIES, SPELL_OPTION, URGENT } from "./safety.js";
 import { sttToken, synthesize, usingClone, warm } from "./voice.js";
-import { transcribe } from "./stt.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -20,26 +19,7 @@ app.get("/config", (_req, res) => {
     mockReplies: process.env.MOCK_REPLIES === "1" || !process.env.ANTHROPIC_API_KEY,
     mockVoice: mockVoice(),
     clonedVoice: usingClone(),
-    stt: !!process.env.CARTESIA_API_KEY,
   });
-});
-
-// Nurse speech in: one utterance as WAV -> text. 204 without a Cartesia key (the client then has no mic).
-app.post("/transcribe", express.raw({ type: "audio/wav", limit: "10mb" }), async (req, res) => {
-  if (!process.env.CARTESIA_API_KEY) {
-    res.status(204).end();
-    return;
-  }
-  if (!Buffer.isBuffer(req.body) || req.body.length < 1000) {
-    res.status(400).json({ error: "wav audio required" });
-    return;
-  }
-  try {
-    res.json({ text: await transcribe(req.body) });
-  } catch (err) {
-    console.error("transcribe failed:", err);
-    res.status(502).json({ error: "stt failed" });
-  }
 });
 
 // Always responds: on any model failure, falls back to safe generic options.
