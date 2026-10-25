@@ -1,9 +1,9 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-24 22:10 PDT (WebEyeTrack removed; replies, stage log)
+Updated: 2026-10-24 23:40 PDT (nurse mic listens from launch)
 
 ## Now
-- Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README.
+- Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README, nurse mic listens from launch.
 - Next: accuracy test on 4 people, 2 outside the team, in venue lighting; stage-log ratings and Figma share links; team call on Spell it and urgent alerts (Cut list).
 - Blocked on: nothing.
 
