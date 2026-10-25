@@ -14,7 +14,7 @@ import { createColumnPicker, COLUMN_BOX } from './columns.js';
 
 // Every handler app.js must provide. Checked at startup, so a missing one fails loudly instead of
 // throwing on every camera frame.
-const HANDLERS = ['status', 'calibration', 'calibrated', 'hold', 'focus', 'select', 'blink', 'rest', 'face', 'fatigue'];
+const HANDLERS = ['status', 'calibration', 'calibrated', 'hold', 'focus', 'point', 'select', 'blink', 'rest', 'face', 'fatigue'];
 
 // Drift check: the center, then two opposite corners, about 8 s. Measures how far the eye readings
 // have moved since calibration and shifts all five calibrated box centers by the average offset.
@@ -253,6 +253,18 @@ export async function startEyes(on, settings) {
     }
   }
 
+  // Where the eyes are on the gaze area (dot coordinates), for the gaze circle: the vision module's
+  // per-axis position (0 at the center dot, ±1 at the box dots) scaled to where those dots sit. The
+  // head model, when on, has its own point. Null while a hold closes the eyes or the face is gone.
+  function gazePoint(out) {
+    if (!out.faceFound || out.blink?.engaged) return null;
+    if (settings.headPose && gaze?.ready) return gaze.point;
+    const p = out.quadrant?.position;
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+    const [mx, my] = dotPositions(settings.dots, settings.layout).bottomRight;
+    return [p.x * mx, p.y * my];
+  }
+
   // Once per new camera frame (~30 fps). A requestAnimationFrame loop ran at the display's rate
   // instead (120 Hz on a MacBook Pro, where video.currentTime advances every refresh), so the face
   // model ran ~110 times a second on the page's main thread: everything lagged, and the vision
@@ -298,6 +310,7 @@ export async function startEyes(on, settings) {
       focus = visionFocus;
       on.focus(focus);
     }
+    on.point(out.mode === 'running' && !drift ? gazePoint(out) : null);
 
     for (const e of out.events) {
       if (e.type === 'holdStart') {

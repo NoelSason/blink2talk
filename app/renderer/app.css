@@ -487,6 +487,25 @@ p { margin: 0; }
 .care__button:hover { border-color: var(--border-strong); }
 .care__button--quiet { color: var(--text-muted); }
 
+/* ---------- Gaze circle (like Beam's gaze bubble) ---------- */
+/* A soft, see-through circle where the camera thinks the eyes are, so the patient can see what the
+   tracker sees. Light rim with a thin dark edge, so it shows on the dark boxes and on the highlighted
+   one. Glides between camera frames (~30 a second) instead of jumping; never takes clicks. */
+.gaze-circle {
+  position: absolute;
+  z-index: 5;
+  width: clamp(72px, 6.25cqi, 120px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  pointer-events: none;
+  border: 3px solid color-mix(in srgb, var(--text) 85%, transparent);
+  background: radial-gradient(circle, color-mix(in srgb, var(--text) 28%, transparent) 0%, color-mix(in srgb, var(--text) 10%, transparent) 65%, transparent 100%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg) 55%, transparent), 0 0 28px color-mix(in srgb, var(--text) 35%, transparent);
+  transition: left 140ms ease-out, top 140ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) { .gaze-circle { transition: none; } }
+
 /* ---------- Eye calibration (vision module, quadrant layout) ---------- */
 /* Covers the whole window, translucent, so the patient can still see the screen behind the dot. */
 .calibration { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 78%, transparent); }

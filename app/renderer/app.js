@@ -70,6 +70,7 @@ const s = {
   faceLost: false,
   cam: { engaged: false, closed: false, progress: 0 }, // camera hold: a long blink or held squint in progress
   calibration: null,          // calibration progress while the camera calibrates
+  gazePoint: null,            // [x, y] where the camera thinks the eyes are (dot coordinates), for the gaze circle
   consent: false,             // the current replies answer a high-stakes question (consent, treatment)
   stakesAbout: null,          // what a yes to it agrees to ("more pain medication"), when known
   resting: false,             // eyes closed 3 s: the camera treats it as a rest, not a choice
@@ -693,6 +694,7 @@ const camera = {
     if (wasEngaged && !s.cam.engaged) openedAt = now();
   },
   // The box the patient is looking at gets the highlight; the middle band (the question) highlights nothing.
+  point: (p) => { s.gazePoint = p; },
   focus: (quadrant) => {
     eyesOn = true;
     if (!gridShown() || now() < keyboardUntil) return;
@@ -775,6 +777,8 @@ function tick() {
     eyesClosed: s.eyesClosed || s.cam.closed,
     resting: s.resting,
     calibration: s.calibration,
+    // The gaze circle: only on the screens the eyes pick from, and only while the camera sees the eyes.
+    gazePoint: eyeSettings.gazeCircle && s.stage === 'choose' && !s.calibration && !s.faceLost && !s.resting ? s.gazePoint : null,
     faceLost: s.faceLost,
     micOn: s.mic === 'on' || s.mic === 'starting', // shown at once on M, before it connects
     caption: s.caption,

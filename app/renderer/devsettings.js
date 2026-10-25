@@ -13,6 +13,7 @@ export const DEFAULTS = {
   learnFromPicks: false,  // a spoken, not-undone pick teaches the box classifier where the eyes were. Off: a wrong pick that isn't undone teaches the wrong box
   layout: 'row',        // 'row' (question on top, 4 tall boxes side by side, left-right eye movement only) | 'kahoot' (2x2 below the question) | 'spread' (2x2 in the corners, question between)
   dots: 'corners',      // calibration dots: 'corners' (outer corner of each box) | 'centers' (middle of each box)
+  gazeCircle: false,    // a soft circle follows where the tracker thinks the eyes are (like Beam's gaze bubble); dev mode turns it on
 };
 
 // Calibration dot positions on the gaze area (x and y in [-1, 1], +y down). Corners: each box's outer

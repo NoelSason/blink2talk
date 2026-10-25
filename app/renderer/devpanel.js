@@ -121,6 +121,12 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
     markDirty(); // the dots are only used while calibrating
   });
 
+  const circleInput = el('input', { type: 'checkbox' });
+  circleInput.addEventListener('change', () => {
+    settings.gazeCircle = circleInput.checked; // live: app.js reads it every frame
+    saveSettings(settings);
+  });
+
   const headInput = el('input', { type: 'checkbox' });
   headInput.addEventListener('change', () => {
     settings.headPose = headInput.checked;
@@ -155,6 +161,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
     layoutInput.value = settings.layout;
     document.documentElement.dataset.layout = settings.layout;
     learnInput.checked = settings.learnFromPicks;
+    circleInput.checked = settings.gazeCircle;
     saveSettings(settings);
     syncSliders();
     markDirty();
@@ -182,6 +189,10 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
       el('h2', { className: 'dev__heading', textContent: 'Calibration dots (recal)' }),
       el('label', { className: 'dev__row' }, dotsInput)),
     el('section', { className: 'dev__section' },
+      el('h2', { className: 'dev__heading', textContent: 'Gaze circle' }),
+      el('label', { className: 'dev__row' }, circleInput,
+        el('span', { className: 'dev__label', textContent: 'Show a circle where the tracker thinks the eyes are' }))),
+    el('section', { className: 'dev__section' },
       el('h2', { className: 'dev__heading', textContent: 'Head model' }),
       el('label', { className: 'dev__row' }, headInput,
         el('span', { className: 'dev__label', textContent: 'Correct box picks for head turns (retrains on calibration)' }))),
@@ -205,6 +216,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   dotsInput.value = settings.dots;
   layoutInput.value = settings.layout;
   learnInput.checked = settings.learnFromPicks;
+  circleInput.checked = settings.gazeCircle;
   syncSliders();
 
   // ---- Accuracy test: a corner is shown on screen; we count which box the vision module says the eyes are on.

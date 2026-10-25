@@ -109,6 +109,7 @@ export function createView() {
   const els = {
     calibration: byId('calibration'),
     calibDot: byId('calib-dot'),
+    gazeCircle: byId('gaze-circle'),
     calibText: byId('calib-text'),
     calibCount: byId('calib-count'),
     screen: byId('screen'),
@@ -244,10 +245,20 @@ export function createView() {
     node.style.top = `${area.top - screen.top + area.height * (0.5 + y / 2)}px`;
   }
 
-  // Before each dot the screen names the next one and counts down; the dot appears when the count ends.
+  // The gaze circle sits where the camera thinks the eyes are (dot coordinates, like the calibration
+  // dots) and glides between camera frames (app.css). Kept on screen at the edges.
+  function renderGazeCircle(p) {
+    if (changed('gaze-shown', !!p)) els.gazeCircle.hidden = !p;
+    if (!p) return;
+    const clamp = (v) => Math.max(-1.05, Math.min(1.05, v));
+    placeOnGrid(els.gazeCircle, clamp(p[0]), clamp(p[1]));
+  }
+
+  // A countdown only before the first dot and before the squint; the dot appears when the count ends.
   function renderCalibration(c) {
     const lead = c?.leadRemainingMs > 0;
-    const seconds = c ? Math.max(1, Math.ceil((lead ? c.leadRemainingMs : c.remainingMs) / 1000)) : 0;
+    const counting = c?.phase === 'ready' || lead;
+    const seconds = counting ? Math.max(1, Math.ceil((lead ? c.leadRemainingMs : c.remainingMs) / 1000)) : 0;
     const where = `${document.documentElement.dataset.dots}|${document.documentElement.dataset.layout}`; // a switch moves the dot
     if (!changed('calibration', c ? `${c.phase}|${lead}|${seconds}|${where}` : '')) return;
     els.calibration.hidden = !c;
@@ -255,11 +266,12 @@ export function createView() {
     // Dots go where the grid's boxes are, so calibration matches what the patient will look at.
     const [x, y] = dotAt()[c.phase] ?? dotAt().center;
     placeOnGrid(els.calibDot, x, y);
-    els.calibDot.hidden = lead;
+    els.calibDot.hidden = counting;
     els.calibText.textContent = lead
       ? 'Next: narrow your eyes. Keep looking at the dot.'
       : CALIBRATION_TEXT[c.phase] ?? CALIBRATION_TEXT.center;
-    els.calibCount.textContent = String(seconds);
+    els.calibCount.hidden = !counting;
+    els.calibCount.textContent = counting ? String(seconds) : '';
   }
 
   function placeCaptionIfChanged(inGrid) {
@@ -269,6 +281,7 @@ export function createView() {
 
   function render(model) {
     renderCalibration(model.calibration);
+    renderGazeCircle(model.gazePoint);
     if (changed('screen-lost', model.faceLost)) els.screen.toggleAttribute('data-lost', model.faceLost);
     const eye = model.faceLost ? 'lost' : model.resting ? 'rest' : model.eyesClosed ? 'closed' : 'open';
     if (changed('eye', eye)) {
