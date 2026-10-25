@@ -6,7 +6,7 @@ Figma Slides deck: https://www.figma.com/slides/8U3Y4Bz4e7EzP9Eq3Ag5sd
 
 ## Our actual path
 
-Brief (text) → FigJam, through the Figma MCP server → Figma Design, through the MCP server, with a parallel Claude Design project → Handoff (`get_design_context` and `tokens.css`) → Code, with Claude Code and by hand. Then eye-tracker testing changed the layout three times in code: a 2×2 grid in the screen's corners (3:00 PM), a Kahoot-style 2×2 (9:45 PM), and a row of four boxes picked by looking left or right only (10:22 PM). The last one is close to the FigJam keep list's "one row of replies, moved by looking left or right." The Figma file was never updated.
+Brief (text) → FigJam, through the Figma MCP server → Figma Design, through the MCP server, with a parallel Claude Design project → Handoff (`get_design_context` and `tokens.css`) → Code, with Claude Code and by hand. Then eye-tracker testing changed the layout three times in code: a 2×2 grid in the screen's corners (3:00 PM), a Kahoot-style 2×2 (9:45 PM), and a row of four boxes picked by looking left or right only (10:22 PM). The row was close to the FigJam keep list's "one row of replies, moved by looking left or right," but it tested worse, so at 12:58 AM on Oct 25 the app went back to the Kahoot 2×2. The Figma file was never updated.
 
 ## Running time log
 
@@ -23,6 +23,7 @@ Times are PDT, Oct 24, 2026.
 | Oct 24, 15:00 | Code generation | Noel + Claude Code | None | ~25 | Figma's single row became a 2×2 grid in the screen's corners, so the patient looks straight at a box. Figma not updated. |
 | Oct 24, 21:45 | Code generation | Marco + Claude Code | None | — | Kahoot-style 2×2: boxes together, one color each. Figma not updated. |
 | Oct 24, 22:22 | Code generation | Marco + Claude Code | None | — | A row of four tall boxes, picked by left-right eye position only, because up/down gaze never got reliable. Figma not updated. |
+| Oct 25, 00:58 | Code generation | Marco + Claude Code | None | — | Back to the Kahoot-style 2×2: the row of four tested worse. The row stays a dev-mode switch. Figma not updated. |
 
 ---
 
@@ -37,7 +38,7 @@ Times are PDT, Oct 24, 2026.
 
 **Friction:** The loop-back arrows made the auto layout sprawl. We kept it instead of hand-placing 19 shapes. The first board landed in a personal Starter team, so we regenerated it in our Education team from the same source.
 
-**What carried forward:** The bedside constraints became the rules for every screen: text at least 28 px, no brightness changes, and no vitals on the patient view. The keep list's "one row of replies, moved by looking left or right" is where the app ended up after testing.
+**What carried forward:** The bedside constraints became the rules for every screen: text at least 28 px, no brightness changes, and no vitals on the patient view. We tried the keep list's "one row of replies, moved by looking left or right" late in testing; it worked worse than the 2×2.
 
 ---
 
@@ -85,7 +86,7 @@ Times are PDT, Oct 24, 2026.
 
 **What came from Figma:** The Listening, Speaking, tired-mode, and Can't-see-you screens, the component names and states, and the main-loop behavior. Designed in code instead: the calibration dots, the consent confirm, Spell it, the care panel, and every layout after 3:00 PM.
 
-**Friction:** Testing moved the layout three times. Patients target a box best by looking straight at it, so Figma's stepped row became a 2×2 grid in the corners. A Kahoot-style 2×2 followed. Then a recorded session showed left/right gaze separating by 17 to 23 times the noise and up/down by under 2, so the final layout is a row of four boxes picked left-right only. We never looped back to update Figma, so the code is the source of truth for layout.
+**Friction:** Testing moved the layout four times. Patients target a box best by looking straight at it, so Figma's stepped row became a 2×2 grid in the corners. A Kahoot-style 2×2 followed. Then a recorded session showed left/right gaze separating by 17 to 23 times the noise and up/down by under 2, so we tried a row of four boxes picked left-right only. It tested worse, and the Kahoot 2×2 came back. We never looped back to update Figma, so the code is the source of truth for layout.
 
 ---
 
