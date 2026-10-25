@@ -58,7 +58,7 @@ function stopServer() {
 const serverReady = startServer();
 
 // The page reaches the server through here instead of fetch, so the server needs no CORS setup.
-const ROUTES = new Set(['config', 'stt-token', 'replies', 'complete', 'speak', 'summary']);
+const ROUTES = new Set(['config', 'stt-token', 'replies', 'complete', 'speak', 'summary', 'local-warm']);
 const GET_ROUTES = new Set(['config', 'stt-token']);
 ipcMain.handle('conversation', async (_event, { route, body }) => {
   if (!ROUTES.has(route)) throw new Error(`unknown route ${route}`);

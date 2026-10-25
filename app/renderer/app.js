@@ -13,7 +13,7 @@ import { createMemory } from './memory.js';
 import { spellBoxes } from './speller.js';
 import { onPatientInput, onDemoKey } from './input.js';
 import { chime, speak, stopSpeaking } from './sound.js';
-import { FALLBACK_URGENT, completeWord, getConfig, getReplies, getSummary, identifySpeaker, prefetchVoice, sttToken, voiceAudio } from './conversation.js';
+import { FALLBACK_URGENT, completeWord, getConfig, getReplies, getSummary, identifySpeaker, prefetchVoice, sttToken, voiceAudio, warmLocalModel } from './conversation.js';
 import { startEyes } from './eyes.js';
 import { loadSettings } from './devsettings.js';
 import { createDevPanel } from './devpanel.js';
@@ -32,6 +32,7 @@ const TIMING = {
   afterSpeech: 1200,  // pause before going back to Listening
   micQuiet: 800,      // the mic stays muted this long after the voice stops, so it doesn't hear the tail
   summaryWait: 2000,  // the summary is redone this long after the conversation last changed
+  continueTurn: 6000, // a mic turn starting this soon after the last one, before a pick, continues it
   micRetry: 3000,
 };
 
@@ -72,6 +73,8 @@ const s = {
   mic: 'off',                 // 'off' | 'starting' | 'on' | 'unavailable'
   turn: null,                 // who said the current question: { speaker, voice, given }
   summary: null,              // { forPatient, forCaregiver, source, t }: the conversation so far
+  localReplies: savedLocal(), // testing only: replies from a small model on this laptop (care panel)
+  localAvailable: false,      // the conversation server has that model
 };
 // Claude's name for each voice the speaker-recognition model has heard ("voice key" -> "Dr. Lee").
 // Voice ids last one launch, so keys carry the launch, and saved lines from earlier launches keep theirs.
@@ -150,11 +153,52 @@ function playQuestion(q) {
 // audio: the turn's speech from the mic, for the speaker-recognition model.
 function nurseSaid(text, speaker = null, audio = null) {
   reset();
-  s.turn = { speaker, voice: null, given: !!speaker };
+  s.turn = { text, speaker, voice: null, voiceId: null, given: !!speaker, endedAt: now() };
   s.caption = { kind: 'question', speaker: speaker ?? 'Someone', text };
   s.transcript = text;
   s.prevPage = null;
   requestReplies(audio);
+}
+
+// The nurse often pauses mid-question; the mic then ends the turn and the rest arrives as a new one.
+// A mic turn that starts within TIMING.continueTurn of the last, before the patient has picked, is
+// the same question: the caption and the replies cover both parts. Returns that earlier turn.
+let micTurnStartedAt = 0; // when the current mic turn's first words arrived
+function continuedTurn() {
+  const t = s.turn;
+  if (!t?.endedAt || micTurnStartedAt - t.endedAt > TIMING.continueTurn) return null;
+  if (s.stage !== 'choose' || s.selected >= 0 || !['replies', 'unaddressed'].includes(s.rowKind)) return null;
+  return t;
+}
+
+function continueQuestion(prev, text) {
+  if (prev.added) memory.popTurn('nurse'); // the first part's line becomes the whole question
+  reset();
+  s.turn = { ...prev, text: `${prev.text} ${text}`, added: false, endedAt: now() };
+  s.caption = { kind: 'question', speaker: prev.speaker ?? 'Someone', text: s.turn.text };
+  s.transcript = s.turn.text;
+  requestReplies(); // same speaker: the first part's voice print stands
+}
+
+// Replies started when the mic thinks the nurse is probably done (turn.eager_end), reused if the
+// final transcript matches. Saves the wait between "probably done" and "done".
+let prefetch = null; // { text, promise }
+function repliesBody(transcript, history, turn) {
+  return {
+    transcript,
+    history: history.slice(-6),
+    patientProfile: memory.forClaude(),
+    fatigue: s.tired ? Math.max(s.fatigue, 0.8) : s.fatigue,
+    speaker: turn?.voiceId ? { voice: turn.voiceId, label: turn.speaker ?? undefined, isNew: turn.isNew } : undefined,
+    local: s.localReplies || undefined,
+  };
+}
+function prefetchReplies(text) {
+  if (!text || !hearingNurse()) return;
+  const prev = continuedTurn();
+  const question = prev ? `${prev.text} ${text}` : text;
+  const history = prev?.added ? memory.turns().slice(0, -1) : memory.turns();
+  prefetch = { text: question, promise: getReplies(repliesBody(question, history, null)) };
 }
 
 // Shows the loading outlines until replies arrive. Stale answers are ignored.
@@ -162,23 +206,20 @@ async function requestReplies(audio = null) {
   const token = ++requestToken;
   const turn = s.turn;
   Object.assign(s, { stage: 'choose', rowKind: 'replies', items: replyItems(['', '', '']), loading: true, hl: -1, selected: -1 });
+  const early = prefetch?.text === s.transcript ? prefetch.promise : null;
+  prefetch = null;
   // Which voice it was (about 50 ms). A voice Claude has named before gets that name right away.
   const v = await identifySpeaker(audio);
   if (token !== requestToken) return;
   if (v) {
-    turn.voice = `${LAUNCH}/${v.voice}`;
+    Object.assign(turn, { voice: `${LAUNCH}/${v.voice}`, voiceId: v.voice, isNew: v.isNew });
     if (!turn.given) turn.speaker = voiceNames.get(turn.voice) ?? null;
     s.caption = { ...s.caption, speaker: turn.speaker ?? 'Someone' };
   }
   memory.addTurn('nurse', s.transcript, { speaker: turn.speaker, voice: turn.voice });
+  turn.added = true;
   conversationChanged();
-  const d = await getReplies({
-    transcript: s.transcript,
-    history: memory.turns().slice(0, -1).slice(-6),
-    patientProfile: memory.forClaude(),
-    fatigue: s.tired ? Math.max(s.fatigue, 0.8) : s.fatigue,
-    speaker: v ? { voice: v.voice, label: turn.speaker ?? undefined, isNew: v.isNew } : undefined,
-  });
+  const d = await (early ?? getReplies(repliesBody(s.transcript, memory.turns().slice(0, -1), turn)));
   if (token !== requestToken) return;
   nameSpeaker(turn, d.speaker);
   s.urgent = d.urgent;
@@ -186,6 +227,7 @@ async function requestReplies(audio = null) {
   if (!d.addressed) {
     // Room talk ("grab the chart from room 4"): stay quiet, but one blink still gets the replies.
     memory.popTurn('nurse');
+    turn.added = false;
     conversationChanged();
     s.held = d.replies;
     s.caption = { kind: 'question', speaker: 'In the room', text: s.transcript };
@@ -366,7 +408,7 @@ async function suggestWords() {
   const prefix = sp.prefix;
   sp.words = [];
   if (!prefix) return;
-  const words = await completeWord({ prefix, sentenceSoFar: sp.message.trim(), context: s.transcript });
+  const words = await completeWord({ prefix, sentenceSoFar: sp.message.trim(), context: s.transcript, local: s.localReplies || undefined });
   if (s.spell !== sp || sp.prefix !== prefix) return;
   sp.words = words;
   // The suggestions box fills in when they arrive; nothing else moves.
@@ -434,6 +476,27 @@ function alertCare(text) {
 }
 
 // ---------- Nurse mic (mic.js, Cartesia Ink-2 through the conversation server's token) ----------
+// What the nurse mic hears (mic.js). Also driven directly by test/e2e.js.
+const heard = {
+  onPartial(text) {
+    if (!text || !hearingNurse()) return;
+    micTurnStartedAt ||= now();
+    const prev = continuedTurn();
+    s.caption = { kind: 'question', speaker: prev ? prev.speaker ?? 'Someone' : 'Someone', text: prev ? `${prev.text} ${text}` : text };
+  },
+  onEagerEnd: (text) => prefetchReplies(text),
+  onResume() { prefetch = null; },
+  onTurn(text, audio) {
+    micTurnStartedAt ||= now();
+    const prev = continuedTurn();
+    micTurnStartedAt = 0;
+    // Don't wipe a half-spelled message or a pick in progress.
+    if (!text || !hearingNurse()) return;
+    if (prev) continueQuestion(prev, text);
+    else nurseSaid(text, null, audio);
+  },
+};
+
 const hearingNurse = () => s.stage === 'choose' && !['spell', 'confirm'].includes(s.rowKind) && s.selected < 0 && !s.calibration;
 
 async function startNurseMic() {
@@ -450,13 +513,7 @@ async function startNurseMic() {
     mic = await startMic({
       token,
       muted: () => s.stage === 'speaking' || now() < micQuietUntil,
-      onPartial: (text) => {
-        if (text && hearingNurse()) s.caption = { kind: 'question', speaker: 'Someone', text };
-      },
-      onTurn: (text, audio) => {
-        // Don't wipe a half-spelled message or a pick in progress.
-        if (text && hearingNurse()) nurseSaid(text, null, audio);
-      },
+      ...heard,
       onError: (message) => {
         mic = null;
         s.mic = 'off';
@@ -702,6 +759,7 @@ function runAction(action, arg) {
   if (action === 'calibrate') eyes?.calibrate();
   if (action === 'profile') memory.setProfile(arg);
   if (action === 'summary') refreshSummary();
+  if (action === 'local-replies') setLocalReplies(arg ?? !s.localReplies);
   if (action === 'clear-history') {
     memory.clearHistory();
     conversationChanged();
@@ -712,7 +770,27 @@ function runAction(action, arg) {
 function syncPanels() {
   const light = document.documentElement.dataset.theme === 'light';
   demo.sync({ tired: s.tired, faceLost: s.faceLost, light });
-  care.update({ tired: s.tired, faceLost: s.faceLost, mic: s.mic === 'starting' ? (micWanted ? 'on' : 'off') : s.mic, light });
+  care.update({
+    tired: s.tired, faceLost: s.faceLost, mic: s.mic === 'starting' ? (micWanted ? 'on' : 'off') : s.mic, light,
+    local: s.localReplies, localAvailable: s.localAvailable,
+  });
+}
+
+// Testing only (care panel): replies and word suggestions from a small model on this laptop instead
+// of Claude. Kept between launches on this machine. Off by default.
+function savedLocal() {
+  try {
+    return localStorage.getItem('blink2talk.localReplies') === 'on';
+  } catch {
+    return false;
+  }
+}
+function setLocalReplies(on) {
+  s.localReplies = on && s.localAvailable;
+  try {
+    localStorage.setItem('blink2talk.localReplies', s.localReplies ? 'on' : 'off');
+  } catch {}
+  if (s.localReplies) warmLocalModel(); // load it now, not on the next question
 }
 
 const demo = createDemoPanel({ questions: QUESTIONS, onAction: runAction });
@@ -722,6 +800,8 @@ const care = createCarePanel({ memory, onAction: runAction });
 async function loadConfig(tries = 15) {
   const config = await getConfig();
   demo.setStatus(config);
+  s.localAvailable = !!config?.localModel;
+  setLocalReplies(s.localReplies);
   if (config) {
     s.urgent = config.urgent ?? FALLBACK_URGENT;
     prefetchVoice(s.urgent);
@@ -741,7 +821,7 @@ onPatientInput((event) => {
 });
 onDemoKey((action) => runAction(action));
 // test/e2e.js loads the page with ?test and drives the camera handlers with recorded-style events.
-if (new URLSearchParams(location.search).has('test')) window.__test = { camera, state: s };
+if (new URLSearchParams(location.search).has('test')) window.__test = { camera, heard, state: s };
 toListening();
 syncPanels();
 loadConfig();

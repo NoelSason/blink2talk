@@ -111,6 +111,23 @@ app.whenReady().then(async () => {
   await doubleBlink();
   check('another double blink goes back to the replies', (await state('s.rowKind')) === 'replies');
 
+  // A question split across two mic turns (the nurse paused) is one question: one caption, one line
+  // in the conversation, replies for both parts. A turn after a pick is a new question.
+  await key('KeyR');
+  const heard = (call) => js(`window.__test.heard.${call}; 1`);
+  await heard(`onPartial('Can I take you')`);
+  await heard(`onTurn('Can I take you down to the X-ray?', null)`);
+  await waitFor(`s.rowKind === 'replies' && !s.loading`);
+  await heard(`onPartial('It will take')`);
+  check('the second part extends the caption', (await state('s.caption.text')) === 'Can I take you down to the X-ray? It will take');
+  await heard(`onTurn('It will take ten minutes.', null)`);
+  check('a split question becomes one question', (await state('s.transcript')) === 'Can I take you down to the X-ray? It will take ten minutes.');
+  check('and one line in the conversation', await js(`(() => { const h = JSON.parse(localStorage.getItem('blink2talk.memory')).history; return h.at(-1).text === 'Can I take you down to the X-ray? It will take ten minutes.' && !h.some((t) => t.text === 'Can I take you down to the X-ray?'); })()`));
+  await waitFor(`s.rowKind === 'replies' && !s.loading`);
+
+  // The testing-only fast local replies switch: off, and greyed out without the model.
+  check('the local replies switch is off and unavailable without its model', await js(`(() => { const box = [...document.querySelectorAll('.care label')].find((l) => l.textContent.includes('testing only'))?.querySelector('input'); return !!box && !box.checked && box.disabled; })()`));
+
   // Summary: back on Listening, the conversation so far shows for the patient and in the care panel.
   // No server here, so it's the plain version: the last few lines as said, with who said them.
   await key('KeyR');

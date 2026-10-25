@@ -3,3 +3,5 @@ node_modules
 .env.*
 !.env.example
 *.wav
+# Testing-only local model (npm run local-model, ~2.5 GB)
+models/

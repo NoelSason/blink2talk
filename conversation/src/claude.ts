@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { isConsentQuestion, CONSENT_REPLIES } from "./safety.js";
 import { mockComplete, mockReplies } from "./mock.js";
+import { localJson, localModelAvailable } from "./local.js";
 
 const MODEL = process.env.CLAUDE_MODEL ?? "claude-haiku-5-5";
 // Summaries run in the background, so they use the strongest model.
@@ -37,9 +38,10 @@ export interface RepliesInput {
   patientProfile?: PatientProfile;
   fatigue?: number; // 0..1, high = offer fewer, shorter options
   speaker?: VoiceInfo;
+  local?: boolean; // testing only: answer with the small on-laptop model (local.ts)
 }
 
-const SYSTEM = `You help a patient who cannot speak or use their hands reply to a nurse or family member. They select a reply with a deliberate blink, so every option must be a complete, natural first-person sentence the patient could say as-is.
+export const SYSTEM = `You help a patient who cannot speak or use their hands reply to a nurse or family member. They select a reply with a deliberate blink, so every option must be a complete, natural first-person sentence the patient could say as-is.
 
 Given what was just said to the patient, propose the most likely replies, in order of likelihood.
 
@@ -53,7 +55,7 @@ Rules:
 - If the message is unintelligible, offer: "Please say that again", "I didn't understand", "Yes", "No".
 - Also say who is speaking. A voice model tells voices apart (voice-1, voice-2, …) and gives the label used for this voice before, if any. Keep that label unless this message gives a better one (a name, a title, a relationship). speaker_label is what the patient would call them: "Dr. Lee", "Nurse Sam", "Your daughter", "Nurse", "Doctor", "Family". Use "Someone" only when there is no clue. speaker_role is nurse, doctor, family, visitor, staff, or unknown.`;
 
-const REPLIES_SCHEMA = {
+export const REPLIES_SCHEMA = {
   type: "object",
   properties: {
     addressed_to_patient: { type: "boolean" },
@@ -65,7 +67,7 @@ const REPLIES_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const COMPLETE_SCHEMA = {
+export const COMPLETE_SCHEMA = {
   type: "object",
   properties: { words: { type: "array", items: { type: "string" } } },
   required: ["words"],
@@ -84,7 +86,6 @@ export async function getReplies(
   inp: RepliesInput,
 ): Promise<{ replies: string[]; source: string; addressed: boolean; speaker: Speaker | null }> {
   if (isConsentQuestion(inp.transcript)) return { replies: CONSENT_REPLIES, source: "consent-rule", addressed: true, speaker: null };
-  if (mock()) return { replies: mockReplies(inp.transcript), source: "mock", addressed: true, speaker: null };
 
   const history = historyLines((inp.history ?? []).slice(-6));
   const v = inp.speaker;
@@ -99,6 +100,16 @@ export async function getReplies(
     .filter(Boolean)
     .join("\n\n");
 
+  // Testing only: the small on-laptop model, when the caregiver switched it on. Claude if it fails.
+  if (inp.local && localModelAvailable()) {
+    try {
+      return toReplies(await localJson<ParsedReplies>(SYSTEM, REPLIES_SCHEMA, prompt), "local");
+    } catch (err) {
+      console.error("local replies failed, using Claude:", err);
+    }
+  }
+  if (mock()) return { replies: mockReplies(inp.transcript), source: "mock", addressed: true, speaker: null };
+
   const res = await client.messages.create({
     model: MODEL,
     max_tokens: 2048,
@@ -107,18 +118,23 @@ export async function getReplies(
     messages: [{ role: "user", content: prompt }],
   }, { timeout: REPLIES_TIMEOUT_MS, maxRetries: 0 });
   if (res.stop_reason === "refusal") throw new Error("model refused");
-  const parsed = JSON.parse(text(res)) as {
-    addressed_to_patient: boolean;
-    replies: string[];
-    speaker_label: string;
-    speaker_role: SpeakerRole;
-  };
+  return toReplies(JSON.parse(text(res)) as ParsedReplies, MODEL);
+}
+
+interface ParsedReplies {
+  addressed_to_patient: boolean;
+  replies: string[];
+  speaker_label: string;
+  speaker_role: SpeakerRole;
+}
+
+function toReplies(parsed: ParsedReplies, source: string) {
   const replies = parsed.replies.map((r) => r.trim()).filter(Boolean).slice(0, 4);
   if (replies.length === 0) throw new Error("empty replies");
   // Replies are kept even when not addressed, so "Reply anyway" is instant.
   const label = parsed.speaker_label?.trim();
   const speaker = label ? { label, role: parsed.speaker_role ?? "unknown" } : null;
-  return { replies, source: MODEL, addressed: parsed.addressed_to_patient !== false, speaker };
+  return { replies, source, addressed: parsed.addressed_to_patient !== false, speaker };
 }
 
 const SUMMARY_SYSTEM = `You summarize a conversation in an ICU room. The patient cannot speak; they answer by choosing one of a few suggested replies with their eyes, and the app speaks it for them. Each line is labeled with who said it.
@@ -170,26 +186,34 @@ export async function summarize(inp: { history: Turn[]; patientProfile?: Patient
   };
 }
 
+const COMPLETE_SYSTEM =
+  "A patient is spelling a message letter by letter with their eyes. Given the letters typed so far for the current word, the sentence so far, and what they were last asked, return the 4 most likely whole words, most likely first. Every word must start with the given prefix (case-insensitive). Lowercase unless it is a proper noun.";
+
 export async function completeWord(inp: {
   prefix: string;
   sentenceSoFar?: string;
   context?: string;
+  local?: boolean; // testing only (local.ts)
 }): Promise<string[]> {
-  if (mock()) return mockComplete(inp.prefix);
-  const res = await client.messages.create({
-    model: MODEL,
-    max_tokens: 1024,
-    output_config: { effort: "low", format: { type: "json_schema", schema: COMPLETE_SCHEMA } },
-    system:
-      "A patient is spelling a message letter by letter with their eyes. Given the letters typed so far for the current word, the sentence so far, and what they were last asked, return the 4 most likely whole words, most likely first. Every word must start with the given prefix (case-insensitive). Lowercase unless it is a proper noun.",
-    messages: [
-      {
-        role: "user",
-        content: `Last asked: ${inp.context ?? "(unknown)"}\nSentence so far: ${inp.sentenceSoFar ?? ""}\nPrefix: ${inp.prefix}`,
-      },
-    ],
-  }, { timeout: REPLIES_TIMEOUT_MS, maxRetries: 0 });
-  const parsed = JSON.parse(text(res)) as { words: string[] };
+  const user = `Last asked: ${inp.context ?? "(unknown)"}\nSentence so far: ${inp.sentenceSoFar ?? ""}\nPrefix: ${inp.prefix}`;
+  let parsed: { words: string[] } | null = null;
+  if (inp.local && localModelAvailable()) {
+    parsed = await localJson<{ words: string[] }>(COMPLETE_SYSTEM, COMPLETE_SCHEMA, user).catch((err) => {
+      console.error("local completion failed, using Claude:", err);
+      return null;
+    });
+  }
+  if (!parsed && mock()) return mockComplete(inp.prefix);
+  if (!parsed) {
+    const res = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1024,
+      output_config: { effort: "low", format: { type: "json_schema", schema: COMPLETE_SCHEMA } },
+      system: COMPLETE_SYSTEM,
+      messages: [{ role: "user", content: user }],
+    }, { timeout: REPLIES_TIMEOUT_MS, maxRetries: 0 });
+    parsed = JSON.parse(text(res)) as { words: string[] };
+  }
   const p = inp.prefix.toLowerCase();
   return parsed.words.filter((w) => w.toLowerCase().startsWith(p)).slice(0, 4);
 }

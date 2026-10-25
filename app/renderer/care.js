@@ -62,6 +62,8 @@ export function createCarePanel({ memory, onAction }) {
   const mic = toggle('Listen for the nurse', 'mic');
   const light = toggle('Light theme', 'theme');
   const micNote = el('p', { className: 'care__note' });
+  const local = toggle('Fast replies on this laptop (testing only)', 'local-replies');
+  const localNote = el('p', { className: 'care__note' });
 
   panel.append(
     el('header', { className: 'care__head' }, el('div', {}, title, el('p', { className: 'care__note', textContent: 'Care panel' })), close),
@@ -73,7 +75,7 @@ export function createCarePanel({ memory, onAction }) {
       el('label', { className: 'care__field' }, el('span', { textContent: 'Name' }), name),
       el('label', { className: 'care__field' }, el('span', { textContent: 'Notes' }), notes),
       often),
-    section('Settings', tired.row, mic.row, micNote, light.row, button('Calibrate eyes again', 'calibrate')),
+    section('Settings', tired.row, mic.row, micNote, light.row, local.row, localNote, button('Calibrate eyes again', 'calibrate')),
   );
 
   function renderAlerts() {
@@ -127,6 +129,10 @@ export function createCarePanel({ memory, onAction }) {
       mic.input.checked = state.mic === 'on';
       mic.input.disabled = state.mic === 'unavailable';
       micNote.textContent = state.mic === 'unavailable' ? 'The microphone needs the conversation server and its speech key.' : '';
+      local.input.checked = !!state.local;
+      local.input.disabled = !state.localAvailable;
+      localNote.textContent = !state.localAvailable ? 'For testing only. Not set up on this laptop.'
+        : 'For testing only. Suggestions come faster but are less accurate. Not for use with patients.';
       light.input.checked = state.light;
       renderAlerts();
     },

@@ -38,7 +38,8 @@ The vision module (`../vision`) owns the eyes: calibration (3 s countdown, then 
 
 ## For the nurse or family
 
-- **Talk:** the mic streams to Cartesia Ink-2, the caption updates as the nurse speaks, and replies appear when they finish. It mutes itself while the patient's voice plays.
+- **Talk:** the mic streams to Cartesia Ink-2, the caption updates as the nurse speaks, and replies appear when they finish. A turn ends after at most 1.5 s of quiet, and replies start as soon as Ink-2 thinks the nurse is probably done. If the nurse pauses mid-question and keeps going within 6 s, before the patient picks, both parts become one question with one set of replies. It mutes itself while the patient's voice plays.
+- **Fast replies on this laptop (testing only):** a switch in the care panel's Settings. Replies and word suggestions come from a small model running on the laptop instead of Claude: quicker, less accurate, not for patients. It's greyed out until the model is downloaded (`cd conversation && npm run local-model`, ~2.5 GB).
 - **Care panel:** the small button in the bottom-right corner, or `N`. It holds alerts, vitals (not connected yet), the conversation, notes about the patient, and settings. Urgent picks badge the button, play a sound, and send a desktop notification.
 - **Memory:** the notes, and the phrases the patient picks most, go to Claude with every question. They're stored on this machine only.
 - **Who said what:** every line in the conversation is labeled with who said it ("Dr. Lee", "Your daughter"). A speaker-recognition model on this laptop (NVIDIA TitaNet-Large, run by sherpa-onnx in `speakers.js`) tells voices apart, so the same person keeps the same label; Claude names each voice from what it says. Voice prints stay in memory for one launch and never leave the laptop. Typed or sample questions skip the voice model.

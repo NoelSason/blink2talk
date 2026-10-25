@@ -2,6 +2,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { completeWord, getReplies, summarize } from "./claude.js";
+import { localModelAvailable, warmLocal } from "./local.js";
 import { CONSENT_REPLIES, SPELL_OPTION, URGENT } from "./safety.js";
 import { sttToken, synthesize, usingClone, warm } from "./voice.js";
 
@@ -19,19 +20,20 @@ app.get("/config", (_req, res) => {
     mockReplies: process.env.MOCK_REPLIES === "1" || !process.env.ANTHROPIC_API_KEY,
     mockVoice: mockVoice(),
     clonedVoice: usingClone(),
+    localModel: localModelAvailable(), // testing only: the small on-laptop model is downloaded
   });
 });
 
 // Always responds: on any model failure, falls back to safe generic options.
 app.post("/replies", async (req, res) => {
-  const { transcript, history, patientProfile, fatigue, speaker } = req.body ?? {};
+  const { transcript, history, patientProfile, fatigue, speaker, local } = req.body ?? {};
   if (typeof transcript !== "string" || !transcript.trim()) {
     res.status(400).json({ error: "transcript required" });
     return;
   }
   const t0 = Date.now();
   try {
-    const out = await getReplies({ transcript, history, patientProfile, fatigue, speaker });
+    const out = await getReplies({ transcript, history, patientProfile, fatigue, speaker, local: local === true });
     res.json({ ...out, urgent: URGENT, spellOption: SPELL_OPTION, ms: Date.now() - t0 });
   } catch (err) {
     console.error("replies failed:", err);
@@ -65,14 +67,20 @@ app.post("/summary", async (req, res) => {
   }
 });
 
+// Testing only: load the small on-laptop model now (the app calls this when the switch is turned on).
+app.post("/local-warm", (_req, res) => {
+  warmLocal();
+  res.status(204).end();
+});
+
 app.post("/complete", async (req, res) => {
-  const { prefix, sentenceSoFar, context } = req.body ?? {};
+  const { prefix, sentenceSoFar, context, local } = req.body ?? {};
   if (typeof prefix !== "string" || !prefix) {
     res.status(400).json({ error: "prefix required" });
     return;
   }
   try {
-    res.json({ words: await completeWord({ prefix, sentenceSoFar, context }) });
+    res.json({ words: await completeWord({ prefix, sentenceSoFar, context, local: local === true }) });
   } catch (err) {
     console.error("complete failed:", err);
     res.json({ words: [] });

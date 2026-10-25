@@ -1,6 +1,6 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-24 16:58 PDT
+Updated: 2026-10-24 17:15 PDT
 
 ## Now
 - Working on: who said each line (voice model + Claude names) and conversation summaries for the patient (Listening) and the care panel.
@@ -35,6 +35,7 @@ Conversation: `main.js` relays to `localhost:8790` over `ipcMain.handle('convers
 | --- | --- |
 | `GET /config` | `urgent[]`, mock flags for the demo panel |
 | `POST /replies { transcript, history, patientProfile, fatigue, speaker }` → `{ replies: string[], urgent, addressed, source, speaker }` | `patientProfile` = name, nurse's notes, most-picked phrases. First 3 replies shown. `addressed: false` → "Reply anyway". `source: "consent-rule"` → confirm screen on Yes/No. `speaker` in = `{ voice, label, isNew }`; out = `{ label, role }` names the caption and every line of that voice |
+| `/replies`, `/complete` with `local: true`; `POST /local-warm`; `/config` → `localModel` | Testing-only care panel switch (off by default, saved locally): replies from the on-laptop model; greyed out without it |
 | `POST /summary { history, patientProfile }` → `{ forPatient, forCaregiver[] }` (204 mock, 502 error) | 2 s after the conversation changes. `forPatient` = "So far" on Listening; `forCaregiver` = care panel Summary. Otherwise the last lines as said |
 | `POST /speak { text }` → WAV, or 204 | Fetched for every reply as it shows; played in the renderer. 204 → system voice |
 | `GET /stt-token` → `{ token }` | Renderer streams the mic to Cartesia `stt/turns/websocket` (Ink-2). `turn.update` = live caption, `turn.end` = question. Silence sent while speaking + 800 ms. `M` toggles |
@@ -49,6 +50,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | --- | --- | --- | --- | --- | --- |
 | 2026-10-24 | Free text cut; first "none" re-asks Claude with `rejected`; second shows 4 categories | "None of these" opens a page with the 3 urgent phrases + Spell it (4-box speller: E/T/A/O in 2 picks, the rest in 3, Claude word suggestions). No re-ask | Noel asked for an eye-reachable speller; the urgent phrases need a place in a 4-box grid | Conversation (`/complete`; `rejected` unused) | No. Team to decide; the 4-category flow would replace this page. |
 | 2026-10-24 | Push-to-talk | Always-on mic with Ink-2 turn detection; muted while the patient's voice plays; room talk waits behind "Reply anyway" | Samarth's streaming mic in `patient.html` works this way | Conversation | No. Samarth's design; worth a CLAUDE.md line. |
+| 2026-10-24 | Cut: local LLM | Testing-only care panel switch "Fast replies on this laptop (testing only)": Qwen3-4B-Instruct via node-llama-cpp in the conversation server; off by default, greyed out until `npm run local-model`; Claude if it fails | Noel asked for it for testing only | Conversation (`local` flag, optional dependency) | No. Team: keep as a testing switch or remove before judging. |
 | 2026-10-24 | `MOCK_STT` / `MOCK_LLM` / `MOCK_TTS` env flags and a mock badge per subsystem | Automatic fallbacks plus a "Sources" list in the demo panel | Fallbacks keep the demo running if a service drops mid-demo | Nobody | No. |
 | 2026-10-24 | Distress alerts cut | The patient picking "I'm in pain" / "I can't breathe" / "Call the nurse" badges the care button, chimes, and sends a desktop notification | It's the patient asking, not a distress detector | Nobody | No. Needs a team OK (see Open questions). |
 | 2026-10-24 | `gaze` / `confirm` / `rest` / `fatigue` over `ipcRenderer` | Renderer reads the vision pipeline's own events (table above) | Tracker and screen share one renderer; IPC adds a hop for nothing | Input | No. Julian's rows to restate. |
@@ -58,6 +60,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-24: Nurse mic turns: Ink-2 `end_timeout_ms: 1500`, `end_threshold: 0.3` (Samarth's settings); replies start on `turn.eager_end` and are reused if the final transcript matches; a mic turn starting ≤ 6 s after the last, before a pick, extends the same question (one caption, one conversation line, fresh replies). Why: Noel saw questions split in two, with replies for half a question; turn ends took up to ~5.6 s. Measured: Haiku at low effort already skips thinking (~82 output tokens, median 1.25 s), so turning thinking off gained nothing. Rejected: a longer turn timeout (slower for every question).
 - 2026-10-24 (Marco): conversation server moved to port 8790. Port 8787 is taken on some Macs (the Obsidian kanban UI). Why: the app silently talked to the wrong server. Rejected: killing the other process.
 - 2026-10-24 (Marco): camera double blink counts closures under 800 ms (was 700), and the spelling page's double-blink check now uses camera blinks. Dev mode shows each blink's length. Why: a deliberate blink ran past 700 ms and was ignored. Squint instruction reworded to plain words.
 - 2026-10-24 (Marco): calibration shows the next dot's name and a countdown before each dot (2 s, set in dev mode). The overlay covers the window, translucent, with large text. Why: the patient couldn't read the prompt, and the dot appeared before they could look at it.

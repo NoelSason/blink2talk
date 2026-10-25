@@ -20,7 +20,8 @@ function speechOnly(chunks) {
   return out.buffer;
 }
 
-export async function startMic({ token, muted, onPartial, onTurn, onError }) {
+// onEagerEnd: Ink-2 thinks the nurse is probably done (replies can start); onResume: they weren't.
+export async function startMic({ token, muted, onPartial, onEagerEnd, onResume, onTurn, onError }) {
   const q = new URLSearchParams({
     model: 'ink-2',
     encoding: 'pcm_s16le',
@@ -29,6 +30,9 @@ export async function startMic({ token, muted, onPartial, onTurn, onError }) {
     access_token: token,
   });
   const ws = new WebSocket(`wss://api.cartesia.ai/stt/turns/websocket?${q}`);
+  // Same turn settings as conversation/public/patient.html: end a turn after at most 1.5 s of quiet
+  // (the default waits up to ~5.6 s). Set before any await, so the open event can't be missed.
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'config', turn: { end_timeout_ms: 1500, end_threshold: 0.3 } }));
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
   const ctx = new AudioContext({ sampleRate: 16000 });
   await ctx.audioWorklet.addModule('./mic-worklet.js');
@@ -61,6 +65,8 @@ export async function startMic({ token, muted, onPartial, onTurn, onError }) {
     const m = JSON.parse(event.data);
     if ((m.type === 'turn.start' || m.type === 'turn.update') && !turn) turn = before;
     if (m.type === 'turn.update') onPartial(m.transcript ?? '');
+    else if (m.type === 'turn.eager_end') onEagerEnd((m.transcript ?? '').trim());
+    else if (m.type === 'turn.resume') onResume();
     else if (m.type === 'turn.end') {
       const audio = speechOnly(turn ?? before);
       turn = null;

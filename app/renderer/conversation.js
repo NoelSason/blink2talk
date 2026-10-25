@@ -77,7 +77,12 @@ export async function getSummary(body) {
   }
 }
 
-// Whole-word suggestions for Spell it. body: { prefix, sentenceSoFar, context }
+// Testing only: loads the small on-laptop model in the server, so the first local reply isn't slow.
+export function warmLocalModel() {
+  call?.('local-warm', {}).catch(() => {});
+}
+
+// Whole-word suggestions for Spell it. body: { prefix, sentenceSoFar, context, local }
 export async function completeWord(body) {
   if (!call || !body.prefix) return [];
   try {

@@ -30,6 +30,7 @@ These do exactly what ←, →, Space do, so test with the keyboard first. Debou
 
 ## API
 - `POST /replies {transcript, history?, patientProfile?, fatigue?, speaker?}` -> `{replies[], addressed, speaker, urgent[], spellOption, source, ms}`. `addressed: false` = speech wasn't meant for the patient (screen stays quiet, offers "Reply anyway"). `speaker` in: `{voice, label?, isNew?}` from the app's voice model; out: `{label, role}` ("Dr. Lee", doctor), or null for the consent rule, mock, and fallback. History lines may carry `speaker`.
+- Testing only: `/replies` and `/complete` take `local: true` to answer with a small model on the laptop (Qwen3-4B-Instruct via node-llama-cpp, `src/local.ts`), falling back to Claude if it fails. `POST /local-warm` loads it; `GET /config` reports `localModel`. Download the model once with `npm run local-model` (~2.5 GB). Not for patients; CLAUDE.md cuts a local LLM, so this stays a switch for testing.
 - `POST /summary {history, patientProfile?}` -> `{forPatient, forCaregiver[], source}`. Uses `SUMMARY_MODEL` (default `claude-opus-5-5`), 30 s timeout. 204 in mock mode, 502 on failure (the app writes a plain one).
 - `POST /complete {prefix, sentenceSoFar?, context?}` -> `{words[]}`
 - `POST /speak {text}` -> `audio/wav` (204 in mock mode)
