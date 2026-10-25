@@ -114,6 +114,8 @@ export function createView() {
     screen: byId('screen'),
     eyeIcon: byId('eye-icon'),
     eyeLabel: byId('eye-label'),
+    micIcon: byId('mic-icon'),
+    micLabel: byId('mic-label'),
     caption: byId('caption'),
     captionWaiting: byId('caption-waiting'),
     captionSpeaker: byId('caption-speaker'),
@@ -271,6 +273,10 @@ export function createView() {
     if (changed('eye', eye)) {
       els.eyeIcon.className = `icon icon--${{ lost: 'eye-off', rest: 'eye-closed', closed: 'eye-closed', open: 'eye' }[eye]}`;
       els.eyeLabel.textContent = { lost: "Can't see you", rest: 'Resting', closed: 'Eyes closed', open: 'I can see you' }[eye];
+    }
+    if (changed('mic', model.micOn)) {
+      els.micIcon.className = `icon icon--${model.micOn ? 'mic' : 'mic-off'}`;
+      els.micLabel.textContent = model.micOn ? 'Mic on' : 'Mic off';
     }
 
     // Caption kinds: waiting (Listening), question (what was said), prompt, and message (what the

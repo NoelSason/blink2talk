@@ -38,6 +38,19 @@ app.whenReady().then(async () => {
   };
   const waitFor = async (expr, ms = 8000) => { for (const t0 = Date.now(); Date.now() - t0 < ms; await sleep(100)) if (await state(expr)) return true; return false; };
 
+  // The top bar says whether the nurse mic is on. Off at launch. With no server here, M asks for the
+  // mic and it stays unavailable, so "on" is set by hand before the second M turns it off.
+  const micLabel = () => js(`document.getElementById('mic-label').textContent`);
+  check('the top bar shows the mic is off at launch', (await micLabel()) === 'Mic off');
+  await key('KeyM');
+  await sleep(100);
+  await js(`window.__test.state.mic = 'on'; 1`);
+  await sleep(80);
+  check('and shows when it is on', (await micLabel()) === 'Mic on');
+  await key('KeyM');
+  await sleep(80);
+  check('M turns it off', (await micLabel()) === 'Mic off' && (await state('s.mic')) === 'off');
+
   // Listening: one item; a long blink opens the urgent options and Spell it.
   check('listening shows one item', (await labels()).length === 1);
   await hold();
