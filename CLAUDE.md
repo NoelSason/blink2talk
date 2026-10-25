@@ -3,7 +3,7 @@
 Read this every session. `DESIGN.md` is reference only; don't read it unless you need a spec. (Not written yet as of 2026-10-24.)
 **If you change an interface, a mock, or a decision, update this file in the same commit.**
 **Scope was cut on 2026-10-25 with ~12 build hours left. Do not re-add anything under "Cut".**
-**Git: push verified work straight to `main`. No branches, no PRs, don't ask first.** Run `git pull --rebase` before every push.
+**Git: commit verified work, then ask before every push.** Once the user says yes, push straight to `main` (no branches, no PRs). Run `git pull --rebase` before every push.
 
 ## Context docs (read before you build)
 
@@ -98,6 +98,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-25 — Marco: Claude asks before every push (commits locally until then). Auto-pushing was annoying. Still straight to `main`, no PRs.
 - 2026-10-24 — Noel: WebEyeTrack removed (code, weights, dependency, `G` switch); the vision module is the only gaze source. Replies move to `claude-opus-5-5` in fast mode with a rewritten prompt: on 37 labeled phrases, grade 3.81 → 4.51 of 5 and median 1.33 → 1.21 s (`npm run eval:replies`). @Samarth: `conversation/` changed, see context/conversation.md.
 - 2026-10-25 — Marco: patient screen is Kahoot style (question on top, 2x2 colored boxes together below). Spread layout kept as a dev-mode switch. Details and the reading-the-question risk in context/product.md.
 - 2026-10-24 — Marco: head-movement input and the phone face-tracking model cut. Our target patients mostly can't move their head; eye input must work alone. The dev-mode head-pose switch only corrects eye picks for head turns and isn't an input.
