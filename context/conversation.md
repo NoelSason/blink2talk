@@ -4,7 +4,7 @@ Updated: 2026-10-25 01:30 PDT
 
 ## Now
 - Working on: `/replies` matches the contract (exactly 3 `{text, intent}`, `highStakes`, `rejected`, `category`), merged with Noel's speaker/highStakes/summary changes. `patient.html`: push-to-talk default, "None of these" -> re-ask -> 4 topics -> spell.
-- Next: Noel wires `rejected`/`category` into the app. Watch Haiku latency (slow tonight; timeout now 5 s default, `.env.example` 8 s).
+- Next: Noel wires `rejected`/`category` into the app. Replies now on Opus 5.5 fast (1.2 s median); timeout 5 s default, `.env.example` 8 s.
 - Blocked on: team agreeing to keep Spell it (see below).
 
 ## Build-order status
@@ -41,6 +41,7 @@ HTTP on `localhost:8790` (Noel's `main.js` proxies it over IPC):
 `POST /complete` and spelling are the free text CLAUDE.md cuts. Samarth's call: keep it, as the 3rd "None of these" step. @Marco @Noel: agree, then move it off the Cut list in CLAUDE.md.
 
 ## Decisions (newest first)
+- 2026-10-24 (Noel; @Samarth please review): replies on `claude-opus-5-5` in fast mode (`CLAUDE_FAST`, beta `fast-mode-2026-02-01`, one standard-speed retry on a 429) with the server-side refusal fallback (`fallbacks: "default"`), and a rewritten SYSTEM prompt: replies fit the question type (yes/no = one yes, one no, one in-between; scales = number ranges; either/or = each option), 2-6 words, no echoing the question, no invented people or symptoms. Exact repeats are dropped. Spell it words stay on Haiku (`COMPLETE_MODEL`). Measured with the new `npm run eval:replies` (37 labeled phrases; rule checks, high-stakes and room-talk labels, latency, a 1-5 grade from Opus): Haiku + old prompt 3.81, 2 sets with rule problems, 1.33 s median / 2.08 s p90 -> Opus fast + new prompt 4.51, 0 problems, 1.21 s / 1.48 s. High stakes and room talk right on all 37 either way. Rejected: Sonnet 5.5 (4.27, 1.50 s), Opus at standard speed (4.54, 2.33 s). Caveat: the grader is Opus too.
 - 2026-10-25: "None of these" re-ask stays on the question (more specific / partial / later), never an unrelated need. Why: first version jumped from "thirsty" to "raise my head". The topic picker handles changing subject.
 - 2026-10-24 (Noel; testing-only local path): local `/replies` passes `rejected` to the model, and the local prompt has five worked examples (choice questions get the choices, yes/no questions get Yes / No / A little); the list grammar allows plain words only (no periods, ≤ 40 chars) after a reply ran on into emoji. 0.10–0.15 s per reply.
 - 2026-10-25: Removed the Ink-2 turn `config` message from `patient.html` after Noel found it stops transcription. Eager-end prefetch stays.

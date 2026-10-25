@@ -3,13 +3,18 @@ import { isConsentQuestion, CONSENT_REPLIES } from "./safety.js";
 import { mockComplete, mockReplies } from "./mock.js";
 import { localList, localModelAvailable } from "./local.js";
 
-const MODEL = process.env.CLAUDE_MODEL ?? "claude-haiku-5-5";
+// Replies: chosen on 37 labeled nurse phrases (`npm run eval:replies`), see context/conversation.md.
+export const MODEL = process.env.CLAUDE_MODEL ?? "claude-opus-5-5";
+// Fast mode (research preview, Claude API only): same model, output up to 2.5x faster, at 2x the price.
+const FAST = process.env.CLAUDE_FAST !== "0";
+// Spell it word suggestions: one short word list per letter typed, so the fastest model.
+const COMPLETE_MODEL = process.env.COMPLETE_MODEL ?? "claude-haiku-5-5";
 // Summaries run in the background, so they use the strongest model.
 const SUMMARY_MODEL = process.env.SUMMARY_MODEL ?? "claude-opus-5-5";
 const SUMMARY_TIMEOUT_MS = 30000;
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY
 // Past this the patient gets safe fallback options instead of waiting.
-// 5 s default: Haiku took 1.5-3.5 s under load and 3 s sent too many patients to the fallback. .env can raise it.
+// 5 s default: replies take about 1.2 s (1.5 s p90) on good Wi-Fi; .env can raise it for slow venue Wi-Fi.
 const REPLIES_TIMEOUT_MS = Number(process.env.REPLIES_TIMEOUT_MS ?? 5000);
 const mock = () => process.env.MOCK_REPLIES === "1" || !process.env.ANTHROPIC_API_KEY;
 
@@ -60,20 +65,26 @@ export interface Option {
 const CONSENT_INTENTS = ["yes", "no", "more-time"];
 const consentOptions = (): Option[] => CONSENT_REPLIES.map((text, i) => ({ text, intent: CONSENT_INTENTS[i] ?? "other" }));
 
-export const SYSTEM = `You help a patient who cannot speak or use their hands reply to a nurse or family member. They select a reply with a deliberate blink, so every option must be a complete, natural first-person sentence the patient could say as-is.
+export const SYSTEM = `You write reply options for a patient in an ICU who is awake but cannot speak or use their hands. Someone in the room has just said something to them. The screen shows your three replies, the patient picks one with their eyes, and the app speaks it aloud in their voice. The patient reads slowly and every pick takes effort, so each reply has to earn its place.
 
-Given what was just said to the patient, propose the most likely replies, in order of likelihood.
+Write exactly 3 replies the patient could say as-is: first person, natural spoken English, 2 to 6 words (never more than 8), no quotation marks, most likely first. Each reply must tell the listener something the other two don't. The screen adds a fourth box, "None of these", itself; never write it. Give each reply a short intent label ("yes", "no", "partial", "water", "family", "ask-time"); the three intents must differ.
 
-Rules:
-- Output exactly 3 replies, each 8 words or fewer, written in the patient's voice ("I", "my"). No quotation marks. The screen adds "None of these" itself; never output it.
-- Give each reply a short intent label (e.g. "yes", "no", "water", "reposition", "family", "ask-time"). The three intents must all be different: usually a plain yes, a plain no, and one specific answer when the question allows it.
-- If rejected replies are listed, the patient said none of them fit. Stay on what was asked, but give three different answers to it: more specific, partial, conditional, or a question back about it (for "Are you thirsty?" after yes/no/water were rejected: "Just ice chips", "Only a small sip", "Maybe in a little while"). Do not repeat or reword a rejected reply. Do not switch to an unrelated need; the screen has its own topic picker for that.
+Fit the replies to what was said:
+- Yes/no question: one plain yes, one plain no, and the most useful in-between or follow-up answer about the same thing ("Just a little", "Ice chips only", "Later, please"). Lead with the answer and don't repeat the question back: "Yes, please" rather than "Yes, I'm thirsty". Never two replies that both mean yes, or both mean no.
+- Either/or question: each option offered, then the most likely third answer ("Neither", "Both", or a common alternative).
+- Number scale (pain 0-10 and similar): three ranges that cover the scale, each with its numbers: "Mild, about 2", "Medium, about 5", "Severe, 8 or more".
+- Where, what, or who question: the three most common answers for an ICU patient. Never invent a symptom, a person, or a relative that the conversation or patient profile doesn't mention; use a general word instead ("my family", "my back").
+- Open question or greeting: short answers to what was asked, then a common need (water, repositioning, pain, family, rest).
+- News or a statement: a short acknowledgement, a short question back about it, and a short feeling or need.
+
+Other rules:
+- If rejected replies are listed, the patient said none of them fit. Stay on what was asked and give three different answers: more specific, partial, conditional, or a question back about it. For "Do you want the TV on?" after "Yes, please", "No, thanks", and "Later, please" were rejected: "Just the news", "Turn it down low", "What's on?". Never repeat or reword a rejected reply, and don't switch to an unrelated need; the screen has a topic picker for that.
 - If a topic is given, all three replies must be about that topic.
-- Never invent medical facts, symptoms, or decisions the patient has not signaled. If the question is open-ended, offer short common needs (water, repositioning, family, rest) rather than guessing a diagnosis.
+- Never invent medical facts, symptoms, or decisions the patient has not signaled.
 - Use the patient profile and recent conversation only to pick relevant specifics (names, preferences).
-- If the patient seems fatigued, keep the replies very short.
-- Set addressed_to_patient to false only when the speech is clearly meant for someone else (staff talking to each other, a phone call, "grab the chart from room 4"). Anything that could plausibly be for the patient, including greetings and statements about their care, counts as addressed. Still fill in replies either way.
-- If the message is unintelligible, offer: "Please say that again", "I didn't understand", "Yes", "No".
+- If the patient seems fatigued, keep the replies to 1 to 3 words.
+- Set addressed_to_patient to false only when the speech is clearly meant for someone else (staff talking to each other, a phone call, "grab the chart from room 4"). Anything that could plausibly be for the patient, including greetings and statements about their care, counts as addressed. When it isn't addressed, still write replies: what the patient might say to join in ("I can hear you", "Is that about me?", "Please talk to me").
+- If the message is unintelligible, offer: "Please say that again", "I didn't understand", "Yes".
 - high_stakes is true only when a yes or no would make a medical decision: consent to a treatment, procedure, surgery, test, or medication change, or code status (CPR, DNR, life support). Routine questions about comfort, pain level, water, positioning, visitors, or feelings are not high stakes, even if they mention medicine ("are you in pain?" is not; "do you want more pain medication?" is). When high_stakes is true, stakes_about is what a yes would agree to, as a short phrase that fits "You said yes to …" ("more pain medication", "the surgery tomorrow morning", "a breathing tube"); otherwise an empty string.
 - Also say who is speaking. A voice model tells voices apart (voice-1, voice-2, …) and gives the label used for this voice before, if any. Keep that label unless this message gives a better one (a name, a title, a relationship). speaker_label is what the patient would call them: "Dr. Lee", "Nurse Sam", "Your daughter", "Nurse", "Doctor", "Family". Use "Someone" only when there is no clue. speaker_role is nurse, doctor, family, visitor, staff, or unknown.`;
 
@@ -118,9 +129,35 @@ export const COMPLETE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-function text(res: Anthropic.Message): string {
-  for (const b of res.content) if (b.type === "text") return b.text;
-  throw new Error(`no text block (stop_reason=${res.stop_reason})`);
+// Server-side refusal fallback: a declined request re-runs inside the same call on the model Anthropic
+// recommends for that refusal category, instead of the patient getting the safe Yes / No replies.
+// Claude Haiku 5.5 has no server-side fallback.
+const FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-1"]);
+const FAST_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-opus-4-8"]);
+type AskParams = Omit<Anthropic.Beta.Messages.MessageCreateParamsNonStreaming, "betas" | "fallbacks" | "speed">;
+
+// One structured-output call; returns its JSON text. Fast mode has its own rate limit: on a 429 the
+// same request runs once more at standard speed.
+async function ask(params: AskParams, opts: { timeout: number; maxRetries: number }, fast = false): Promise<string> {
+  const fallback = FALLBACK_MODELS.has(params.model);
+  const speedUp = fast && FAST_MODELS.has(params.model);
+  const betas: Anthropic.Beta.AnthropicBeta[] = [];
+  if (fallback) betas.push("server-side-fallback-2026-07-01");
+  if (speedUp) betas.push("fast-mode-2026-02-01");
+  try {
+    const res = await client.beta.messages.create({
+      ...params,
+      ...(betas.length ? { betas } : {}),
+      ...(fallback ? { fallbacks: "default" as const } : {}),
+      ...(speedUp ? { speed: "fast" as const } : {}),
+    }, opts);
+    if (res.stop_reason === "refusal") throw new Error("model refused");
+    for (const b of res.content) if (b.type === "text") return b.text;
+    throw new Error(`no text block (stop_reason=${res.stop_reason})`);
+  } catch (err) {
+    if (speedUp && err instanceof Anthropic.RateLimitError) return ask(params, opts, false);
+    throw err;
+  }
 }
 
 const historyLines = (turns: Turn[]) =>
@@ -183,15 +220,14 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
   }
   if (mock()) return ruleReplies(inp.transcript, mockReplies(inp.transcript, inp.category), "mock");
 
-  const res = await client.messages.create({
+  const json = await ask({
     model: MODEL,
-    max_tokens: 2048,
+    max_tokens: 4096,
     output_config: { effort: "low", format: { type: "json_schema", schema: REPLIES_SCHEMA } },
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: prompt }],
-  }, { timeout: REPLIES_TIMEOUT_MS, maxRetries: 0 });
-  if (res.stop_reason === "refusal") throw new Error("model refused");
-  return toReplies(JSON.parse(text(res)) as ParsedReplies, MODEL);
+  }, { timeout: REPLIES_TIMEOUT_MS, maxRetries: 0 }, FAST);
+  return toReplies(JSON.parse(json) as ParsedReplies, MODEL);
 }
 
 interface ParsedReplies {
@@ -203,6 +239,8 @@ interface ParsedReplies {
   stakes_about: string;
 }
 
+const sameText = (a: string, b: string) => a.toLowerCase().replace(/[^a-z0-9]/g, "") === b.toLowerCase().replace(/[^a-z0-9]/g, "");
+
 function toReplies(parsed: ParsedReplies, source: string): RepliesOut {
   const highStakes = parsed.high_stakes === true;
   const about = highStakes ? parsed.stakes_about?.trim() || null : null;
@@ -213,6 +251,7 @@ function toReplies(parsed: ParsedReplies, source: string): RepliesOut {
         .map((r) => (typeof r === "string" ? { text: r, intent: "" } : r))
         .map((o) => ({ text: String(o.text ?? "").trim(), intent: String(o.intent ?? "").trim() }))
         .filter((o) => o.text && !/^none of these/i.test(o.text))
+        .filter((o, i, all) => all.findIndex((x) => sameText(x.text, o.text)) === i) // a repeat wastes a box
         .slice(0, 3);
   if (options.length < 3) throw new Error(`expected 3 replies, got ${options.length}`);
   const replies = options.map((o) => o.text);
@@ -255,15 +294,14 @@ export async function summarize(inp: { history: Turn[]; patientProfile?: Patient
   ]
     .filter(Boolean)
     .join("\n\n");
-  const res = await client.messages.create({
+  const json = await ask({
     model: SUMMARY_MODEL,
-    max_tokens: 2048,
+    max_tokens: 4096,
     output_config: { effort: "low", format: { type: "json_schema", schema: SUMMARY_SCHEMA } },
     system: SUMMARY_SYSTEM,
     messages: [{ role: "user", content: prompt }],
   }, { timeout: SUMMARY_TIMEOUT_MS, maxRetries: 1 });
-  if (res.stop_reason === "refusal") throw new Error("model refused");
-  const parsed = JSON.parse(text(res)) as { for_patient: string; for_caregiver: string[] };
+  const parsed = JSON.parse(json) as { for_patient: string; for_caregiver: string[] };
   return {
     forPatient: parsed.for_patient.trim(),
     forCaregiver: parsed.for_caregiver.map((b) => b.trim()).filter(Boolean).slice(0, 5),
@@ -290,14 +328,14 @@ export async function completeWord(inp: {
   }
   if (!parsed && mock()) return mockComplete(inp.prefix);
   if (!parsed) {
-    const res = await client.messages.create({
-      model: MODEL,
+    const json = await ask({
+      model: COMPLETE_MODEL,
       max_tokens: 1024,
       output_config: { effort: "low", format: { type: "json_schema", schema: COMPLETE_SCHEMA } },
       system: COMPLETE_SYSTEM,
       messages: [{ role: "user", content: user }],
     }, { timeout: REPLIES_TIMEOUT_MS, maxRetries: 0 });
-    parsed = JSON.parse(text(res)) as { words: string[] };
+    parsed = JSON.parse(json) as { words: string[] };
   }
   const p = inp.prefix.toLowerCase();
   return parsed.words.filter((w) => w.toLowerCase().startsWith(p)).slice(0, 4);

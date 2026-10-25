@@ -52,4 +52,4 @@ Urgent options ("I'm in pain", "I can't breathe", "Call the nurse") are hard-cod
 - `/speak` waits for the full audio (no streaming yet); new phrases take ~0.6 s.
 - Addressee detection is a model judgment: ambiguous lines ("I'll be on break for 15 minutes") are treated as addressed.
 - STT hears whoever is loudest. The app tells voices apart with a speaker-recognition model on the laptop (`app/speakers.js`) and Claude names them; the match threshold was set on synthetic voices. Falls back to Chrome Web Speech without a Cartesia key.
-- Claude replies time out at 5 s by default (`REPLIES_TIMEOUT_MS`; `.env.example` sets 8 s) and fall back to Yes / No / I need more time. Haiku latency varies with API load (~1.2-3.5 s).
+- Claude replies time out at 5 s by default (`REPLIES_TIMEOUT_MS`; `.env.example` sets 8 s) and fall back to Yes / No / I need more time. Opus 5.5 in fast mode measured 1.21 s median, 1.48 s p90 on 37 phrases; venue Wi-Fi adds to that.

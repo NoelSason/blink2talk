@@ -22,7 +22,7 @@ a corner and confirms with a squint or closure (≥ 800 ms), and the reply is sp
 voice. A care drawer shows the nurse the transcript and alerts.
 
 Stack: Electron 28+, run unpackaged with `npm start`. MediaPipe Face Landmarker in the renderer for
-gaze and blink/squint. Claude `claude-haiku-5-5` for replies.
+gaze and blink/squint. Claude `claude-opus-5-5` (fast mode, low effort) for replies.
 Cartesia Ink (STT) + Sonic-3.6 (TTS, cloned voice). API keys live in the main process only.
 
 ## Build order (do these in sequence; nothing out of order)
@@ -98,6 +98,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-24 — Noel: WebEyeTrack removed (code, weights, dependency, `G` switch); the vision module is the only gaze source. Replies move to `claude-opus-5-5` in fast mode with a rewritten prompt: on 37 labeled phrases, grade 3.81 → 4.51 of 5 and median 1.33 → 1.21 s (`npm run eval:replies`). @Samarth: `conversation/` changed, see context/conversation.md.
 - 2026-10-24 — Marco: head-movement input and the phone face-tracking model cut. Our target patients mostly can't move their head; eye input must work alone. The dev-mode head-pose switch only corrects eye picks for head turns and isn't an input.
 - 2026-10-24 — Input/Product (Marco): box picking decides left/right and top/bottom on separate axes; calibration dots and corner marks at the box corners (±0.9); kept picks teach the classifier; WebEyeTrack available as a test gaze source in dev mode. Dwell to highlight stays 300 ms (vision default), not 700. Measured cause in context/input.md.
 - 2026-10-24 — Product/Conversation (Noel): `/replies` now returns `highStakes` (Claude classifies; keyword rule only as fallback) and `about`, closer to the `options.highStakes` row above. Eye calibration auto-starts at launch again; three quick blinks offer recalibration.

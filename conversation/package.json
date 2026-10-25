@@ -8,6 +8,7 @@
     "clone": "tsx --env-file-if-exists=.env scripts/clone-voice.ts",
     "typecheck": "tsc --noEmit",
     "eval": "tsx --env-file-if-exists=.env scripts/eval-phrases.ts",
+    "eval:replies": "tsx --env-file-if-exists=.env scripts/eval-replies.ts",
     "local-model": "mkdir -p models && curl -L -o models/Qwen3-4B-Instruct-2507-Q4_K_M.gguf https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
   },
   "dependencies": {
