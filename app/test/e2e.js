@@ -192,6 +192,36 @@ app.whenReady().then(async () => {
   await doubleBlink();
   check('double blink on the replies goes back to Listening', (await state('s.rowKind')) === 'listen');
 
+  // Arrow keys in the row layout (the default): right walks the boxes as drawn, left to right, through
+  // all four; up and down don't move; tired mode's empty box is skipped. (Tired mode is still on from above.)
+  const wasTired = await state('s.tired');
+  if (wasTired) await key('KeyT');
+  await key('KeyQ');
+  await waitFor(`s.rowKind === 'replies' && !s.loading`);
+  const highlightedX = () => js(`document.querySelector('#reply-row > [data-state=highlighted]')?.getBoundingClientRect().left ?? null`);
+  const xs = [];
+  const hls = [];
+  for (let i = 0; i < 4; i++) {
+    await key('ArrowRight');
+    await sleep(80);
+    xs.push(await highlightedX());
+    hls.push(await state('s.hl'));
+  }
+  check('arrow right reaches all four boxes, left to right', new Set(hls).size === 4 && xs.every((x, i) => x != null && (i === 0 || x > xs[i - 1])), JSON.stringify({ hls, xs }));
+  const before = await state('s.hl');
+  await key('ArrowUp');
+  await key('ArrowDown');
+  check('up and down do nothing in the row', (await state('s.hl')) === before);
+  await key('KeyT');
+  // From None of these (far right): the second reply, then over the empty box to the first.
+  const tiredWalk = [];
+  for (let i = 0; i < 2; i++) {
+    await key('ArrowLeft');
+    tiredWalk.push(await state('s.hl'));
+  }
+  check('in tired mode the arrows skip the empty box', (await state('s.tired')) && JSON.stringify(tiredWalk) === '[1,0]', JSON.stringify(tiredWalk));
+  if (!wasTired) await key('KeyT');
+
   // Summary: back on Listening, the conversation so far shows for the patient and in the care panel.
   // No server here, so it's the plain version: the last few lines as said, with who said them.
   await key('KeyR');

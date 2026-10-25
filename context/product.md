@@ -1,14 +1,14 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-25 00:20 PDT (row-layout accuracy test; red Mic off)
+Updated: 2026-10-25 00:51 PDT (arrow keys in the row layout)
 
 ## Now
-- Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README, nurse mic listens from launch, red Mic off, accuracy test for the row layout.
+- Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README, nurse mic listens from launch, red Mic off, accuracy test for the row layout, arrow keys in the row layout.
 - Next: accuracy test on 4 people, 2 outside the team, in venue lighting; stage-log ratings and Figma share links; team call on Spell it and urgent alerts (Cut list).
 - Blocked on: nothing.
 
 ## Build-order status
-- Step 1 (main loop): runs end to end. Samarth's Ink-2 streaming mic, Claude replies, Julian's quadrant tracker, Sonic cloned voice. `app/test/e2e.js` (37 checks), unit tests (6), and `app/test/stress.js` (3000 random inputs, 60 full cycles) pass.
+- Step 1 (main loop): runs end to end. Samarth's Ink-2 streaming mic, Claude replies, Julian's quadrant tracker, Sonic cloned voice. `app/test/e2e.js` (58 checks), unit tests (16), and `app/test/stress.js` (3000 random inputs, 60 full cycles) pass.
 - Step 2 (mocks): no env flags yet. Without a server the app falls back to sample replies and the system voice; the demo panel (`D`) shows which sources are live.
 - Step 3 (nurse window): care drawer in the same window (alerts, summary, conversation with who said each line, notes, settings). Vitals tiles say "Not connected yet".
 - Step 4 ("none of these"): differs from CLAUDE.md (see Deviations).
@@ -60,6 +60,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-25 (Noel): arrow keys follow the row layout. `gridMove` still moved by 2x2 row and column, but the row draws the cells as 1, 3, 2, 4 (columns.js `COLUMN_BOX`), so Right only reached the first and third bars. Now left and right step through the bars as drawn (`ROW_ORDER`), skipping an empty one (tired mode), and up and down do nothing; the 2x2 layouts keep all four directions. e2e checks the highlighted box moves right across all four bars on screen.
 - 2026-10-25 (Noel): the dev accuracy test scores the layout in use. Row of 4: each column twice, the target at the column's center on the gaze area, counted by the row picker (`eyes-frame` now carries `column`). 2x2: corners, as before. Tests record `layout`; the README reports row and 2x2 apart, and the calibration fit note says it scores the 2x2. Why: the row became the default, but the test still scored the 2x2 classifier, so nothing measured the shipped layout. Rejected: scoring the row by the 2x2 classifier's left/right (it isn't what picks).
 - 2026-10-25 (Noel): "Mic off" in the top bar is red and bold (`--alert`; 4.7:1 dark, 4.3:1 light, large text). Why: Noel asked; a muted mic should stand out.
 - 2026-10-25 (Julian): calibration dots last 3 s instead of 2 s (`calibration.phaseMs` in `app/renderer/devsettings.js`); the squint step shares it. Vision side in context/input.md.

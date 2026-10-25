@@ -18,6 +18,7 @@ import { startEyes } from './eyes.js';
 import { loadSettings } from './devsettings.js';
 import { createDevPanel } from './devpanel.js';
 import { startMic } from './mic.js';
+import { COLUMN_BOX } from './columns.js';
 
 const TIMING = {
   word: 280,          // a sample question arrives one word at a time, like the live caption
@@ -45,6 +46,8 @@ const URGENT_ICONS = { "I'm in pain": 'bandage', "I can't breathe": 'wind', 'Cal
 // Grid cells in reading order; the vision module names them by quadrant.
 const GRID = { topLeft: 0, topRight: 1, bottomLeft: 2, bottomRight: 3 };
 const QUADRANT = Object.keys(GRID); // cell index -> quadrant name
+// The row layout (dev setting 'row', the default) shows the same cells left to right in this order (columns.js).
+const ROW_ORDER = COLUMN_BOX.map((box) => GRID[box]);
 
 const memory = createMemory({ name: PATIENT });
 const s = {
@@ -622,10 +625,20 @@ function cellFor(quadrant) {
   return twoColumns() ? (quadrant.endsWith('Left') ? 0 : 1) : GRID[quadrant];
 }
 const twoColumns = () => s.rowKind === 'confirm' || s.rowKind === 'recalibrate';
+const rowLayout = () => eyeSettings.layout === 'row';
 
+// The 2x2 moves by row and column. In the row layout the cells sit left to right in ROW_ORDER, so
+// left and right step along it (skipping empty cells) and up and down do nothing.
 function gridMove(hl, dir) {
-  if (hl < 0) return s.items.findIndex(Boolean);
+  if (hl < 0) return rowLayout() && !twoColumns() ? ROW_ORDER.find((i) => s.items[i]) ?? -1 : s.items.findIndex(Boolean);
   if (twoColumns()) return { left: 0, right: 1 }[dir] ?? hl;
+  if (rowLayout()) {
+    const step = { left: -1, right: 1 }[dir];
+    for (let at = ROW_ORDER.indexOf(hl) + (step ?? 0); step && at >= 0 && at < ROW_ORDER.length; at += step) {
+      if (s.items[ROW_ORDER[at]]) return ROW_ORDER[at];
+    }
+    return hl;
+  }
   const col = hl % 2;
   const row = Math.floor(hl / 2);
   const next = { left: row * 2, right: row * 2 + 1, up: col, down: 2 + col }[dir];

@@ -51,7 +51,7 @@ Dev mode (backtick) can turn on learning from picks: a pick that is spoken and n
 
 | Key | What it does |
 |---|---|
-| Arrow keys | Move the highlight around the grid |
+| Arrow keys | Move the highlight: left and right along the row of four (the default layout); all four directions in the 2x2 layouts |
 | Space, held about 1 s | Long blink: choose |
 | Space, Space | Double blink |
 | `N` | Care panel |
@@ -67,7 +67,7 @@ Dev mode (backtick) can turn on learning from picks: a pick that is spoken and n
 npm test   # in app/: drift, voice-matching, and accuracy-record unit tests, then the real page off-screen (about 40 s)
 ```
 
-It runs on sample replies with the camera and mic blocked, so it gives the same result every time. Camera events go straight into the handlers the vision module calls, so a broken tracker-to-screen contract fails the test. It covers the grid, the middle band, the summary on Listening and in the care panel, selecting each corner, "None of these" and back, double blinks walking back out of Spell it, Can't see you, tired mode (including while replies load), consent confirmation, undo while speaking, Spell it, and where the calibration dots land. The vision module has its own unit tests (`cd ../vision && npm test`). Neither measures real-camera accuracy.
+It runs on sample replies with the camera and mic blocked, so it gives the same result every time. Camera events go straight into the handlers the vision module calls, so a broken tracker-to-screen contract fails the test. It covers the grid, arrow keys in the row layout, the middle band, the summary on Listening and in the care panel, selecting each corner, "None of these" and back, double blinks walking back out of Spell it, Can't see you, tired mode (including while replies load), consent confirmation, undo while speaking, Spell it, and where the calibration dots land. The vision module has its own unit tests (`cd ../vision && npm test`). Neither measures real-camera accuracy.
 
 ## For other eye trackers
 
