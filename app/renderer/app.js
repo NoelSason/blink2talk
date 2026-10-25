@@ -421,9 +421,10 @@ function goBack() {
   } else if (s.prevPage) {
     chime('undo');
     showPage(s.prevPage);
-  } else if (s.rowKind === 'replies' || s.rowKind === 'unaddressed') {
+  } else if ((s.rowKind === 'replies' || s.rowKind === 'unaddressed') && !s.loading) {
     // The replies are the first page after a question; going back from them is "not now".
-    // Noel's log: double blinks there were seen but did nothing, so it felt broken.
+    // Noel's log: double blinks there were seen but did nothing, so it felt broken. Not while they
+    // load: two ordinary blinks during a long wait (a cold start) threw away the question.
     chime('undo');
     toListening();
   }

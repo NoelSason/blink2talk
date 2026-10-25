@@ -60,6 +60,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-24: Double blink leaves the replies only once they've loaded. Why: on a slow first answer (cold Claude, a clinician clip), two ordinary blinks during the wait threw the question away and went back to Listening (Noel).
 - 2026-10-24 (Marco): nurse mic is off at launch; M or the care panel's "Listen for the nurse" turns it on. Why: always-on listening transcribed room chatter as the nurse, and Ink-2 auto-detected it as Hindi.
 - 2026-10-24: "None of these" and "Go back" boxes show the hold fill ring like replies. Why: Noel couldn't tell his hold on None of these was working; his eye log showed the picks going through, but those boxes had no ring.
 - 2026-10-24: Double blink on the replies (no page before them) goes back to Listening. Why: Noel's eye log showed his double blinks detected and paired, but on the replies and Listening there was nothing to go back to, so it felt broken.

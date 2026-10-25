@@ -164,6 +164,16 @@ app.whenReady().then(async () => {
   // The testing-only fast local replies switch: off, and greyed out without the model.
   check('the local replies switch is off and unavailable without its model', await js(`(() => { const box = [...document.querySelectorAll('.care label')].find((l) => l.textContent.includes('testing only'))?.querySelector('input'); return !!box && !box.checked && box.disabled; })()`));
 
+  // While the replies load, a double blink does nothing (ordinary blinks during a long wait).
+  // Sample replies load instantly here, so the loading state is held by hand.
+  await key('KeyQ');
+  await waitFor(`s.rowKind === 'replies' && !s.loading`);
+  await state('(s.loading = true)');
+  await doubleBlink();
+  check('double blink while replies load keeps the question', (await state('s.rowKind')) === 'replies');
+  await state('(s.loading = false)');
+  await key('KeyR');
+
   // Double blink on the replies (no page before them) goes back to Listening.
   await key('KeyQ');
   await waitFor(`s.rowKind === 'replies' && !s.loading`);
