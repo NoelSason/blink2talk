@@ -11,13 +11,13 @@ import { createDemoPanel } from './demo.js';
 import { createCarePanel } from './care.js';
 import { createMemory, timeLabel } from './memory.js';
 import { spellBoxes } from './speller.js';
-import { onPatientInput, onDemoKey } from './input.js';
+import { onPatientInput, onDemoKey, onHoldKey, onMicKey } from './input.js';
 import { chime, speak, stopSpeaking } from './sound.js';
 import { FALLBACK_URGENT, completeWord, condense, getConfig, getReplies, getStarters, getSummary, guessCategory, identifySpeaker, plainCondense, prefetchVoice, startCandidates, sttToken, voiceAudio, warmLocalModel } from './conversation.js';
 import { startEyes } from './eyes.js';
 import { loadSettings } from './devsettings.js';
 import { createDevPanel } from './devpanel.js';
-import { startMic } from './mic.js';
+import { startMic, startTalk } from './mic.js';
 import { COLUMN_BOX } from './columns.js';
 
 const TIMING = {
@@ -36,7 +36,7 @@ const TIMING = {
   micQuiet: 800,      // the mic stays muted this long after the voice stops, so it doesn't hear the tail
   summaryWait: 2000,  // the summary is redone this long after the conversation last changed
   continueTurn: 6000, // a mic turn starting this soon after the last one, before a pick, continues it
-  micRetry: 3000,
+  micRetry: 3000,     // always listening: reconnect after this long when the stream drops
 };
 
 const END_NONE = { type: 'end', kind: 'none', label: 'None of these', action: 'more' };
@@ -83,7 +83,8 @@ const s = {
   consent: false,             // the current replies answer a high-stakes question (consent, treatment)
   stakesAbout: null,          // what a yes to it agrees to ("more pain medication"), when known
   resting: false,             // eyes closed 3 s: the camera treats it as a rest, not a choice
-  mic: 'off',                 // 'off' | 'starting' | 'on' | 'unavailable'
+  micMode: savedMicMode(),    // 'talk' (hold M to talk, the default) | 'always' (care panel switch)
+  mic: 'idle',                // 'idle' (talk: between holds) | 'on' | 'off' (always: muted with M) | 'unavailable'
   turn: null,                 // who said the current question: { speaker, voice, given }
   browse: null,               // the open category: { cat, list, at, size } (its fixed order, first shown, page size)
   speakRequest: null,         // the pick being spoken is the patient's own request: its category ('need' | 'say')
@@ -116,9 +117,13 @@ const driftButton = document.getElementById('drift-start');
 driftButton.addEventListener('click', () => { driftButton.blur(); runAction('drift-check'); });
 let keyboardUntil = 0;
 let micQuietUntil = 0;
-let micWanted = true; // listening from launch. M or the care panel mutes it (it can pick up room chatter).
-let mic = null;
-let micGen = 0; // which start of the mic is current
+let micWanted = true; // always listening: on from launch until M mutes it
+let mic = null;       // always listening: the running stream (mic.js)
+let micGen = 0;       // which start of it is current
+let talk = null;      // push-to-talk: the stream while M is held (mic.js)
+let talkHeld = false;
+let talkGen = 0;      // which press is current
+let sttCache = null;  // { token, until }: the STT token lasts an hour, so a press doesn't wait for a new one
 let eyes = null;
 let camLesson = null;          // { quadrant, look } from the camera's last pick, taught back once the reply is spoken
 
@@ -213,9 +218,10 @@ function nurseSaid(text, speaker = null, audio = null) {
   requestReplies(audio);
 }
 
-// The nurse often pauses mid-question; the mic then ends the turn and the rest arrives as a new one.
-// A mic turn that starts within TIMING.continueTurn of the last, before the patient has picked, is
-// the same question: the caption and the replies cover both parts. Returns that earlier turn.
+// The nurse often pauses mid-question: always listening, the mic ends the turn there; with push-to-
+// talk, they let go of M and press again for the rest. A turn that starts within TIMING.continueTurn
+// of the last, before the patient has picked, is the same question: the caption and the replies cover
+// both parts. Returns that earlier turn.
 let micTurnStartedAt = 0; // when the current mic turn's first words arrived
 function continuedTurn() {
   const t = s.turn;
@@ -233,8 +239,8 @@ function continueQuestion(prev, text) {
   requestReplies(); // same speaker: the first part's voice print stands
 }
 
-// Replies started when the mic thinks the nurse is probably done (turn.eager_end), reused if the
-// final transcript matches. Saves the wait between "probably done" and "done".
+// Always listening: replies started when the mic thinks the nurse is probably done (turn.eager_end),
+// reused if the final transcript matches. Saves the wait between "probably done" and "done".
 let prefetch = null; // { text, promise }
 function repliesBody(transcript, history, turn) {
   return {
@@ -627,7 +633,9 @@ function alertCare(text) {
 }
 
 // ---------- Nurse mic (mic.js, Cartesia Ink-2 through the conversation server's token) ----------
-// What the nurse mic hears (mic.js). Also driven directly by test/e2e.js.
+// Two modes, switched in the care panel: push-to-talk (the default), where the nurse holds M while
+// talking; or always listening, where Ink decides when the nurse is done and M mutes. What the mic
+// heard arrives here either way. Also driven directly by test/e2e.js.
 const heard = {
   onPartial(text) {
     if (!text || !hearingNurse()) return;
@@ -649,26 +657,38 @@ const heard = {
 };
 
 const hearingNurse = () => s.stage === 'choose' && !['spell', 'confirm', 'recalibrate'].includes(s.rowKind) && s.selected < 0 && !s.calibration;
+const micMuted = () => s.stage === 'speaking' || now() < micQuietUntil;
 
+async function micToken() {
+  if (sttCache && now() < sttCache.until) return sttCache.token;
+  const token = await sttToken();
+  sttCache = token ? { token, until: now() + 50 * 60 * 1000 } : null;
+  return token;
+}
+
+function micUnavailable(why) {
+  s.mic = 'unavailable';
+  demo.setMic(`Mic: off (${why})`);
+  syncPanels();
+}
+
+// --- Always listening ---
 async function startNurseMic() {
-  if (mic || !micWanted) return;
-  const gen = ++micGen; // M (off) or a newer start while this one connects makes it stale
+  if (mic || !micWanted || s.micMode !== 'always') return;
+  const gen = ++micGen; // M (off), a mode switch, or a newer start while this one connects makes it stale
   s.mic = 'starting';
   syncPanels();
-  const token = await sttToken();
+  const token = await micToken();
   if (gen !== micGen) return;
-  if (!token) {
-    s.mic = 'unavailable';
-    demo.setMic('Mic: off (needs the conversation server and a Cartesia key)');
-    return syncPanels();
-  }
+  if (!token) return micUnavailable('needs the conversation server and a Cartesia key');
   try {
     const started = await startMic({
       token,
-      muted: () => s.stage === 'speaking' || now() < micQuietUntil,
+      muted: micMuted,
       ...heard,
       onError: (message) => {
         if (gen !== micGen) return; // a mic that was already turned off or replaced
+        sttCache = null;
         mic = null;
         s.mic = 'off';
         demo.setMic(`Mic: reconnecting (${message})`);
@@ -679,7 +699,7 @@ async function startNurseMic() {
     if (gen !== micGen) return started.stop(); // turned off while it was connecting
     mic = started;
     s.mic = 'on';
-    demo.setMic('Mic: listening for the nurse');
+    demo.setMic('Mic: listening for the nurse (M mutes)');
   } catch (err) {
     if (gen !== micGen) return;
     s.mic = 'off';
@@ -695,8 +715,94 @@ function setMic(on) {
   mic?.stop();
   mic = null;
   s.mic = s.mic === 'unavailable' ? 'unavailable' : 'off';
-  demo.setMic('Mic: off');
+  demo.setMic('Mic: off (M turns it back on)');
   syncPanels();
+}
+
+// --- Push-to-talk ---
+// Ready once there's a token: "Hold M to talk", or Mic off without the speech service.
+function readyToTalk() {
+  micToken().then((token) => {
+    if (s.micMode !== 'talk' || s.mic === 'on') return;
+    if (!token) return micUnavailable('needs the conversation server and a Cartesia key');
+    s.mic = 'idle';
+    demo.setMic('Mic: hold M to talk');
+    syncPanels();
+  });
+}
+
+// M down: the label changes at once; the stream takes a moment to connect, and mic.js keeps the
+// audio from that moment, so the first words aren't lost.
+async function talkDown() {
+  if (talkHeld) return;
+  talkHeld = true;
+  const gen = ++talkGen;
+  s.mic = 'on';
+  demo.setMic('Mic: listening (let go of M when done)');
+  syncPanels();
+  const token = await micToken();
+  if (gen !== talkGen || !talkHeld) return; // let go before anything was recorded
+  if (!token) return micUnavailable('needs the conversation server and a Cartesia key');
+  try {
+    const started = await startTalk({
+      token,
+      muted: micMuted,
+      ...heard,
+      onError: (message) => {
+        sttCache = null; // an expired token is the usual cause; the next press gets a new one
+        demo.setMic(`Mic: ${message}. Hold M to try again`);
+        if (gen !== talkGen || !talkHeld) return;
+        talkHeld = false;
+        talk = null;
+        s.mic = 'idle';
+        syncPanels();
+      },
+    });
+    // Let go (or pressed again) while it connected: what was said in that time is still sent.
+    if (gen !== talkGen || !talkHeld) return started.release();
+    talk = started;
+  } catch (err) {
+    if (gen !== talkGen) return;
+    talkHeld = false;
+    micUnavailable(err?.message ?? String(err));
+  }
+}
+
+// M up: send what was said. mic.js hands it to heard.onTurn once Ink has the last words.
+function talkUp() {
+  if (!talkHeld) return;
+  talkHeld = false;
+  talk?.release();
+  talk = null;
+  if (s.mic !== 'on') return;
+  s.mic = 'idle';
+  demo.setMic('Mic: hold M to talk');
+  syncPanels();
+}
+
+// The care panel's switch. A hold in progress is still sent; an always-on stream stops.
+function setMicMode(mode) {
+  if (mode === s.micMode) return;
+  talkUp();
+  micGen++;
+  mic?.stop();
+  mic = null;
+  s.micMode = mode;
+  try {
+    localStorage.setItem('blink2talk.micMode', mode);
+  } catch {}
+  if (mode === 'always') {
+    micWanted = true;
+    startNurseMic();
+  } else readyToTalk();
+}
+
+function savedMicMode() {
+  try {
+    return localStorage.getItem('blink2talk.micMode') === 'always' ? 'always' : 'talk';
+  } catch {
+    return 'talk';
+  }
 }
 
 // ---------- Patient input ----------
@@ -884,7 +990,8 @@ function tick() {
     // The gaze circle: only on the screens the eyes pick from, and only while the camera sees the eyes.
     gazePoint: eyeSettings.gazeCircle && s.stage === 'choose' && !s.calibration && !s.faceLost && !s.resting ? s.gazePoint : null,
     faceLost: s.faceLost,
-    micOn: s.mic === 'on' || s.mic === 'starting', // shown at once on M, before it connects
+    mic: s.mic,
+    micMode: s.micMode,
     caption: s.caption,
     stage: s.stage,
     single: s.rowKind === 'listen',
@@ -979,9 +1086,10 @@ function runAction(action, arg) {
   if (action === 'listen') toListening();
   if (action === 'tired') setTired(arg ?? !s.tired);
   if (action === 'face') setFaceLost(arg ?? !s.faceLost);
-  if (action === 'mic') setMic(arg ?? !micWanted);
+  if (action === 'mic-mode') setMicMode(arg ? 'always' : 'talk');
   if (action === 'theme') root.dataset.theme = (arg ?? root.dataset.theme !== 'light') ? 'light' : 'dark';
   if (action === 'calibrate') eyes?.calibrate();
+  if (action === 'skip-calibration' && eyes?.skipCalibration()) toListening();
   if (action === 'drift-check') eyes?.driftCheck();
   if (action === 'profile') memory.setProfile(arg);
   if (action === 'summary') refreshSummary();
@@ -997,7 +1105,7 @@ function syncPanels() {
   const light = document.documentElement.dataset.theme === 'light';
   demo.sync({ tired: s.tired, faceLost: s.faceLost, light });
   care.update({
-    tired: s.tired, faceLost: s.faceLost, mic: s.mic === 'starting' ? (micWanted ? 'on' : 'off') : s.mic, light,
+    tired: s.tired, faceLost: s.faceLost, mic: s.mic, micMode: s.micMode, light,
     local: s.localReplies, localAvailable: s.localAvailable,
   });
 }
@@ -1022,7 +1130,7 @@ function setLocalReplies(on) {
 const demo = createDemoPanel({ questions: QUESTIONS, onAction: runAction });
 const care = createCarePanel({ memory, onAction: runAction });
 
-// The server may still be starting; check until it answers (about 15 s), then start the mic.
+// The server may still be starting; check until it answers (about 15 s), then get the mic's token.
 async function loadConfig(tries = 15) {
   const config = await getConfig();
   demo.setStatus(config);
@@ -1032,8 +1140,9 @@ async function loadConfig(tries = 15) {
     s.urgent = config.urgent ?? FALLBACK_URGENT;
     prefetchVoice([...s.urgent, EMERGENCY.say]);
     prefetchStarters();
-    if (micWanted) startNurseMic();
-    else demo.setMic('Mic: off (M or the care panel turns it back on)');
+    if (s.micMode === 'talk') readyToTalk(); // gets the token now, so the first press doesn't wait
+    else if (micWanted) startNurseMic();
+    else demo.setMic('Mic: off (M turns it back on)');
   } else if (tries > 0) {
     setTimeout(() => loadConfig(tries - 1), 1000);
   } else {
@@ -1048,6 +1157,12 @@ onPatientInput((event) => {
   if (event.type === 'eyes') onEyes(Boolean(event.closed));
 });
 onDemoKey((action) => runAction(action));
+onHoldKey((action) => runAction(action));
+// M: hold to talk, or mute and unmute when always listening.
+onMicKey({
+  down: () => (s.micMode === 'talk' ? talkDown() : setMic(!micWanted)),
+  up: () => s.micMode === 'talk' && talkUp(),
+});
 // test/e2e.js loads the page with ?test and drives the camera handlers with recorded-style events.
 if (new URLSearchParams(location.search).has('test')) window.__test = { camera, heard, state: s, memory, conversationChanged };
 toListening();

@@ -289,10 +289,14 @@ export function createView() {
       els.eyeIcon.className = `icon icon--${{ lost: 'eye-off', rest: 'eye-closed', closed: 'eye-closed', open: 'eye' }[eye]}`;
       els.eyeLabel.textContent = { lost: "Can't see you", rest: 'Resting', closed: 'Eyes closed', open: 'I can see you' }[eye];
     }
-    if (changed('mic', model.micOn)) {
-      els.micStatus.classList.toggle('eye-status--off', !model.micOn); // red: the nurse isn't being heard
-      els.micIcon.className = `icon icon--${model.micOn ? 'mic' : 'mic-off'}`;
-      els.micLabel.textContent = model.micOn ? 'Mic on' : 'Mic off';
+    // Red when the nurse can't be heard and should be: always listening but muted, or no mic at all.
+    // With push-to-talk, idle between holds of M is normal, so it isn't red.
+    if (changed('mic', `${model.micMode}:${model.mic}`)) {
+      const listening = model.mic === 'on' || model.mic === 'starting';
+      const between = model.micMode === 'talk' && model.mic === 'idle';
+      els.micStatus.classList.toggle('eye-status--off', !listening && !between);
+      els.micIcon.className = `icon icon--${listening ? 'mic' : 'mic-off'}`;
+      els.micLabel.textContent = listening ? (model.micMode === 'talk' ? 'Listening' : 'Mic on') : between ? 'Hold M to talk' : 'Mic off';
     }
 
     // Caption kinds: waiting (Listening), question (what was said), prompt, and message (what the

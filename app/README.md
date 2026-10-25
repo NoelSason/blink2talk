@@ -51,13 +51,15 @@ Dev mode (backtick) can turn on learning from picks: a pick that is spoken and n
 
 | Key | What it does |
 |---|---|
-| Arrow keys | Move the highlight: left and right along the row of four (the default layout); all four directions in the 2x2 layouts |
+| Arrow keys | Move the highlight: all four directions in the 2x2 (the default layout); left and right along the row of four (dev mode) |
 | Space, held about 1 s | Long blink: choose |
 | Space, Space | Double blink |
 | `N` | Care panel |
 | `D` | Demo controls: type what the nurse says, sample questions, sources |
 | `Q` / `R` | Next sample question / back to Listening |
-| `M` / `C` / `K` | Mic on or off / calibrate again / 8 s drift check |
+| `M` | Nurse mic: hold while talking, let go to send. With the care panel's Always listening on, M mutes and unmutes instead |
+| `S`, held about 1 s | Skip the eye calibration: back to the last one this session, or keyboard only until `C` |
+| `C` / `K` | Calibrate again / 8 s drift check |
 | `` ` `` | Dev panel (timings, live eye readout) |
 | `T` / `F` / `L` | Tired mode / pretend the face is lost / light theme |
 

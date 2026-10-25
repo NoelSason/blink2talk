@@ -40,17 +40,36 @@ app.whenReady().then(async () => {
   };
   const waitFor = async (expr, ms = 8000) => { for (const t0 = Date.now(); Date.now() - t0 < ms; await sleep(100)) if (await state(expr)) return true; return false; };
 
-  // The top bar says whether the nurse mic is on. It listens from launch, so the first M mutes it.
-  // With no server here the mic can't connect, so "on" is set by hand first.
+  // Push-to-talk: the top bar says to hold M, and Listening while it's held. With no server here the
+  // mic can't connect, so "held" is set by hand, and a real press ends at Mic off in red.
   const micLabel = () => js(`document.getElementById('mic-label').textContent`);
+  const micRed = () => js(`document.getElementById('mic-status').classList.contains('eye-status--off')`);
+  check('the top bar says to hold M to talk, not in red', (await micLabel()) === 'Hold M to talk' && !(await micRed()));
   await js(`window.__test.state.mic = 'on'; 1`);
   await sleep(80);
-  const micRed = () => js(`document.getElementById('mic-status').classList.contains('eye-status--off')`);
-  check('the top bar shows when the mic is on', (await micLabel()) === 'Mic on' && !(await micRed()));
+  check('while M is held it says Listening', (await micLabel()) === 'Listening' && !(await micRed()));
+  await js(`window.__test.state.mic = 'idle'; 1`);
+  await key('KeyM');
+  await sleep(150);
+  await key('KeyM', 'keyup');
+  await sleep(80);
+  check('without the speech service, holding M shows Mic off in red', (await micLabel()) === 'Mic off' && (await micRed()) && (await state('s.mic')) === 'unavailable');
+  check('and nothing is heard', (await state('s.rowKind')) === 'listen');
+
+  // The care panel switches to always listening (saved on this laptop), where M mutes instead.
+  const micSwitch = `[...document.querySelectorAll('.care label')].find((l) => l.textContent.includes('Always listening'))?.querySelector('input')`;
+  check('the care panel has the always-listening switch, off by default', await js(`(() => { const box = ${micSwitch}; return !!box && !box.checked; })()`));
+  await js(`${micSwitch}.click(); 1`);
+  check('switching it on sets always listening and saves it', (await state('s.micMode')) === 'always' && (await js(`localStorage.getItem('blink2talk.micMode')`)) === 'always');
+  await js(`window.__test.state.mic = 'on'; 1`);
+  await sleep(80);
+  check('always listening, the top bar says Mic on', (await micLabel()) === 'Mic on' && !(await micRed()));
   await key('KeyM');
   await sleep(80);
-  check('the first M turns it off', (await micLabel()) === 'Mic off' && (await state('s.mic')) === 'off');
-  check('and shows it in red', await micRed());
+  check('and M mutes it, in red', (await micLabel()) === 'Mic off' && (await micRed()) && (await state('s.mic')) === 'off');
+  await key('KeyM', 'keyup');
+  await js(`${micSwitch}.click(); 1`);
+  check('switching it off goes back to push-to-talk', (await state('s.micMode')) === 'talk' && (await js(`localStorage.getItem('blink2talk.micMode')`)) === 'talk');
 
   // Listening: one item; a long blink opens the Start screen, the same four every time.
   check('listening shows one item', (await labels()).length === 1);

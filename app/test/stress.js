@@ -57,6 +57,7 @@ app.whenReady().then(async () => {
     () => `window.__test.heard.onEagerEnd(${JSON.stringify(pick(QUESTIONS))})`,
     () => `dispatchEvent(new KeyboardEvent('keydown', { code: '${pick(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyR', 'KeyQ', 'KeyT', 'KeyF'])}' }))`,
     () => `(dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' })), setTimeout(() => dispatchEvent(new KeyboardEvent('keyup', { code: 'Space' })), ${pick([60, 300, 1100])}))`,
+    () => `(dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM' })), setTimeout(() => dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyM' })), ${pick([30, 400, 2000])}))`,
   ];
   const t0 = Date.now();
   let firstBad = null;

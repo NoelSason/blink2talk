@@ -16,7 +16,7 @@ export function createCarePanel({ memory, onAction }) {
   const panel = document.getElementById('care');
   const opener = document.querySelector('.care-button');
   let alerts = []; // { text, t }
-  let state = { tired: false, faceLost: false, mic: 'off', light: false };
+  let state = { tired: false, faceLost: false, mic: 'idle', micMode: 'talk', light: false };
 
   const section = (title, ...children) => el('section', { className: 'care__section' }, el('h3', { className: 'care__heading', textContent: title }), ...children);
   const toggle = (text, action) => {
@@ -58,7 +58,7 @@ export function createCarePanel({ memory, onAction }) {
   notes.addEventListener('input', saveProfile);
 
   const tired = toggle('Tired mode: 2 replies, larger text', 'tired');
-  const mic = toggle('Listen for the nurse', 'mic');
+  const mic = toggle('Always listening', 'mic-mode');
   const light = toggle('Light theme', 'theme');
   const micNote = el('p', { className: 'care__note' });
   const local = toggle('Fast replies on this laptop (testing only)', 'local-replies');
@@ -127,9 +127,12 @@ export function createCarePanel({ memory, onAction }) {
     update(next) {
       state = { ...state, ...next };
       tired.input.checked = state.tired;
-      mic.input.checked = state.mic === 'on';
-      mic.input.disabled = state.mic === 'unavailable';
-      micNote.textContent = state.mic === 'unavailable' ? 'The microphone needs the conversation server and its speech key.' : '';
+      mic.input.checked = state.micMode === 'always';
+      micNote.textContent = state.mic === 'unavailable'
+        ? 'The microphone needs the conversation server and its speech key.'
+        : state.micMode === 'always'
+          ? 'Hears everything said in the room. Press M to mute or unmute.'
+          : `Hold M while you talk to ${memory.profile.name}, and let go when you're done.`;
       local.input.checked = !!state.local;
       local.input.disabled = !state.localAvailable;
       localNote.textContent = !state.localAvailable ? 'For testing only. Not set up on this laptop.'

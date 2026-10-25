@@ -1,6 +1,6 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-25 (default layout back to the Kahoot 2x2)
+Updated: 2026-10-25 02:20 PDT (push-to-talk on M with an always-listening switch; hold S skips calibration)
 
 ## Now
 - Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README, nurse mic listens from launch, red Mic off, accuracy test for the row layout, arrow keys in the row layout, "None of these" re-asks stress-tested and fixed.
@@ -38,7 +38,7 @@ Conversation: `main.js` relays to `localhost:8790` over `ipcMain.handle('convers
 | `/replies`, `/complete` with `local: true`; `POST /local-warm`; `/config` → `localModel` | Testing-only care panel switch (off by default, saved locally): replies from the on-laptop model; greyed out without it |
 | `POST /summary { history, patientProfile }` → `{ forPatient, forCaregiver[] }` (204 mock, 502 error) | 2 s after the conversation changes. `forPatient` = "So far" on Listening; `forCaregiver` = care panel Summary. Otherwise the last lines as said |
 | `POST /speak { text }` → WAV, or 204 | Fetched for every reply as it shows; played in the renderer. 204 → system voice |
-| `GET /stt-token` → `{ token }` | Renderer streams the mic to Cartesia `stt/turns/websocket` (Ink-2). `turn.update` = live caption, `turn.end` = question. Silence sent while speaking + 800 ms. `M` toggles |
+| `GET /stt-token` → `{ token }` (cached 50 min) | Renderer streams the mic to Cartesia `stt/turns/websocket` (Ink-2). Push-to-talk (default): hold M; letting go sends `close`, and everything said in the hold is one question (`mic.js` `startTalk`). Always listening (care panel switch, saved per laptop): `turn.update` = live caption, `turn.end` = question, `turn.eager_end` starts replies early, `M` mutes. Silence sent while speaking + 800 ms |
 | `POST /complete { prefix, sentenceSoFar, context }` → `{ words }` | Spell it suggestions |
 
 Speaker recognition: renderer → `ipcMain.handle('speaker', pcm)` (16 kHz pcm_s16le of one mic turn, silence trimmed) → `{ voice: "voice-N", similarity, isNew }` or null (`app/speakers.js`).
@@ -48,7 +48,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 ## Deviations from CLAUDE.md
 | Date | CLAUDE.md says | We did | Why | Affects | CLAUDE.md updated? |
 | --- | --- | --- | --- | --- | --- |
-| 2026-10-24 | Push-to-talk | Always-on mic with Ink-2 turn detection; muted while the patient's voice plays; room talk waits behind "Reply anyway" | Samarth's streaming mic in `patient.html` works this way | Conversation | No. Samarth's design; worth a CLAUDE.md line. |
+| 2026-10-25 | Push-to-talk | Push-to-talk on M by default, as CLAUDE.md says; always listening (Ink-2 turn detection, room talk waits behind "Reply anyway") stays as a care-panel switch | Noel asked for push-to-talk, then for a switch to keep the always-on option | Conversation | No; push-to-talk is CLAUDE.md's design, the switch is extra. |
 | 2026-10-24 | Cut: local LLM | Testing-only care panel switch "Fast replies on this laptop (testing only)": Qwen3-4B-Instruct via node-llama-cpp in the conversation server; off by default, greyed out until `npm run local-model`; Claude if it fails | Noel asked for it for testing only | Conversation (`local` flag, optional dependency) | No. Team: keep as a testing switch or remove before judging. |
 | 2026-10-24 | `MOCK_STT` / `MOCK_LLM` / `MOCK_TTS` env flags and a mock badge per subsystem | Automatic fallbacks plus a "Sources" list in the demo panel | Fallbacks keep the demo running if a service drops mid-demo | Nobody | No. |
 | 2026-10-24 | Distress alerts cut | The patient picking "I'm in pain" / "I can't breathe" / "Call the nurse" badges the care button, chimes, and sends a desktop notification | It's the patient asking, not a distress detector | Nobody | No. Needs a team OK (see Open questions). |
@@ -60,6 +60,8 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude (0.8 or more: Claude makes the first two replies stand on their own). On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-25 (Noel): hold S (1 s) during the eye calibration skips it: back to the last calibration this session (`eyes.js` keeps it), or keyboard only until C. A hold, so a stray S does nothing. Tested with Chromium's fake camera: a 0.3 s tap does nothing; a 1.2 s hold ends the dots and shows Listening.
+- 2026-10-25 (Noel): nurse mic is push-to-talk on M (hold, let go to send); the care panel's "Always listening" switch (saved per laptop) brings back the always-on mic, where M mutes. Push-to-talk keeps the audio from before the socket opens, joins every Ink turn in the hold, and sends on letting go: about 0.5 to 0.8 s after a mid-sentence release (Ink transcribes the rest and hangs up), 0.3 s if the last sentence had already ended (Ink doesn't hang up then). Measured end to end with the real page, Ink-2, and Claude, the mic fed a spoken WAV: 3 s of speech with M up was not heard; "did you sleep okay last night?" came through whole, with replies. A 0.7 s hold of two words came back empty from Ink. Top bar: "Hold M to talk" (not red: that's normal between holds), "Listening" while held, red "Mic off" only when the mic can't work or is muted while always listening. Why: Noel asked for push-to-talk instead of always listening, then for a switch.
 - 2026-10-25 (Marco): default layout back to the Kahoot 2x2 (`devsettings.js` `layout: 'kahoot'`). Why: four columns didn't work when Marco tested it. Row of 4 stays in dev mode (Layout); e2e switches to it for the row checks. A laptop that saved a layout in dev mode keeps it until changed there.
 - 2026-10-25 (Noel): arrow keys follow the row layout. `gridMove` still moved by 2x2 row and column, but the row draws the cells as 1, 3, 2, 4 (columns.js `COLUMN_BOX`), so Right only reached the first and third bars. Now left and right step through the bars as drawn (`ROW_ORDER`), skipping an empty one (tired mode), and up and down do nothing; the 2x2 layouts keep all four directions. e2e checks the highlighted box moves right across all four bars on screen.
 - 2026-10-25 (Noel): "None of these" stays two re-asks on the same question, then urgent + Spell it; CLAUDE.md's flow now says so (the topic picker stays in `patient.html`). Why: the second set should still answer the question ("Did you sleep ok?" → why it was good or bad). The re-ask fixes are server-side (context/conversation.md). Rejected: sending which reply the patient looked at longest; the longest look mostly marks the reply that took longest to read.

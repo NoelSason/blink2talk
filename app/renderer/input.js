@@ -48,7 +48,6 @@ const DEMO_KEYS = {
   KeyC: 'calibrate',     // recalibrate the camera eye tracker
   KeyK: 'drift-check',   // 8 s drift check: center and two corners, shifts the boxes back
   KeyN: 'care',          // open or close the care panel
-  KeyM: 'mic',           // nurse microphone on or off
 };
 export function onDemoKey(handler) {
   window.addEventListener('keydown', (event) => {
@@ -56,4 +55,40 @@ export function onDemoKey(handler) {
     const action = DEMO_KEYS[event.code];
     if (action) handler(action);
   });
+}
+
+// Operator keys that act only when held, so a stray press does nothing.
+const HOLD_KEYS = {
+  KeyS: { action: 'skip-calibration', ms: 1000 }, // skip the eye calibration dots
+};
+export function onHoldKey(handler) {
+  const timers = new Map();
+  window.addEventListener('keydown', (event) => {
+    const hold = HOLD_KEYS[event.code];
+    if (!hold || typing(event) || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    clearTimeout(timers.get(event.code));
+    timers.set(event.code, setTimeout(() => handler(hold.action), hold.ms));
+  });
+  window.addEventListener('keyup', (event) => {
+    clearTimeout(timers.get(event.code));
+    timers.delete(event.code);
+  });
+  window.addEventListener('blur', () => {
+    timers.forEach(clearTimeout);
+    timers.clear();
+  });
+}
+
+// The nurse mic's key, M: held while talking (push-to-talk), or pressed to mute and unmute (always
+// listening); app.js decides. Leaving the window counts as letting go, since the key-up never
+// arrives then and a push-to-talk mic would stay open.
+export function onMicKey({ down, up }) {
+  window.addEventListener('keydown', (event) => {
+    if (event.code !== 'KeyM' || typing(event) || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    down();
+  });
+  window.addEventListener('keyup', (event) => {
+    if (event.code === 'KeyM') up();
+  });
+  window.addEventListener('blur', up);
 }

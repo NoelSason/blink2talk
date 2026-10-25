@@ -140,6 +140,23 @@ export async function startEyes(on, settings) {
     status('Eyes: calibrating…');
   }
 
+  // Hold S: stop the dots. Back to the last calibration this session if there is one; otherwise no
+  // eye input until the next calibration (C), and the keyboard still works.
+  let lastCalibration = null; // { result, blinkLevels }
+  function skipCalibration() {
+    if (pipeline?.mode !== 'calibrating') return false;
+    on.calibration(null);
+    if (lastCalibration) {
+      pipeline.useCalibration(lastCalibration.result);
+      blinkLevels = lastCalibration.blinkLevels;
+      status('Eyes: calibration skipped, using the last one');
+    } else {
+      build(); // a pipeline that isn't calibrating
+      status('Eyes: calibration skipped. Keyboard only; press C to calibrate');
+    }
+    return true;
+  }
+
   function collectLabels(t, c, f, pose) {
     if (c.phase !== labels.phase) {
       labels.phase = c.phase;
@@ -329,6 +346,7 @@ export async function startEyes(on, settings) {
       else if (e.type === 'fatigue') on.fatigue(e.level);
       else if (e.type === 'calibrated') {
         blinkLevels = { ...e.result.thresholds }; // the vision module's closed and open levels
+        lastCalibration = { result: e.result, blinkLevels };
         if (settings.headPose) trainHeadModel();
         const q = e.result.quadrants;
         log({ t: r(e.t, 10), event: 'calibrated', at: Date.now(), tester, dims: q?.dims, centroids: q?.centroids, scale: q?.scale, accuracy: q?.accuracy, warnings: e.result.warnings, settings });
@@ -370,6 +388,7 @@ export async function startEyes(on, settings) {
   return {
     calibrate: rebuild,
     rebuild,
+    skipCalibration,
     driftCheck: startDrift,
     // Blink settings applied at once (the vision module reads them on every hold). The same values
     // are in `settings`, so a rebuild keeps them.
