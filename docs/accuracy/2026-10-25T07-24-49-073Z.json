@@ -1,0 +1,37 @@
+{
+  "session": "2026-10-25T07-24-49-073Z",
+  "calibrations": [
+    {
+      "t": 18733.5,
+      "at": 1792913105141,
+      "tester": null,
+      "fit": {
+        "center": 0,
+        "topLeft": 1,
+        "topRight": 0.34782608695652173,
+        "bottomRight": 0.8260869565217391,
+        "bottomLeft": 0
+      },
+      "warnings": [
+        "Hard to tell apart: center, topRight, bottomLeft. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate.",
+        "Squint couldn't be told apart from normal looks; select with full blinks."
+      ]
+    },
+    {
+      "t": 42450.3,
+      "at": 1792913128860,
+      "tester": null,
+      "fit": {
+        "center": 0,
+        "topLeft": 1,
+        "topRight": 0,
+        "bottomRight": 0.7777777777777778,
+        "bottomLeft": 0.21739130434782608
+      },
+      "warnings": [
+        "Hard to tell apart: center, topRight, bottomLeft. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate."
+      ]
+    }
+  ],
+  "tests": []
+}
