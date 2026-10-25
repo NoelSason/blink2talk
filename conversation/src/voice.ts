@@ -5,6 +5,7 @@ const FALLBACK_VOICE = "6ccbfb76-1fc6-48f7-b71d-91ac6298247b";
 
 let client: Cartesia | undefined;
 const cache = new Map<string, Buffer>();
+const pending = new Map<string, Promise<Buffer>>(); // same text asked twice at once (warm + app prefetch): one request
 
 export function voiceId(): string {
   return process.env.CARTESIA_VOICE_ID || FALLBACK_VOICE;
@@ -19,6 +20,16 @@ export async function synthesize(text: string): Promise<Buffer> {
   const key = `${voiceId()}|${text}`;
   const hit = cache.get(key);
   if (hit) return hit;
+  let job = pending.get(key);
+  if (!job) {
+    // One retry: a transient Cartesia failure would otherwise send the app to the system voice.
+    job = generate(text, key).catch(() => generate(text, key)).finally(() => pending.delete(key));
+    pending.set(key, job);
+  }
+  return job;
+}
+
+async function generate(text: string, key: string): Promise<Buffer> {
   client ??= new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
   const res = await client.tts.generate({
     model_id: "sonic-3.6",

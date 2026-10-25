@@ -30,7 +30,8 @@ Every launch starts with eye onboarding, because lighting, posture, and the lapt
 1. **Calibration** (about 15 s): look at the dot in the center, then at each corner where the boxes will be, then squint. Turning your head a little toward a dot is fine.
 2. **Practice:** four rounds, one marked box at a time, each corner once in random order. Look at it and close your eyes for a moment. The demo controls (`D`) show the result, for example "Practice: 4 of 4 correct, 2.3 s each". Press `C` to calibrate again if it's low.
 
-- **Consent:** a yes or no to a consent or treatment question (the conversation server answers those with Yes / No / Explain more only) is confirmed before it's spoken: the question stays on screen above two tall boxes, Say "Yes" on the left and Go back on the right. Only left or right counts there, the direction the eye tracker reads best.
+- **High-stakes answers:** when a yes or no would make a medical decision (consent to a treatment, a procedure, a medication change, CPR), the replies are Yes / No / Explain more, and a Yes or No is confirmed before it's spoken: "You said “Yes” to more pain medication. Is that correct?" with "Yes, that's right" on the left and "No, go back" on the right. Only left or right counts there, the direction the eye tracker reads best. Ordinary questions ("are you in pain?", "okay with the lights off?") aren't confirmed.
+- **Blink three times quickly:** offers "Calibrate your eyes again?". Two quick blinks still go back; quick blinks count even when they're fast.
 
 ## How the gaze works
 

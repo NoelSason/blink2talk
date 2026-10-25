@@ -1,6 +1,6 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-24 17:15 PDT
+Updated: 2026-10-24 17:55 PDT
 
 ## Now
 - Working on: who said each line (voice model + Claude names) and conversation summaries for the patient (Listening) and the care panel.
@@ -34,7 +34,7 @@ Conversation: `main.js` relays to `localhost:8790` over `ipcMain.handle('convers
 | Route | App use |
 | --- | --- |
 | `GET /config` | `urgent[]`, mock flags for the demo panel |
-| `POST /replies { transcript, history, patientProfile, fatigue, speaker }` → `{ replies: string[], urgent, addressed, source, speaker }` | `patientProfile` = name, nurse's notes, most-picked phrases. First 3 replies shown. `addressed: false` → "Reply anyway". `source: "consent-rule"` → confirm screen on Yes/No. `speaker` in = `{ voice, label, isNew }`; out = `{ label, role }` names the caption and every line of that voice |
+| `POST /replies { transcript, history, patientProfile, fatigue, speaker }` → `{ replies: string[], urgent, addressed, source, speaker, highStakes, about }` | `patientProfile` = name, nurse's notes, most-picked phrases. First 3 replies shown. `addressed: false` → "Reply anyway". `source: "consent-rule"` → confirm screen on Yes/No. `speaker` in = `{ voice, label, isNew }`; out = `{ label, role }` names the caption and every line of that voice |
 | `/replies`, `/complete` with `local: true`; `POST /local-warm`; `/config` → `localModel` | Testing-only care panel switch (off by default, saved locally): replies from the on-laptop model; greyed out without it |
 | `POST /summary { history, patientProfile }` → `{ forPatient, forCaregiver[] }` (204 mock, 502 error) | 2 s after the conversation changes. `forPatient` = "So far" on Listening; `forCaregiver` = care panel Summary. Otherwise the last lines as said |
 | `POST /speak { text }` → WAV, or 204 | Fetched for every reply as it shows; played in the renderer. 204 → system voice |
@@ -60,6 +60,11 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-24: High stakes is Claude's call inside `/replies` (`highStakes`, `about`), matching CLAUDE.md's `options.highStakes`; the keyword rule is only the fallback when Claude doesn't answer. The confirm says what the pick agrees to: "You said “Yes” to more pain medication. Is that correct?" with "Yes, that's right" / "No, go back". Why: the keyword rule confirmed "okay with the lights off?" and "did the medication help?". Tested: 9 of 9 classified right (CPR, feeding tube vs lights, pain level, visitors).
+- 2026-10-24: Eye calibration starts on its own at every launch again (the Calibrate button and C still redo it). @Marco: this reverses "calibration never starts on its own": without it the app is stuck on Listening, since nothing can be picked until calibration. Three quick blinks (within 1.5 s) offer "Calibrate your eyes again?" (two tall boxes); after two blinks the app waits 0.65 s for a third before going back.
+- 2026-10-24: Quick blinks are counted in `eyes.js` from each frame's eye openness against the calibrated closed/open levels (2+ frames each way), not from the vision module's blink events, which smooth over 3 frames and merged fast double blinks.
+- 2026-10-24: The nurse mic sends no Ink-2 turn config: `{ type: "config", turn: { end_timeout_ms, end_threshold } }` stops Ink-2 returning any transcript (tested by streaming a WAV both ways). Split questions are joined in app.js instead. @Samarth: `patient.html` sends the same message.
+- 2026-10-24: A voice clip that fails to load is not cached (the next ask retries) and speaking retries once before the system voice; the server shares one synthesis per phrase and retries once; voice requests get 30 s. Why: on slow venue Wi-Fi urgent phrases fell back to the system voice for the whole session.
 - 2026-10-24 (Marco): 8 s drift check (Re-center button, K, dev panel): center + two opposite corners, measures how far the eye readings moved since calibration and shifts all five box centers by the average offset, in place (`renderer/drift.js`, unit-tested). Feature log to `app/logs/eyes-*.jsonl` about 10 times a second with calibration, drift and test labels, no images. The 'open now' tick sound is removed (Marco's call). Why: accuracy fell from about 85% to 40% over a session, and we need to see which measurement drifts.
 - 2026-10-24 (Marco): spelling page uses a 600 ms hold to select (800 ms elsewhere), applied live per page through the vision module's `setBlinkConfig`. A tick plays when a hold is long enough, because the select fires on reopening and the patient can't see the ring. Why: typing took too long, and patients held their eyes shut past the point of selecting. Both times are dev-mode sliders.
 - 2026-10-24: Nurse mic turns: Ink-2 `end_timeout_ms: 1500`, `end_threshold: 0.3` (Samarth's settings); replies start on `turn.eager_end` and are reused if the final transcript matches; a mic turn starting ≤ 6 s after the last, before a pick, extends the same question (one caption, one conversation line, fresh replies). Why: Noel saw questions split in two, with replies for half a question; turn ends took up to ~5.6 s. Measured: Haiku at low effort already skips thinking (~82 output tokens, median 1.25 s), so turning thinking off gained nothing. Rejected: a longer turn timeout (slower for every question).

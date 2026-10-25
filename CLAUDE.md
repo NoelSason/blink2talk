@@ -97,6 +97,8 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-24 — Product/Conversation (Noel): `/replies` now returns `highStakes` (Claude classifies; keyword rule only as fallback) and `about`, closer to the `options.highStakes` row above. Eye calibration auto-starts at launch again; three quick blinks offer recalibration.
+
 - 2026-10-24 — Product (Noel): a testing-only "Fast replies on this laptop" switch in the care panel (local Qwen3-4B, off by default) despite "local LLM" on the Cut list. Not for the demo or patients; team to keep or remove. App mic now uses Samarth's Ink-2 turn settings and joins split questions.
 
 - 2026-10-24 — Product (Noel): conversation lines are labeled with who said them (on-device TitaNet voice prints + Claude names them in `/replies` → `speaker`), and a new `/summary` (Opus 5.5) feeds "So far" on Listening and the care panel. @Samarth: `conversation/` changed, see context/conversation.md.

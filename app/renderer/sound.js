@@ -85,7 +85,8 @@ function systemVoice(text) {
 // `isCurrent` is checked once the audio is ready: if the patient undid the pick meanwhile, nothing plays.
 export async function speak(text, getAudio, isCurrent = () => true) {
   const fallbackMs = Math.max(2500, text.split(/\s+/).length * 450);
-  const bytes = getAudio ? await getAudio(text) : null;
+  // One retry: a prefetched clip that failed is fetched again before falling back to the system voice.
+  const bytes = getAudio ? (await getAudio(text)) ?? (await getAudio(text)) : null;
   if (!isCurrent()) return;
   const spoken = bytes ? playWav(bytes) : systemVoice(text);
   return Promise.race([spoken, new Promise((resolve) => setTimeout(resolve, fallbackMs + (bytes ? 4000 : 0)))]);

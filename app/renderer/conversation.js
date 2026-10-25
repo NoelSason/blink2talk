@@ -45,11 +45,14 @@ export async function getReplies(body) {
         addressed: d.addressed !== false,
         source: d.source,
         speaker: label ? { label, role: d.speaker.role ?? 'unknown' } : null,
+        // A yes or no makes a medical decision; `about` is what a yes agrees to ("more pain medication").
+        highStakes: d.highStakes === true,
+        about: typeof d.about === 'string' && d.about.trim() ? d.about.trim().slice(0, 80) : null,
       };
     } catch {}
   }
   const sample = QUESTIONS.find((q) => q.text === body.transcript);
-  return { replies: sample?.replySets[0] ?? ['Yes', 'No', "I'm not sure"], urgent: FALLBACK_URGENT, addressed: true, source: 'sample', speaker: null };
+  return { replies: sample?.replySets[0] ?? ['Yes', 'No', "I'm not sure"], urgent: FALLBACK_URGENT, addressed: true, source: 'sample', speaker: null, highStakes: false, about: null };
 }
 
 // Which voice said a nurse-mic turn (the speaker-recognition model in the main process):
@@ -111,7 +114,13 @@ const MAX_CACHED = 40;
 export function voiceAudio(text) {
   if (!call) return Promise.resolve(null);
   if (!voiceCache.has(text)) {
-    voiceCache.set(text, call('speak', { text }).catch(() => null));
+    // A failed fetch (slow network, the server busy) isn't kept: the next ask tries again, so a
+    // phrase never sticks to the system voice for the rest of the session.
+    const audio = call('speak', { text }).catch(() => null).then((bytes) => {
+      if (!bytes && voiceCache.get(text) === audio) voiceCache.delete(text);
+      return bytes;
+    });
+    voiceCache.set(text, audio);
     if (voiceCache.size > MAX_CACHED) voiceCache.delete(voiceCache.keys().next().value);
   }
   return voiceCache.get(text);

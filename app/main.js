@@ -68,7 +68,9 @@ ipcMain.handle('conversation', async (_event, { route, body }) => {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body ?? {}),
-    signal: AbortSignal.timeout(15000),
+    // Voice clips get longer: on slow venue Wi-Fi a clip can take over 15 s, and a timeout means the
+    // system voice instead of the patient's.
+    signal: AbortSignal.timeout(route === 'speak' ? 30000 : 15000),
   });
   if (res.status === 204) return null; // no Cartesia key: no voice or mic
   if (route === 'speak') return res.ok ? await res.arrayBuffer() : null;

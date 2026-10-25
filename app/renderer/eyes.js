@@ -115,8 +115,11 @@ export async function startEyes(on, settings) {
     labels = { phase: null, since: 0, looks: {}, poses: [] };
   }
 
-  // Starts the dots. Only on request (the Calibrate button, C, or the dev panel); never automatically.
+  // Starts the dots: on every launch (lighting, posture, and the laptop's position change between
+  // sessions, and nothing can be picked until it's done), and on request (the Calibrate button, C,
+  // three quick blinks, or the dev panel).
   function rebuild() {
+    blinkLevels = null;
     reset();
     pipeline.startCalibration();
     status('Eyes: calibrating…');
@@ -197,6 +200,43 @@ export async function startEyes(on, settings) {
     }
   }
 
+  // Quick blinks, counted from each frame's eye openness (EAR) instead of the vision module's blink
+  // events: it smooths EAR over 3 frames, so two fast blinks merged into one and a fast double blink
+  // didn't count. A blink here is EAR under the calibrated closed level for 2+ frames, then over the
+  // calibrated open level for 2+ frames. Needing 2 frames each way keeps camera noise from turning
+  // one blink into several (a first version counted single frames, and ordinary blinks added up to
+  // "three blinks"). Quiet for a moment after a pick, so lids settling after a choice don't count.
+  const QUICK_BLINK_MS = 500;
+  let blinkLevels = null;  // { close, open }, set by calibration
+  let closedSince = null;  // first frame under `close` in the current run
+  let closedFrames = 0;
+  let openFrames = 0;
+  let blinkStart = null;   // a closure that has lasted 2+ frames
+  let blinkQuietUntil = 0;
+  function countBlink(t, ear) {
+    if (!blinkLevels || !Number.isFinite(ear)) {
+      closedSince = blinkStart = null;
+      closedFrames = openFrames = 0;
+      return;
+    }
+    if (ear < blinkLevels.close) {
+      openFrames = 0;
+      if (closedFrames++ === 0) closedSince = t;
+      if (closedFrames >= 2) blinkStart ??= closedSince;
+    } else {
+      closedFrames = 0;
+      if (ear > blinkLevels.open && blinkStart !== null && ++openFrames >= 2) {
+        // Only quick ones: a closure of QUICK_BLINK_MS or more may be a pick (600 ms on the spelling page).
+        if (t >= blinkQuietUntil && t - blinkStart < QUICK_BLINK_MS) {
+          log({ t: r(t, 10), event: 'quickBlink', ms: r(t - blinkStart, 1) });
+          on.blink(t - blinkStart);
+        }
+        blinkStart = null;
+        openFrames = 0;
+      }
+    }
+  }
+
   // Once per new camera frame (~30 fps). A requestAnimationFrame loop ran at the display's rate
   // instead (120 Hz on a MacBook Pro, where video.currentTime advances every refresh), so the face
   // model ran ~110 times a second on the page's main thread: everything lagged, and the vision
@@ -228,6 +268,7 @@ export async function startEyes(on, settings) {
 
     let focus = null;
     if (out.mode === 'running' && !drift) {
+      countBlink(t, frame.ear);
       on.hold(out.blink ?? null);
       focus = out.quadrant?.focus ?? null;
       if (settings.headPose && gaze?.ready) focus = gaze.update(t, f, pose, !!out.blink?.engaged);
@@ -239,14 +280,16 @@ export async function startEyes(on, settings) {
         if (settings.headPose) gaze?.holdStart(e.t);
       } else if (e.type === 'quadrantSelect') {
         log({ t: r(e.t, 10), event: 'select', box: e.quadrant, via: e.via });
+        blinkQuietUntil = e.t + 1000;
         if (!drift) on.select(settings.headPose && gaze?.ready ? gaze.lockedFocus : e.quadrant);
       } else if (e.type === 'blink') {
+        // Logged only: quick blinks reach the app from countBlink, which doesn't merge fast ones.
         log({ t: r(e.t, 10), event: 'blink', ms: r(e.durationMs, 1) });
-        if (!drift) on.blink(e.durationMs);
       }
       else if (e.type === 'rest' || e.type === 'restEnd') on.rest(e.type === 'rest');
       else if (e.type === 'fatigue') on.fatigue(e.level);
       else if (e.type === 'calibrated') {
+        blinkLevels = { ...e.result.thresholds }; // the vision module's closed and open levels
         if (settings.headPose) trainHeadModel();
         const q = e.result.quadrants;
         log({ t: r(e.t, 10), event: 'calibrated', dims: q?.dims, centroids: q?.centroids, scale: q?.scale, accuracy: q?.accuracy, warnings: e.result.warnings, settings });
@@ -279,8 +322,7 @@ export async function startEyes(on, settings) {
     }));
   };
 
-  reset();
-  status('Eyes: not calibrated. Press Calibrate.');
+  rebuild();
   video.requestVideoFrameCallback(loop);
 
   return {

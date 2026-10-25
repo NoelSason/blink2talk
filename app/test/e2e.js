@@ -25,8 +25,10 @@ app.whenReady().then(async () => {
   const key = (code, type = 'keydown') => js(`dispatchEvent(new KeyboardEvent('${type}', { code: '${code}' })); 1`);
   const hold = async () => { await key('Space'); await sleep(1100); await key('Space', 'keyup'); await sleep(150); };
   // Two camera blinks, the way the vision module reports them: a short closure, then another.
-  const camDoubleBlink = async () => { await cam('blink(220)'); await sleep(300); await cam('blink(220)'); await sleep(200); };
-  const doubleBlink = async () => { for (let i = 0; i < 2; i++) { await key('Space'); await sleep(80); await key('Space', 'keyup'); await sleep(120); } };
+  const camDoubleBlink = async () => { await cam('blink(220)'); await sleep(300); await cam('blink(220)'); await sleep(800); };
+  const blinks = async (n) => { for (let i = 0; i < n; i++) { await key('Space'); await sleep(80); await key('Space', 'keyup'); await sleep(120); } };
+  // Two blinks act once the wait for a possible third is over (TIMING.thirdBlink).
+  const doubleBlink = async () => { await blinks(2); await sleep(800); };
   const cam = (call) => js(`window.__test.camera.${call}; 1`);
   const state = (expr) => js(`(s => ${expr})(window.__test.state)`);
   // Boxes as drawn (the next frame), in reading order; null for an empty cell. The middle band (question and status) isn't a box.
@@ -80,7 +82,8 @@ app.whenReady().then(async () => {
   await state('(s.consent = true)');
   await cam(`select('topLeft')`);
   check('a consent yes is confirmed first', (await state('s.rowKind')) === 'confirm' && (await state('s.selected')) === -1);
-  check('the confirm screen is two boxes, the question above them', JSON.stringify(await labels()) === JSON.stringify(['Say “Yes, please”', 'Go back'])
+  check('the confirm screen says what was chosen, above two boxes', JSON.stringify(await labels()) === JSON.stringify(["Yes, that's right", 'No, go back'])
+    && (await state('s.caption.text')) === 'You said “Yes, please”. Is that correct?'
     && (await js(`document.getElementById('caption').parentElement.id`)) === 'gaze-area');
   await cam(`focus('bottomLeft')`);
   check('on the confirm screen, any look to the left means the left box', (await state('s.hl')) === 0);
@@ -110,6 +113,13 @@ app.whenReady().then(async () => {
   check('double blink leaves Spell it for the urgent options', (await state('s.rowKind')) === 'starters');
   await doubleBlink();
   check('another double blink goes back to the replies', (await state('s.rowKind')) === 'replies');
+
+  // Three quick blinks offer calibration again; Go back returns to where they were.
+  await key('KeyR');
+  await blinks(3);
+  check('three blinks offer calibration again', (await state('s.rowKind')) === 'recalibrate' && JSON.stringify(await labels()) === JSON.stringify(['Calibrate again', 'Go back']));
+  await cam(`select('topRight')`);
+  check('Go back from it returns to Listening', (await state('s.rowKind')) === 'listen');
 
   // A question split across two mic turns (the nurse paused) is one question: one caption, one line
   // in the conversation, replies for both parts. A turn after a pick is a new question.

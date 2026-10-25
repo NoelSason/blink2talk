@@ -26,7 +26,9 @@ const TIMING = {
   longBlink: 1000,    // eyes closed this long selects (keyboard stand-in; the camera has its own)
   shortBlink: 400,    // closures shorter than this count toward a double blink (keyboard)
   camShortBlink: 800, // the same for the camera: a closure shorter than a select (selectMs) is a blink
-  doubleBlink: 1000,  // two short blinks inside this window go back or undo
+  doubleBlink: 1000,  // short blinks less than this apart make a run: two go back or undo,
+  thirdBlink: 650,    // three offer calibration again; after two, wait this long for a third
+  tripleSpan: 1500,   // and all three must fall inside this, so ordinary blinks never add up to it
   selectedMin: 1500,  // "Selected" stays up at least this long,
   selectedSeen: 1000, // and at least this long after the eyes open, so the patient sees it
   afterSpeech: 1200,  // pause before going back to Listening
@@ -68,7 +70,8 @@ const s = {
   faceLost: false,
   cam: { engaged: false, closed: false, progress: 0 }, // camera hold: a long blink or held squint in progress
   calibration: null,          // calibration progress while the camera calibrates
-  consent: false,             // the current replies answer a consent or treatment question
+  consent: false,             // the current replies answer a high-stakes question (consent, treatment)
+  stakesAbout: null,          // what a yes to it agrees to ("more pain medication"), when known
   resting: false,             // eyes closed 3 s: the camera treats it as a rest, not a choice
   mic: 'off',                 // 'off' | 'starting' | 'on' | 'unavailable'
   turn: null,                 // who said the current question: { speaker, voice, given }
@@ -226,7 +229,8 @@ async function requestReplies(audio = null) {
   if (token !== requestToken) return;
   nameSpeaker(turn, d.speaker);
   s.urgent = d.urgent;
-  s.consent = d.source === 'consent-rule';
+  s.consent = d.highStakes;
+  s.stakesAbout = d.about;
   if (!d.addressed) {
     // Room talk ("grab the chart from room 4"): stay quiet, but one blink still gets the replies.
     memory.popTurn('nurse');
@@ -285,6 +289,9 @@ function select(i) {
     spellPick(item.box, i);
   } else if (item.action === 'confirmed') {
     choose(i, item.say);
+  } else if (item.action === 'recalibrate') {
+    chime();
+    runAction('calibrate');
   } else if (item.action === 'unconfirm') {
     goBack();
   } else if (item.action === 'say') {
@@ -297,12 +304,16 @@ function select(i) {
 // The question stays on screen, so the patient can check what they're answering. Two tall boxes,
 // left and right only: left/right is the direction the eye tracker reads best (Noel's recorded
 // session: about 4x the separation of up/down), so the step guarding a consent answer uses only that.
+// Only on a high-stakes question (the conversation server classifies it): the caption says what the
+// pick agrees to, "You said “Yes” to more pain medication. Is that correct?"
 function askConfirm(i, text) {
   chime('tick');
   s.prevPage = page(i);
+  const to = s.stakesAbout ? ` to ${s.stakesAbout}` : '';
+  s.caption = { kind: 'prompt', text: `You said “${text}”${to}. Is that correct?` };
   setRow('confirm', [
-    card(`Say “${text}”`, { icon: 'volume', action: 'confirmed', say: text }),
-    { type: 'end', kind: 'back', label: 'Go back', action: 'unconfirm' },
+    card("Yes, that's right", { icon: 'volume', action: 'confirmed', say: text }),
+    { type: 'end', kind: 'back', label: 'No, go back', action: 'unconfirm' },
   ]);
 }
 
@@ -500,7 +511,7 @@ const heard = {
   },
 };
 
-const hearingNurse = () => s.stage === 'choose' && !['spell', 'confirm'].includes(s.rowKind) && s.selected < 0 && !s.calibration;
+const hearingNurse = () => s.stage === 'choose' && !['spell', 'confirm', 'recalibrate'].includes(s.rowKind) && s.selected < 0 && !s.calibration;
 
 async function startNurseMic() {
   if (mic || !micWanted) return;
@@ -560,7 +571,7 @@ function cellFor(quadrant) {
   if (!quadrant) return -1;
   return twoColumns() ? (quadrant.endsWith('Left') ? 0 : 1) : GRID[quadrant];
 }
-const twoColumns = () => s.rowKind === 'confirm';
+const twoColumns = () => s.rowKind === 'confirm' || s.rowKind === 'recalibrate';
 
 function gridMove(hl, dir) {
   if (hl < 0) return s.items.findIndex(Boolean);
@@ -585,12 +596,33 @@ function onEyes(closed) {
   if (t - closeStartedAt < TIMING.shortBlink) shortBlink(t);
 }
 
+let backTimer = 0;
 function shortBlink(t) {
-  shortBlinks = shortBlinks.filter((x) => t - x < TIMING.doubleBlink);
+  if (shortBlinks.length && t - shortBlinks.at(-1) >= TIMING.doubleBlink) shortBlinks = [];
   shortBlinks.push(t);
-  if (shortBlinks.length < 2) return;
-  shortBlinks = [];
-  goBack();
+  clearTimeout(backTimer);
+  if (shortBlinks.length >= 3 && t - shortBlinks.at(-3) <= TIMING.tripleSpan) {
+    shortBlinks = [];
+    offerRecalibrate();
+  } else if (shortBlinks.length >= 2) {
+    backTimer = setTimeout(() => {
+      shortBlinks = [];
+      goBack();
+    }, TIMING.thirdBlink);
+  }
+}
+
+// Three quick blinks: "Calibrate your eyes again?" on two tall boxes, like the consent confirm.
+// Anywhere else than a choice screen (speaking, a pick showing), it's an undo, like two blinks.
+function offerRecalibrate() {
+  if (s.stage !== 'choose' || s.selected >= 0 || s.loading || s.calibration || s.rowKind === 'recalibrate') return goBack();
+  chime('tick');
+  s.prevPage = page(s.hl);
+  s.caption = { kind: 'prompt', text: 'Calibrate your eyes again?' };
+  setRow('recalibrate', [
+    card('Calibrate again', { icon: 'eye', action: 'recalibrate' }),
+    { type: 'end', kind: 'back', label: 'Go back', action: 'unconfirm' },
+  ]);
 }
 
 // Picks whatever is highlighted now: a long blink, or select() from a gaze module.

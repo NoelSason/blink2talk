@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { completeWord, getReplies, summarize } from "./claude.js";
+import { completeWord, getReplies, ruleReplies, summarize } from "./claude.js";
 import { localModelAvailable, warmLocal } from "./local.js";
 import { CONSENT_REPLIES, SPELL_OPTION, URGENT } from "./safety.js";
 import { sttToken, synthesize, usingClone, warm } from "./voice.js";
@@ -38,10 +38,7 @@ app.post("/replies", async (req, res) => {
   } catch (err) {
     console.error("replies failed:", err);
     res.json({
-      replies: CONSENT_REPLIES, // yes / no / explain: safe when the model is down
-      source: "fallback",
-      addressed: true,
-      speaker: null,
+      ...ruleReplies(transcript, CONSENT_REPLIES, "fallback"), // yes / no / explain: safe when the model is down
       urgent: URGENT,
       spellOption: SPELL_OPTION,
       ms: Date.now() - t0,

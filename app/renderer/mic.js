@@ -30,9 +30,9 @@ export async function startMic({ token, muted, onPartial, onEagerEnd, onResume, 
     access_token: token,
   });
   const ws = new WebSocket(`wss://api.cartesia.ai/stt/turns/websocket?${q}`);
-  // Same turn settings as conversation/public/patient.html: end a turn after at most 1.5 s of quiet
-  // (the default waits up to ~5.6 s). Set before any await, so the open event can't be missed.
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'config', turn: { end_timeout_ms: 1500, end_threshold: 0.3 } }));
+  // No turn config message: sending { type: 'config', turn: { end_timeout_ms, end_threshold } } (as
+  // conversation/public/patient.html does) stops Ink-2 returning any transcript (tested 2026-10-24).
+  // Split questions are joined in app.js instead.
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
   const ctx = new AudioContext({ sampleRate: 16000 });
   await ctx.audioWorklet.addModule('./mic-worklet.js');
