@@ -110,9 +110,15 @@ p { margin: 0; }
 /* ---------- Choosing: the reply row ---------- */
 .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-4); position: relative; }
 .reply-row { display: flex; align-items: center; gap: var(--sp-3); }
-/* Listening: the single item takes the middle third of the row. */
-.reply-row--single { justify-content: center; }
-.reply-row--single .reply-card { flex: 0 0 calc((100% - 2 * var(--sp-3)) / 3); }
+/* Listening: the single item is big, two thirds of the width and the whole stage height, so it is
+   easy to find and look at (Marco, 2026-10-25). */
+.reply-row--single { justify-content: center; flex: 1; min-height: 0; align-items: stretch; --hl-scale: 1.01; }
+.reply-row--single .reply-card {
+  flex: 0 0 66%;
+  height: auto;
+  min-height: min(var(--card-h), 100%);
+  font-size: calc(var(--fs-reply) * 1.45);
+}
 
 .status-line {
   min-height: calc(var(--fs-body) * 1.4);
