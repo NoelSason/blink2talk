@@ -11,8 +11,19 @@ export const DEFAULTS = {
   face: { lostMs: 500, foundMs: 150 },
   headPose: false,
   learnFromPicks: false,  // a spoken, not-undone pick teaches the box classifier where the eyes were. Off: a wrong pick that isn't undone teaches the wrong box
+  dots: 'corners',      // calibration dots: 'corners' (outer corner of each box) | 'centers' (middle of each box)
   gazeSource: 'vision', // 'vision' (MediaPipe features + per-axis classifier) | 'webeyetrack' (neural gaze point)
 };
+
+// Calibration dot positions on the gaze area (x and y in [-1, 1], +y down). Corners: each box's outer
+// corner, the biggest eye movement the screen allows. Centers: the middle of each box (about 0.6 on the
+// 2x2 layout). The vision module's classifier only compares eye features between dots, so either works
+// with it; the view, the head model and WebEyeTrack use these numbers.
+export const DOT_POSITIONS = {
+  corners: { center: [0, 0], topLeft: [-0.9, -0.9], topRight: [0.9, -0.9], bottomLeft: [-0.9, 0.9], bottomRight: [0.9, 0.9] },
+  centers: { center: [0, 0], topLeft: [-0.6, -0.6], topRight: [0.6, -0.6], bottomLeft: [-0.6, 0.6], bottomRight: [0.6, 0.6] },
+};
+export const dotPositions = (dots) => DOT_POSITIONS[dots] ?? DOT_POSITIONS.corners;
 
 export function loadSettings() {
   const out = structuredClone(DEFAULTS);

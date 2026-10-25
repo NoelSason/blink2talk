@@ -2,6 +2,7 @@
 // DOM when a value changed. Nothing here changes overall screen brightness: state changes only
 // restyle the highlighted item.
 
+import { dotPositions } from './devsettings.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const byId = (id) => document.getElementById(id);
@@ -25,13 +26,8 @@ const CALIBRATION_TEXT = {
 };
 // Calibration dots sit at the outer corner of each box (x and y in [-1, 1] over the gaze area, +y down):
 // the biggest eye movement the screen allows. Each box shows a small mark in that corner (app.css).
-const DOT_AT = {
-  center: [0, 0],
-  topLeft: [-0.9, -0.9],
-  topRight: [0.9, -0.9],
-  bottomLeft: [-0.9, 0.9],
-  bottomRight: [0.9, 0.9],
-};
+// Dev mode can move them to the box centers instead (devsettings.js `dots`, set on <html data-dots>).
+const dotAt = () => dotPositions(document.documentElement.dataset.dots);
 
 function icon(name, extra = '') {
   const el = document.createElement('span');
@@ -210,7 +206,7 @@ export function createView() {
     }
   }
 
-  // A point on the gaze area (x and y in [-1, 1]; DOT_AT) placed in screen coordinates.
+  // A point on the gaze area (x and y in [-1, 1]; dotAt) placed in screen coordinates.
   function placeOnGrid(node, x, y) {
     const screen = els.screen.getBoundingClientRect();
     let area = els.gazeArea.getBoundingClientRect();
@@ -227,7 +223,7 @@ export function createView() {
     els.calibration.hidden = !c;
     if (!c) return;
     // Dots go where the grid's boxes are, so calibration matches what the patient will look at.
-    const [x, y] = DOT_AT[c.phase] ?? DOT_AT.center;
+    const [x, y] = dotAt()[c.phase] ?? dotAt().center;
     placeOnGrid(els.calibDot, x, y);
     els.calibDot.hidden = lead;
     els.calibText.textContent = lead

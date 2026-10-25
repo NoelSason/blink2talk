@@ -204,6 +204,8 @@ p { margin: 0; }
 .reply-grid > :nth-child(3)::after { bottom: 10px; left: 10px; }
 .reply-grid > :nth-child(4)::after { bottom: 10px; right: 10px; }
 .reply-grid--columns > :nth-child(-n+4)::after { display: none; }
+/* Dots at the box centers (dev mode): the box itself is the target, so no corner marks. */
+[data-dots="centers"] .reply-grid > :nth-child(-n+4)::after { display: none; }
 /* Confirming a consent answer: two tall boxes, left and right, with the question above them. The
    middle column is the rest zone. */
 .reply-grid--columns { grid-template-rows: 1fr; }

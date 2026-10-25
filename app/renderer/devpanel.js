@@ -107,6 +107,16 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
     saveSettings(settings);
   });
 
+  const dotsInput = el('select', {});
+  for (const [v, text] of [['corners', 'Outer corner of each box'], ['centers', 'Middle of each box']]) {
+    dotsInput.append(el('option', { value: v, textContent: text }));
+  }
+  dotsInput.addEventListener('change', () => {
+    settings.dots = dotsInput.value;
+    saveSettings(settings);
+    markDirty(); // the dots are only used while calibrating
+  });
+
   const headInput = el('input', { type: 'checkbox' });
   headInput.addEventListener('change', () => {
     settings.headPose = headInput.checked;
@@ -137,6 +147,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
   const resetBtn = button('Reset to defaults', () => {
     Object.assign(settings, structuredClone(DEFAULTS));
     headInput.checked = settings.headPose;
+    dotsInput.value = settings.dots;
     sourceInput.value = settings.gazeSource;
     learnInput.checked = settings.learnFromPicks;
     saveSettings(settings);
@@ -161,6 +172,9 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
       el('label', { className: 'dev__row' }, learnInput,
         el('span', { className: 'dev__label', textContent: 'Learn from spoken picks (teaches the chosen box where the eyes were)' }))),
     el('section', { className: 'dev__section' },
+      el('h2', { className: 'dev__heading', textContent: 'Calibration dots (recal)' }),
+      el('label', { className: 'dev__row' }, dotsInput)),
+    el('section', { className: 'dev__section' },
       el('h2', { className: 'dev__heading', textContent: 'Head model' }),
       el('label', { className: 'dev__row' }, headInput,
         el('span', { className: 'dev__label', textContent: 'Correct box picks for head turns (retrains on calibration)' }))),
@@ -181,6 +195,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
   );
   applyBtn.disabled = true;
   headInput.checked = settings.headPose;
+  dotsInput.value = settings.dots;
   sourceInput.value = settings.gazeSource;
   learnInput.checked = settings.learnFromPicks;
   syncSliders();

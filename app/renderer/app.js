@@ -26,7 +26,7 @@ const TIMING = {
   longBlink: 1000,    // eyes closed this long selects (keyboard stand-in; the camera has its own)
   shortBlink: 400,    // closures shorter than this count toward a double blink (keyboard)
   camShortBlink: 800, // the same for the camera: a closure shorter than a select (selectMs) is a blink
-  doubleBlink: 1000,  // short blinks less than this apart make a run: two go back or undo,
+  doubleBlink: 1400,  // short blinks less than this apart make a run: two go back or undo,
   thirdBlink: 650,    // three offer calibration again; after two, wait this long for a third
   tripleSpan: 1500,   // and all three must fall inside this, so ordinary blinks never add up to it
   selectedMin: 1500,  // "Selected" stays up at least this long,

@@ -196,6 +196,12 @@ app.whenReady().then(async () => {
   const bottomRight = await dot('bottomRight');
   await cam('calibration(null)');
   check('calibration dots sit on the box centers', topLeft[0] < center[0] && topLeft[1] < center[1] && bottomRight[0] > center[0] && bottomRight[1] > center[1]);
+  // Dev mode's "Middle of each box" pulls the corner dots in toward the center.
+  await js(`document.documentElement.dataset.dots = 'centers'; 1`);
+  const inner = await dot('topLeft');
+  await cam('calibration(null)');
+  await js(`document.documentElement.dataset.dots = 'corners'; 1`);
+  check('box-center dots sit inside the corner dots', inner[0] > topLeft[0] && inner[1] > topLeft[1] && inner[0] < center[0] && inner[1] < center[1]);
 
   const errors = await js('window.__errors');
   // Dev mode opens from its button and from the backtick key, and closes again.
