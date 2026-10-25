@@ -105,6 +105,7 @@ let micQuietUntil = 0;
 let micWanted = true;
 let mic = null;
 let eyes = null;
+let camLesson = null;          // { quadrant, look } from the camera's last pick, taught back once the reply is spoken
 
 const later = (ms, fn) => timers.push(setTimeout(fn, ms));
 function reset() {
@@ -334,9 +335,12 @@ function toSpeaking(text) {
   memory.picked(text);
   conversationChanged();
   const token = ++speechToken;
+  const lesson = camLesson;
+  camLesson = null;
   // The token check also runs before playback starts, so audio that arrives after an undo stays silent.
   speak(text, voiceAudio, () => token === speechToken).then(() => {
     if (token !== speechToken) return;
+    if (lesson && settings.learnPicks) eyes?.learn(lesson.quadrant, lesson.look); // spoken and not undone: the patient meant that box
     micQuietUntil = now() + TIMING.micQuiet;
     later(TIMING.afterSpeech, toListening);
   });
@@ -650,13 +654,14 @@ const camera = {
     s.hl = i >= 0 && s.items[i] ? i : -1;
   },
   // Selects the box that had focus when the hold started. Listening has one item, so any hold picks it.
-  select: (quadrant) => {
+  select: (quadrant, look) => {
     openedAt = now();
     if (s.stage !== 'choose' || s.loading || s.selected >= 0 || s.faceLost || s.calibration) return;
     if (s.rowKind === 'listen') return select(0);
     const i = cellFor(quadrant);
     if (i >= 0 && s.items[i]) {
       s.hl = i;
+      camLesson = look ? { quadrant, look } : null;
       select(i);
     }
   },

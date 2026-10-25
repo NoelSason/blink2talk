@@ -21,10 +21,10 @@ const FLOOR = [0.02, 0.02, 0.08, 0.08, 0.04, 0.04, 0.03, 0.03];
 // app.css (.reply-grid) lays the boxes out to match these centers.
 export const TARGETS = {
   center: [0, 0],
-  topLeft: [-0.6, -0.62],
-  topRight: [0.6, -0.62],
-  bottomLeft: [-0.6, 0.62],
-  bottomRight: [0.6, 0.62],
+  topLeft: [-0.9, -0.9],
+  topRight: [0.9, -0.9],
+  bottomLeft: [-0.9, 0.9],
+  bottomRight: [0.9, 0.9],
 };
 
 const BAND = 0.28;          // |y| below this is the middle band (reading the question): no box

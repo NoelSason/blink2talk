@@ -6,10 +6,12 @@ export const SETTINGS_KEY = 'blink2talk.dev';
 
 export const DEFAULTS = {
   calibration: { readyMs: 3000, leadMs: 2000, phaseMs: 2000, settleMs: 500 },
-  quadrant: { focusMs: 300, margin: 0.5, smoothingFrames: 5 },
+  quadrant: { focusMs: 300, margin: 0.15, dead: 0.3, smoothingFrames: 5 },
   blink: { selectMs: 800, refractoryMs: 1200, smoothingFrames: 3 },
   face: { lostMs: 500, foundMs: 150 },
   headPose: false,
+  learnPicks: true,   // a spoken, not-undone pick teaches the box classifier where the eyes were
+  gazeSource: 'vision', // 'vision' (MediaPipe features + per-axis classifier) | 'webeyetrack' (neural gaze point)
 };
 
 export function loadSettings() {

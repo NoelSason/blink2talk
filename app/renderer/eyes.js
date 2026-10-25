@@ -9,6 +9,7 @@
 
 import { createGazeModel, featureVector, headPose, TARGETS } from './gaze.js';
 import { measureDrift, shiftCenters } from './drift.js';
+import { AxisPicker, startWebEyeTrack, toArea } from './webeyetrack.js';
 
 // Every handler app.js must provide. Checked at startup, so a missing one fails loudly instead of
 // throwing on every camera frame.
@@ -97,6 +98,49 @@ export async function startEyes(on, settings) {
     log({ t: r(performance.now(), 10), event: 'label', label });
   });
   let faceChange = null;       // { to, since } while a change is waiting out its debounce
+  // WebEyeTrack gaze source (dev setting). wet: the tracker; wetPoint: its last point in area units;
+  // wetArmed: the box it had in focus when a hold began, so the pick matches what was highlighted.
+  let wet = null;
+  let wetPoint = null;
+  let wetPicker = null;
+  let wetArmed = null;
+  let wetLabeledPhase = null;
+  const gazeArea = () => document.getElementById('gaze-area')?.getBoundingClientRect();
+  async function startWet() {
+    if (wet || settings.gazeSource !== 'webeyetrack') return;
+    wetPicker = new AxisPicker({ ...settings.quadrant });
+    try {
+      wet = await startWebEyeTrack(video, (nx, ny, open, t) => {
+        const area = gazeArea();
+        if (!area?.width) return;
+        const [ax, ay] = toArea(nx, ny, area);
+        wetPoint = { ax, ay, open, t };
+        window.dispatchEvent(new CustomEvent('eyes-point', { detail: { x: ax, y: ay } })); // dev panel dot
+      });
+      status('Eyes: WebEyeTrack loading…');
+    } catch (err) {
+      status(`Eyes: WebEyeTrack failed (${err?.message ?? err}); using the vision module`);
+      settings.gazeSource = 'vision';
+    }
+  }
+  function stopWet() {
+    wet?.stop();
+    wet = null;
+    wetPoint = null;
+    wetPicker = null;
+  }
+  // Teach WebEyeTrack where the eyes are: the calibration dot, or a box's corner mark after a confirmed pick.
+  function wetLabelAt(el, corner) {
+    if (!wet || !el) return;
+    const b = el.getBoundingClientRect();
+    const inset = 17; // the corner mark's center (app.css): 10 px in, 14 px wide
+    const x = corner ? (corner.endsWith('Right') ? b.right - inset : b.left + inset) : b.left + b.width / 2;
+    const y = corner ? (corner.startsWith('bottom') ? b.bottom - inset : b.top + inset) : b.top + b.height / 2;
+    wet.label(x, y);
+    log({ t: r(performance.now(), 10), event: 'wetLabel', corner: corner ?? 'dot', x: r(x / window.innerWidth - 0.5), y: r(y / window.innerHeight - 0.5) });
+  }
+  const CELL = { topLeft: 1, topRight: 2, bottomLeft: 3, bottomRight: 4 };
+
 
   function build() {
     pipeline = new EyePipeline({
@@ -119,6 +163,9 @@ export async function startEyes(on, settings) {
   function rebuild() {
     blinkLevels = null;
     reset();
+    wetLabeledPhase = null;
+    if (settings.gazeSource === 'webeyetrack') startWet();
+    else stopWet();
     pipeline.startCalibration();
     status('Eyes: calibrating…');
   }
@@ -259,7 +306,12 @@ export async function startEyes(on, settings) {
     if (drift) stepDrift(t, frame, f);
     else if (out.mode === 'calibrating' && out.calibration) {
       collectLabels(t, out.calibration, f, pose);
-      on.calibration(out.calibration.phase !== 'done' ? out.calibration : null);
+      const c = out.calibration;
+      if (wet && c.phase in TARGETS && c.remainingMs < 400 && wetLabeledPhase !== c.phase) {
+        wetLabeledPhase = c.phase;
+        wetLabelAt(document.getElementById('calib-dot'));
+      }
+      on.calibration(c.phase !== 'done' ? c : null);
     } else {
       on.calibration(null);
     }
@@ -270,16 +322,21 @@ export async function startEyes(on, settings) {
       on.hold(out.blink ?? null);
       focus = out.quadrant?.focus ?? null;
       if (settings.headPose && gaze?.ready) focus = gaze.update(t, f, pose, !!out.blink?.engaged);
+      // WebEyeTrack: its point drives the box while the eyes are open; a hold freezes it (lids drag the point).
+      if (wet && wetPicker && wetPoint && !out.blink?.engaged && wetPoint.open) focus = wetPicker.update(t, wetPoint.ax, wetPoint.ay);
+      else if (wet && wetPicker) focus = wetPicker.focus;
       on.focus(focus);
     }
 
     for (const e of out.events) {
       if (e.type === 'holdStart') {
         if (settings.headPose) gaze?.holdStart(e.t);
+        wetArmed = wetPicker?.focus ?? null;
       } else if (e.type === 'quadrantSelect') {
-        log({ t: r(e.t, 10), event: 'select', box: e.quadrant, via: e.via });
+        const box = wet && wetPicker ? wetArmed : settings.headPose && gaze?.ready ? gaze.lockedFocus : e.quadrant;
+        log({ t: r(e.t, 10), event: 'select', box, via: e.via, source: wet ? 'webeyetrack' : 'vision' });
         blinkQuietUntil = e.t + 1000;
-        if (!drift) on.select(settings.headPose && gaze?.ready ? gaze.lockedFocus : e.quadrant);
+        if (!drift) on.select(box, wet ? null : e.look);
       } else if (e.type === 'blink') {
         // Logged only: quick blinks reach the app from countBlink, which doesn't merge fast ones.
         log({ t: r(e.t, 10), event: 'blink', ms: r(e.durationMs, 1) });
@@ -316,7 +373,7 @@ export async function startEyes(on, settings) {
 
     // For the dev panel's live readout and accuracy test. Not used by the patient screen.
     window.dispatchEvent(new CustomEvent('eyes-frame', {
-      detail: { mode: out.mode, faceFound: out.faceFound, looking: out.quadrant?.looking ?? null, focus },
+      detail: { mode: out.mode, faceFound: out.faceFound, looking: wet && wetPicker ? wetPicker.looking : out.quadrant?.looking ?? null, focus, source: wet ? 'webeyetrack' : 'vision' },
     }));
   };
 
@@ -331,6 +388,12 @@ export async function startEyes(on, settings) {
     // are in `settings`, so a rebuild keeps them.
     setBlink(patch) {
       pipeline?.setBlinkConfig(patch);
+    },
+    // A pick that was spoken and not undone: teach the box classifier where the eyes were for that box.
+    learn(quadrant, look) {
+      if (!quadrant) return;
+      if (wet) wetLabelAt(document.querySelector(`.reply-grid > :nth-child(${CELL[quadrant]})`), quadrant);
+      else if (look) pipeline?.learn(quadrant, look);
     },
   };
 }

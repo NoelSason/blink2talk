@@ -15,7 +15,7 @@ import {
   type QuadrantConfig,
   type QuadrantEvent,
   type QuadrantState,
-} from "./quadrant";
+ learnTarget } from "./quadrant";
 import type { EyeFrame } from "./types";
 
 export type PipelineMode = "idle" | "calibrating" | "running";
@@ -26,7 +26,7 @@ export type PipelineEvent =
   | QuadrantEvent
   | FatigueEvent
   /** Quadrant layout: a select, with the box that had focus when the hold started (null = rest circle). */
-  | { type: "quadrantSelect"; t: number; quadrant: Quadrant | null; via: HoldKind }
+  | { type: "quadrantSelect"; t: number; quadrant: Quadrant | null; via: HoldKind; look: number[] | null }
   | { type: "calibrated"; t: number; result: CalibrationResult }
   | { type: "calibrationFailed"; t: number; reason: string }
   | { type: "faceLost"; t: number }
@@ -76,6 +76,8 @@ export class EyePipeline {
   private quadrant: QuadrantClassifier | null = null;
   private fatigue: FatigueMonitor | null = null;
   private armedQuadrant: Quadrant | null = null;
+  /** Smoothed look just before the hold began; handed back by the app with `learn()` once the pick is spoken. */
+  private armedLook: number[] | null = null;
   private squinting = false;
   private faceFound = false;
 
@@ -118,6 +120,15 @@ export class EyePipeline {
     this.squinting = false;
     this.calibrator = null;
     this._mode = "running";
+  }
+
+  /**
+   * A pick the patient let stand (spoken, not undone) is a labeled look: nudge that box's calibrated
+   * centroid toward it, so the boxes follow slow drift (posture, eyelids) without a recalibration.
+   */
+  learn(quadrant: Quadrant, look: readonly number[] | null, rate = 0.2): void {
+    if (!look || !this.quadrant) return;
+    learnTarget(this.quadrant.calibration, quadrant, look, rate);
   }
 
   /** Takes effect immediately (except `smoothingFrames`, which applies at the next calibration). */
@@ -171,8 +182,11 @@ export class EyePipeline {
       // was looking at, before the lids could drag the gaze estimate down.
       const q = this.quadrant.update(t, frame, frozen);
       for (const e of b.events) {
-        if (e.type === "holdStart") this.armedQuadrant = q.state.focus;
-        if (e.type === "select") events.push({ type: "quadrantSelect", t, quadrant: this.armedQuadrant, via: e.via });
+        if (e.type === "holdStart") {
+          this.armedQuadrant = q.state.focus;
+          this.armedLook = this.quadrant.lookBeforeHold();
+        }
+        if (e.type === "select") events.push({ type: "quadrantSelect", t, quadrant: this.armedQuadrant, via: e.via, look: this.armedLook });
       }
       out.quadrant = q.state;
       events.push(...q.events);

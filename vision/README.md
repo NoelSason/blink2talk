@@ -34,9 +34,13 @@ webcam. **Use video file** on either page replays a recording instead of the web
 
 A 3 s countdown, then each dot for 2 s (with its own countdown; the first 0.5 s is ignored while the eyes
 move). Order: center, the middle of each box (left and right on the bench), then a squint. Each box is "where
-the eyes were while looking at it": nearest centroid, with each feature scaled by its spread so whichever
-separates the boxes best for this person dominates. Dots sit at fixed normalized `TARGET_POSITIONS` (the box
-centers of a 2×2 grid). Box-center dots tested better than outer-corner dots with a linear fit.
+the eyes were while looking at it". Left/right and top/bottom are decided separately (`axisPosition`): each
+axis uses only its own features (`gazeX`/`lookX`, `gazeY`/`lookY`), weighted by how many spreads they separate
+the sides, with a rest zone around the center and hysteresis at the midlines. A recorded session showed why:
+vertical features drift with the eyelids and head tilt within minutes, and in a joint nearest-centroid that
+drift outweighed a strong left/right signal. Dots sit at fixed normalized `TARGET_POSITIONS` (the outer corners
+of a 2×2 grid, ±0.9), the biggest eye movement the screen allows. `learnTarget` nudges a box's centroid toward
+the look that preceded a pick the user let stand (`EyePipeline.learn`), so boxes follow slow drift.
 
 - **Blink thresholds** come from the narrowest normal look, usually a bottom box, so looking down isn't
   mistaken for a blink.
@@ -53,7 +57,7 @@ centers of a 2×2 grid). Box-center dots tested better than outer-corner dots wi
 | `src/cv/features.ts` | Landmarks → per-frame `EyeFrame` (EAR, iris position, blendshape look direction and squint). Pure. |
 | `src/cv/calibration.ts` | Dots → blink thresholds, gaze model, squint thresholds. |
 | `src/cv/blink.ts` | Hold state machine (closed or squinting): select on release, refractory, rest, fill progress. |
-| `src/cv/quadrant.ts` | Box-center-calibrated nearest centroid, rest target at the center, hysteresis, 300 ms focus dwell. |
+| `src/cv/quadrant.ts` | Corner-calibrated per-axis classifier (left/right, top/bottom), rest zone at the center, hysteresis, 300 ms focus dwell, learning from kept picks. |
 | `src/cv/gaze.ts` | Left/center/right with dwell, hysteresis and re-arm (bench). |
 | `src/cv/fatigue.ts` | Blink rate, blink duration, eyelid droop vs. baseline. |
 | `src/cv/pipeline.ts` | `EyePipeline`: `EyeFrame` in, UI state and events out. No DOM, no MediaPipe. |

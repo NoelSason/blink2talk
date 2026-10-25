@@ -23,14 +23,14 @@ const CALIBRATION_TEXT = {
   bottomRight: 'Look at the dot',
   squint: 'Narrow your eyes, like in bright sun. Keep looking at the dot.',
 };
-// Calibration dots sit where the boxes will be (x and y in [-1, 1] over the gaze area, +y down;
-// matched by the .reply-grid layout in app.css).
+// Calibration dots sit at the outer corner of each box (x and y in [-1, 1] over the gaze area, +y down):
+// the biggest eye movement the screen allows. Each box shows a small mark in that corner (app.css).
 const DOT_AT = {
   center: [0, 0],
-  topLeft: [-0.6, -0.62],
-  topRight: [0.6, -0.62],
-  bottomLeft: [-0.6, 0.62],
-  bottomRight: [0.6, 0.62],
+  topLeft: [-0.9, -0.9],
+  topRight: [0.9, -0.9],
+  bottomLeft: [-0.9, 0.9],
+  bottomRight: [0.9, 0.9],
 };
 
 function icon(name, extra = '') {

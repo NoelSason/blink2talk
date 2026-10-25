@@ -32,7 +32,11 @@ Every launch starts with eye calibration, because lighting, posture, and the lap
 
 ## How the gaze works
 
-The vision module (`../vision`) owns the eyes: calibration (3 s countdown, then 2 s on the center, each box, and a squint), which box the patient is looking at (nearest calibrated target with a 300 ms focus dwell), blink and squint holds, rest, face found or lost, and fatigue. `renderer/eyes.js` only maps its output onto the screen; `renderer/view.js` places the calibration dots on the same box centers the grid uses. Nothing about the eyes is decided in the app. To tune the gaze, change the vision module and its tests.
+The vision module (`../vision`) owns the eyes: calibration (3 s countdown, then 2 s on the center, each box's outer corner, and a squint), which box the patient is looking at (left/right and top/bottom decided on separate axes, a rest zone in the middle, 300 ms focus dwell), blink and squint holds, rest, face found or lost, and fatigue. `renderer/eyes.js` only maps its output onto the screen; `renderer/view.js` places the calibration dots on the box corners, and each box shows a small mark in that corner so the patient glances toward it (the biggest eye movement the screen allows). Nothing about the eyes is decided in the app. To tune the gaze, change the vision module and its tests.
+
+A pick that is spoken and not undone teaches the chosen box where the eyes were just before the hold (`pipeline.learn`, 20% of the gap per lesson), so the boxes follow slow drift from posture and eyelids without a recalibration. Dev mode (backtick) can turn this off.
+
+**WebEyeTrack (test).** Dev mode can switch the gaze source to [WebEyeTrack](https://github.com/RedForestAI/WebEyeTrack) (MIT): a small neural network that predicts a point on the screen from an eye crop plus head pose and adapts from a few labeled points (our calibration dots, then every spoken pick). It runs in a Web Worker with its own copy of MediaPipe, fed the same camera frames. Blink, squint, rest, and fatigue still come from the vision module. `npm run gaze` vendors the bundle into `renderer/vendor/` with its URLs pointed at this app; the weights are in `renderer/web/`. Smoke test: `npx electron test/webeyetrack-smoke.js`.
 
 ## For the nurse or family
 

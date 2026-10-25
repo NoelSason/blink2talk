@@ -21,7 +21,8 @@ const SCHEMA = [
   ] },
   { group: 'Box choice', rows: [
     { key: 'quadrant.focusMs', label: 'Look time before highlight', min: 100, max: 800, step: 50, unit: 'ms' },
-    { key: 'quadrant.margin', label: 'Margin (lower = more decisive)', min: 0.1, max: 1.5, step: 0.05, unit: '' },
+    { key: 'quadrant.margin', label: 'Hysteresis (share of center-to-side)', min: 0, max: 0.5, step: 0.05, unit: '' },
+    { key: 'quadrant.dead', label: 'Rest circle half-width (share of center-to-side)', min: 0.1, max: 0.6, step: 0.05, unit: '' },
     { key: 'quadrant.smoothingFrames', label: 'Smoothing (frames)', min: 1, max: 15, step: 1, unit: '' },
   ] },
   { group: 'Long blink / squint', rows: [
@@ -93,6 +94,21 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
     return row;
   }
 
+  const sourceInput = el('select', {});
+  for (const [v, text] of [['vision', 'Vision module (eye features, per-axis boxes)'], ['webeyetrack', 'WebEyeTrack (neural gaze point, test)']]) {
+    sourceInput.append(el('option', { value: v, textContent: text }));
+  }
+  sourceInput.addEventListener('change', () => {
+    settings.gazeSource = sourceInput.value;
+    saveSettings(settings);
+    markDirty(); // the source starts at the next calibration
+  });
+  const learnInput = el('input', { type: 'checkbox' });
+  learnInput.addEventListener('change', () => {
+    settings.learnPicks = learnInput.checked;
+    saveSettings(settings);
+  });
+
   const headInput = el('input', { type: 'checkbox' });
   headInput.addEventListener('change', () => {
     settings.headPose = headInput.checked;
@@ -116,6 +132,8 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   const resetBtn = button('Reset to defaults', () => {
     Object.assign(settings, structuredClone(DEFAULTS));
     headInput.checked = settings.headPose;
+    sourceInput.value = settings.gazeSource;
+    learnInput.checked = settings.learnPicks;
     saveSettings(settings);
     syncSliders();
     markDirty();
@@ -132,6 +150,11 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
         el('span', {}, 'Face: ', live.face), el('span', {}, 'Tracker: ', live.mode),
         el('span', {}, 'Last blinks: ', live.blinks),
         el('span', {}, 'Last drift: ', live.drift))),
+    el('section', { className: 'dev__section' },
+      el('h2', { className: 'dev__heading', textContent: 'Gaze source' }),
+      el('label', { className: 'dev__row' }, sourceInput),
+      el('label', { className: 'dev__row' }, learnInput,
+        el('span', { className: 'dev__label', textContent: 'Learn from spoken picks (teaches the chosen box where the eyes were)' }))),
     el('section', { className: 'dev__section' },
       el('h2', { className: 'dev__heading', textContent: 'Head model' }),
       el('label', { className: 'dev__row' }, headInput,
@@ -151,6 +174,8 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   );
   applyBtn.disabled = true;
   headInput.checked = settings.headPose;
+  sourceInput.value = settings.gazeSource;
+  learnInput.checked = settings.learnPicks;
   syncSliders();
 
   // ---- Accuracy test: a corner is shown on screen; we count which box the vision module says the eyes are on.

@@ -97,6 +97,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-24 — Input/Product (Marco): box picking decides left/right and top/bottom on separate axes; calibration dots and corner marks at the box corners (±0.9); kept picks teach the classifier; WebEyeTrack available as a test gaze source in dev mode. Dwell to highlight stays 300 ms (vision default), not 700. Measured cause in context/input.md.
 - 2026-10-24 — Product/Conversation (Noel): `/replies` now returns `highStakes` (Claude classifies; keyword rule only as fallback) and `about`, closer to the `options.highStakes` row above. Eye calibration auto-starts at launch again; three quick blinks offer recalibration.
 
 - 2026-10-24 — Product (Noel): a testing-only "Fast replies on this laptop" switch in the care panel (local Qwen3-4B, off by default) despite "local LLM" on the Cut list. Not for the demo or patients; team to keep or remove. App mic now uses Samarth's Ink-2 turn settings and joins split questions.

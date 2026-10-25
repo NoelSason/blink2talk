@@ -1,6 +1,6 @@
 # Input context (owner: Julian)
 
-Updated: 2026-10-24 (skeleton written by Marco from `vision/README.md`; Julian, correct and own this)
+Updated: 2026-10-24 18:30 PDT (skeleton written by Marco from `vision/README.md`; Julian, correct and own this)
 
 ## Now
 - Working on:
@@ -20,6 +20,7 @@ CLAUDE.md table says `gaze { corner, t }`, `confirm { t }`, `rest { t }`, `fatig
 
 ## Decisions (newest first)
 - 2026-10-24 (Noel, submission audit): `rolldown` added to `vision/package.json` devDependencies (`npm run eyes` in app/ used it only through vite); README test count 52 → 54. No code change.
+- 2026-10-24 (Marco, for Julian to check): `quadrant.ts` decides left/right and top/bottom on separate axes (`axisPosition`), each from its own features, with a rest zone (`dead`, 0.3 of center-to-side) and hysteresis (`margin`, now a share of center-to-side, default 0.15). `TARGET_POSITIONS` moved from box centers (±0.5) to box corners (±0.9). `learnTarget` + `EyePipeline.learn(quadrant, look)` nudge a box's centroid toward the look before a kept pick (rate 0.2); `quadrantSelect` now carries `look`. Spread floor raised to 0.1 of the target range. 54 tests pass. Why: Marco's recorded session (6 min): left/right separation 17 to 23x noise, top/bottom under 2x, and vertical features drifted 2 to 7 half-gaps within 100 s (r = -0.94 with eyelid opening), which in the joint nearest-centroid flipped picks that the horizontal features had right. Rejected: raising the noise floor alone (drift in a weak axis still dominated).
 - 2026-10-24 (Marco): `leadMs` now applies only before the squint (dots no longer have a lead-in; the start keeps `readyMs`). Total is `readyMs + (phases-2) * phaseMs + leadMs`. Tests updated (54 pass). Why: the patient asked for a countdown only before the start and the squint.
 - 2026-10-24 (Marco, for Julian to check): `CalibrationConfig.leadMs` (default 0, so your defaults are unchanged) adds a pause before each dot and the squint. The progress reports `leadRemainingMs` during it and takes no samples. The app sets 2000. `totalMs` now includes the lead-in. Tests added in `test/calibration.test.ts` (54 pass). Why: the patient needs to read which dot comes next before it appears.
 
