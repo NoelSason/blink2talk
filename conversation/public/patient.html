@@ -39,8 +39,9 @@ let state = "listening";          // listening | options | spelling | speaking
 let items = [], sel = 0;          // current choices: { label, kind }
 let history = [], lastNurse = "", fatigue = 0;
 let spelled = "", prefix = "";    // spelling mode
-let unaddressed = [];             // replies held back when speech wasn't meant for the patient
+let unaddressed = [], unaddressedOpts = [];             // replies held back when speech wasn't meant for the patient
 let shown = [], noneCount = 0;    // "None of these" flow for the current question
+let yesNo = false;                // first set offered both a yes and a no
 const CAT_LABEL = { pain: "Pain", comfort: "Body / comfort", people: "People", question: "I have a question" };
 
 function setState(s) { state = s; $("state").textContent = s; }
@@ -60,7 +61,8 @@ function render() {
 const urgentItems = () => cfg.urgent.map((u) => ({ label: u, kind: "urgent" }));
 
 // 3 replies + "None of these" (the 2x2 in the real app), urgent options always reachable.
-function showOptions(replies) {
+function showOptions(replies, options) {
+  if (!shown.length) yesNo = ["yes", "no"].every((i) => options?.some((o) => o.intent === i));
   shown.push(...replies);
   items = [
     ...replies.slice(0, 3).map((r) => ({ label: r, kind: "reply" })),
@@ -85,19 +87,22 @@ async function nurseSaid(text) {
   const d = await p;
   if (d.addressed === false) {
     // Room talk ("grab the chart from room 4"): stay quiet, but one blink still gets the replies.
-    history.pop(); unaddressed = d.replies;
+    history.pop(); unaddressed = d.replies; unaddressedOpts = d.options;
     $("heard").textContent = `Not for patient: “${text}”`;
     setState("listening");
     items = [{ label: "Reply anyway", kind: "spell", act: "anyway" }, ...urgentItems()];
     sel = 0; render();
     return;
   }
-  showOptions(d.replies);
+  showOptions(d.replies, d.options);
 }
 
 // "None of these": 1st re-asks with the rejected replies, 2nd offers four topics, 3rd opens spelling.
 async function none() {
   noneCount++;
+  // Yes and No were both offered and didn't fit: the answer isn't about this question, so ask what it's about.
+  // (A patient who slept badly picks No; re-asking would only give reworded noes.)
+  if (noneCount === 1 && yesNo) noneCount = 2;
   if (noneCount === 1) return moreReplies({});
   if (noneCount === 2) return showTopics();
   setState("spelling"); spelled = ""; prefix = ""; spellItems();
@@ -118,7 +123,7 @@ async function moreReplies(extra) {
   // Claude timed out: the fallback (Yes / No / more time) would look like nothing happened, so move on.
   if (d.source === "fallback") return extra.category ? (setState("spelling"), spelled = "", prefix = "", spellItems()) : showTopics();
   $("heard").textContent = `Nurse: “${lastNurse}”`;
-  showOptions(d.replies);
+  showOptions(d.replies, d.options);
 }
 
 async function speak(text) {
@@ -170,7 +175,7 @@ function move(d) { if (!items.length || state === "speaking") return; sel = (sel
 function select() {
   const it = items[sel]; if (!it) return;
   if (state === "spelling") return spellSelect(it);
-  if (it.act === "anyway") { history.push({ role: "nurse", text: lastNurse }); return showOptions(unaddressed); }
+  if (it.act === "anyway") { history.push({ role: "nurse", text: lastNurse }); return showOptions(unaddressed, unaddressedOpts); }
   if (state !== "options" && it.kind !== "urgent") return;
   if (it.act === "none") return none();
   if (it.act === "cat") return moreReplies({ category: it.cat });
