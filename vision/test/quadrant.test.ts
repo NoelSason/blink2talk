@@ -122,18 +122,18 @@ describe("box-center calibration and selection", () => {
     return { p, t };
   }
 
-  it("counts down 3 s, then takes 2 s per dot", () => {
+  it("counts down 3 s, then takes 3 s per dot", () => {
     const c = new Calibrator({ ...new EyePipeline().cfg.calibration, layout: "quadrants" });
     const first = c.add(at("center", 0));
     expect(first).toMatchObject({ phase: "ready", remainingMs: 3000 });
     expect(c.add(at("center", 1500)).remainingMs).toBe(1500);
     expect(c.add(at("center", 3000)).phase).toBe("center");
-    expect(c.totalMs).toBe(15_000);
+    expect(c.totalMs).toBe(21_000);
   });
 
   it("calibrates without warnings", () => {
     const { p, t } = calibrated();
-    expect(t).toBeLessThan(15_200);
+    expect(t).toBeLessThan(21_200);
     expect(p.calibration?.quadrants).not.toBeNull();
     expect(p.calibration?.squint?.feature).toBe("squint");
     expect(p.calibration?.warnings).toEqual([]);

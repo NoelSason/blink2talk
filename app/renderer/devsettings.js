@@ -5,7 +5,7 @@
 export const SETTINGS_KEY = 'blink2talk.dev';
 
 export const DEFAULTS = {
-  calibration: { readyMs: 3000, leadMs: 2000, phaseMs: 2000, settleMs: 500 },
+  calibration: { readyMs: 3000, leadMs: 2000, phaseMs: 3000, settleMs: 500 },
   quadrant: { focusMs: 300, margin: 0.15, dead: 0.3, smoothingFrames: 5 },
   blink: { selectMs: 800, refractoryMs: 1200, smoothingFrames: 3 },
   face: { lostMs: 500, foundMs: 150 },

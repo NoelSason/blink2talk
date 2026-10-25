@@ -41,7 +41,7 @@ export interface CalibrationConfig {
 export const DEFAULT_CALIBRATION: CalibrationConfig = {
   layout: "leftRight",
   readyMs: 3000,
-  phaseMs: 2000,
+  phaseMs: 3000,
   leadMs: 0,
   settleMs: 500,
   closedFraction: 0.65,

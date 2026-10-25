@@ -47,7 +47,7 @@ Cartesia Ink (STT) + Sonic-3.6 (TTS, cloned voice). API keys live in the main pr
 
 ## Input (one path)
 
-- 20 s look-at-dot calibration (4 corners + center). No hands needed.
+- ~23 s look-at-dot calibration (4 corners + center, 3 s per dot). No hands needed.
 - 2x2 grid: 3 replies + "none of these" in the four corners; center = dead zone ("thinking").
 - Dwell ≥ 700 ms on a corner highlights it. Exaggerated corner glances are fine and encouraged.
 - Confirm = eyelids narrowed or closed ≥ 800 ms (squint counts). Hysteresis T / T+0.05. Refractory 1.2 s.
