@@ -102,6 +102,8 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-25 — Noel: nurse mic is push-to-talk on M (hold, let go to send), as designed above; "Always listening" in the care panel switches back to the always-on mic, where M mutes. Hold S skips the eye calibration. Who-questions now offer people (named ones first, then "My partner", "My children"…), never a guessed gender. Details in context/product.md and context/conversation.md.
+
 - 2026-10-25 — Marco: default patient layout back to the Kahoot 2x2 (question on top, 2x2 below). Four columns didn't work in testing. Row of 4 stays a dev-mode switch.
 - 2026-10-25 — Noel: agent relay at agents.blink2talk2.us (`relay/`, `.claude/hooks/relay.mjs`). Agents claim files before editing; a hook blocks an edit to another teammate's claimed file and tells both humans, who resolve it. Team tooling, not product. Setup in `relay/README.md`.
 - 2026-10-25 — Noel: "None of these" flow rewritten above to match the app (two re-asks on the same question, then urgent + Spell it); the topic picker stays in `patient.html`. A stress test of the re-asks found: high-stakes re-asks repeated Yes / No / I need more time, a failed Claude call repeated rejected replies (and answered "Where does it hurt?" with Yes / No), and yes/no re-asks gave only one side. All fixed in `conversation/` (context/conversation.md). Rejected: weighting the box the patient looked at longest, because that mostly measures how long a reply takes to read. Arrow keys now follow the row layout.

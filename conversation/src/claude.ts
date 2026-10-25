@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { isConsentQuestion, questionKind, CLARIFY_REPLIES, CONSENT_REPLIES, FALLBACK_REPLIES, FALLBACK_SPARE } from "./safety.js";
+import { asksForOne, isConsentQuestion, questionKind, CLARIFY_REPLIES, CONSENT_REPLIES, FALLBACK_REPLIES, FALLBACK_SPARE } from "./safety.js";
 import { mockComplete, mockReplies } from "./mock.js";
 import { localList, localModelAvailable } from "./local.js";
 
@@ -87,14 +87,16 @@ Fit the replies to what was said:
 - Yes/no question: one plain yes, one plain no, and the most useful in-between or follow-up answer about the same thing ("Just a little", "Ice chips only", "Later, please"). Lead with the answer and don't repeat the question back: "Yes, please" rather than "Yes, I'm thirsty". Never two replies that both mean yes, or both mean no.
 - Either/or question: each option offered, then the most likely third answer ("Neither", "Both", or a common alternative).
 - Number scale (pain 0-10 and similar): three ranges that cover the scale, each with its numbers: "Mild, about 2", "Medium, about 5", "Severe, 8 or more".
-- Where, what, or who question: the three most common answers for an ICU patient. Never invent a symptom, a person, or a relative that the conversation or patient profile doesn't mention; use a general word instead ("my family", "my back").
+- Who question (which person to call, bring, or ask for): every reply names a person. Use the people the profile, notes, or conversation mention, by the name or label given. Fill the rest with the most common relationships, worded without guessing the patient's gender or marital status: "My partner", "My children", "My parents", "My brother or sister", "A close friend". Those are choices the patient can turn down, not facts, so they are fine when no family is known; never make up a name. At most one reply may be "Nobody right now".
+- Where or what question: the three most common answers for an ICU patient. Never invent a symptom; use a general word instead ("my back").
 - Open question or greeting: short answers to what was asked, then a common need (water, repositioning, pain, family, rest).
 - News or a statement: a short acknowledgement, a short question back about it, and a short feeling or need.
 
 Other rules:
-- If rejected replies are listed, the patient said none of them fit. Stay on what was asked, but each new reply must add something the rejected ones didn't: a reason, a when or how ("Call her after lunch", "Just send her a text"), a different person or thing ("Call my son instead"), or a message to pass on ("Tell her I love her"). Use a question back only when a patient would naturally ask it; don't force one in. If a yes and a no were rejected, no new reply may be a plain yes or no in other words: "Call her now" is just yes, "Not right now" is just no. A yes or no with its reason is fine, and the patient may mean either side, so cover both: "Comfortable since you turned me", "My heels are sore". Never repeat or reword a rejected reply. Do not switch to an unrelated need; the screen has its own topic picker for that.
+- If rejected replies are listed, the patient said none of them fit. Stay on what was asked, but each new reply must add something the rejected ones didn't: a reason, a when or how ("Call her after lunch", "Just send her a text"), a different person or thing ("Call my son instead"), or a message to pass on ("Tell her I love her"). Use a question back only when a patient would naturally ask it; don't force one in. If a yes and a no were rejected, no new reply may be a plain yes or no in other words: "Call her now" is just yes, "Not right now" is just no. A yes or no with its reason is fine, and the patient may mean either side, so cover both: "Comfortable since you turned me", "My heels are sore". For a who, where, or what question, the new replies are the next most likely answers of the same kind: other people, other places, other things. Never repeat or reword a rejected reply. Do not switch to an unrelated need; the screen has its own topic picker for that.
 - If a topic is given, all three replies must be about that topic.
 - Never invent medical facts, symptoms, or decisions the patient has not signaled.
+- Never guess the patient's gender or marital status from their name ("My husband" for a patient named Rosa); use a word that fits anyone unless the profile or conversation says.
 - Never contradict what the patient already said in the recent conversation: if they said the pain is gone, don't offer "My back hurts".
 - Use the patient profile, the earlier notes, and the recent conversation only to pick relevant specifics (names, preferences), and only when they answer what was asked. Each line has the time it was said and the local time is given: lines from hours or days ago are background, not what is happening now. Never bring in a profile detail to fill a box (a favorite drink in an answer about pain), never read the profile back to the speaker ("My son lives in Fresno"), and never offer what the patient's condition rules out (food or drink to someone intubated).
 - Fatigue 0.8 or more: the screen shows only your first two replies. Keep every reply to 1 to 3 words, and make the first two the pair that answers on its own: yes and no, both choices, or the two halves of a scale with their numbers ("Under 5", "5 or more").
@@ -226,7 +228,11 @@ function rejectedBlock(inp: RepliesInput): string {
     // Quoted here, next to the rules, because a rule pointing back at the conversation above was
     // ignored: after "Yes, pretty well" to a sleep question, re-asks still offered "the alarms woke me".
     answers ? `The patient already answered ${answers}. Those answers stand: every new reply, its reason included, must still be true for someone who said them. Find another reason rather than contradict them.` : "",
-    `If the rejected replies include an answer and its opposite (yes and no, good and bad, on and off), cover both sides in your first two replies (a tired patient sees only two), each with its reason.`,
+    // "Someone" and "nobody" aren't sides: covering both on a who-question gave "Call whoever is
+    // listed first" and "Wait until morning to call" instead of other people.
+    asksForOne(inp.transcript)
+      ? `The question asks for a person, place, or thing: the new replies are the next most likely ones of that kind (other people, other places, other things), not a when or a how.`
+      : `If the rejected replies include an answer and its opposite (yes and no, good and bad, on and off), cover both sides in your first two replies (a tired patient sees only two), each with its reason.`,
     `Don't change the subject.`,
   ].filter(Boolean).join("\n");
 }

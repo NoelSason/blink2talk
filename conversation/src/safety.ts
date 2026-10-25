@@ -33,9 +33,17 @@ export const FALLBACK_SPARE = [
 ];
 
 // The last clause decides: "Oh no, what kept you up?" is open; "…, and are you hungry?" is yes/no.
-export function questionKind(transcript: string): keyof typeof FALLBACK_REPLIES {
+function lastClause(transcript: string): string {
   const clauses = transcript.split(/[.!?,;:]/).map((c) => c.trim()).filter(Boolean);
-  const last = (clauses.at(-1) ?? "").replace(/^(and|but|so|ok|okay|oh|well|now)\s+/i, "");
+  return (clauses.at(-1) ?? "").replace(/^(and|but|so|ok|okay|oh|well|now)\s+/i, "");
+}
+
+// Who, which, where, or what: the answers are people, places, or things, so a re-ask offers more of
+// them, not a when or a how ("Who from your family should I call?").
+export const asksForOne = (transcript: string) => /^(who|whom|whose|which|where|what)\b/i.test(lastClause(transcript));
+
+export function questionKind(transcript: string): keyof typeof FALLBACK_REPLIES {
+  const last = lastClause(transcript);
   if (/^(where|what|which|who|whom|whose|when|why|how)\b/i.test(last)) return "open";
   if (/^(do|does|did|are|is|was|were|am|can|could|will|would|have|has|had|should|shall|may|might|want|need|any)\b/i.test(last)) return "yesNo";
   return transcript.trim().endsWith("?") ? "yesNo" : "statement";
