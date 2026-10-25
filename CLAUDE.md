@@ -92,7 +92,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 ## Known limitations (say these in README and Q&A, don't fix them now)
 
 - Needs the patient to hold gaze; no fallback for nystagmus or a swollen eye.
-- Blink/squint thresholds not validated across eye shapes; duration gate is the main protection. Tested on 4 teammates.
+- Blink/squint thresholds not validated across eye shapes; duration gate is the main protection. Tested only by the team so far, not with patients.
 - No free text. No vitals: the monitor above the bed does that.
 
 ## Decisions log (append, newest first; date + who)
@@ -114,7 +114,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 ## Run
 
 ```
-cp .env.example .env   # fill keys; never commit .env
-npm install
-npm start               # offline: MOCK_STT=1 MOCK_LLM=1 MOCK_TTS=1 npm start
+cp conversation/.env.example conversation/.env   # fill keys; never commit .env
+./start                 # installs what's missing, starts the server, opens the app full screen
+# offline: set MOCK_REPLIES=1 and MOCK_VOICE=1 in conversation/.env (canned replies, system voice)
 ```

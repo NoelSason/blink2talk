@@ -19,6 +19,7 @@ CLAUDE.md table says `gaze { corner, t }`, `confirm { t }`, `rest { t }`, `fatig
 | --- | --- | --- | --- | --- | --- |
 
 ## Decisions (newest first)
+- 2026-10-24 (Noel, submission audit): `rolldown` added to `vision/package.json` devDependencies (`npm run eyes` in app/ used it only through vite); README test count 52 → 54. No code change.
 - 2026-10-24 (Marco): `leadMs` now applies only before the squint (dots no longer have a lead-in; the start keeps `readyMs`). Total is `readyMs + (phases-2) * phaseMs + leadMs`. Tests updated (54 pass). Why: the patient asked for a countdown only before the start and the squint.
 - 2026-10-24 (Marco, for Julian to check): `CalibrationConfig.leadMs` (default 0, so your defaults are unchanged) adds a pause before each dot and the squint. The progress reports `leadRemainingMs` during it and takes no samples. The app sets 2000. `totalMs` now includes the lead-in. Tests added in `test/calibration.test.ts` (54 pass). Why: the patient needs to read which dot comes next before it appears.
 

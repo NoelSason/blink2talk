@@ -23,5 +23,8 @@
   },
   "optionalDependencies": {
     "node-llama-cpp": "^3.22.2"
+  },
+  "engines": {
+    "node": ">=22.9"
   }
 }

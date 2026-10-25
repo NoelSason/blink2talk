@@ -46,8 +46,8 @@ These do exactly what ←, →, Space do, so test with the keyboard first. Debou
 Urgent options ("I'm in pain", "I can't breathe", "Call the nurse") are hard-coded, never model-generated. Speech not addressed to the patient (staff talking to each other) is flagged by Claude, and the screen stays quiet, but "Reply anyway" and the urgent options are one blink away, so a wrong guess never silences the patient. Consent/treatment questions return only Yes / No / Explain more. "None of these, I'll spell it" is always offered. If Claude fails, the server falls back to Yes / No / Explain more.
 
 ## Known limitations
-- Consent detection is a keyword list, so it can miss rephrasings.
+- High stakes is Claude's call. When Claude doesn't answer (mock mode, a timeout), a keyword list decides, which can miss rephrasings.
 - `/speak` waits for the full audio (no streaming yet); new phrases take ~0.6 s.
 - Addressee detection is a model judgment: ambiguous lines ("I'll be on break for 15 minutes") are treated as addressed.
-- STT hears whoever is loudest; no speaker identification. Falls back to Chrome Web Speech without a Cartesia key.
+- STT hears whoever is loudest. The app tells voices apart with a speaker-recognition model on the laptop (`app/speakers.js`) and Claude names them; the match threshold was set on synthetic voices. Falls back to Chrome Web Speech without a Cartesia key.
 - Claude replies time out at 3 s and fall back to Yes / No / Explain more.

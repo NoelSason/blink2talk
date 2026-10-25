@@ -71,8 +71,7 @@ export function createDemoPanel({ questions, onAction }) {
       status.voice,
       status.mic,
       status.eyes,
-      el('span', { textContent: 'Keyboard also works: arrows, hold Space' }),
-      el('span', { textContent: 'Vitals: not connected' })),
+      el('span', { textContent: 'Keyboard also works: arrows, hold Space' })),
   );
 
   return {

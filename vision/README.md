@@ -16,7 +16,7 @@ the rest of the team.
 ```bash
 npm install --legacy-peer-deps   # npm 10.8 crashes ("edgesOut") without the flag
 npm run dev                      # copies MediaPipe WASM + downloads the model, then serves :5173
-npm test                         # 52 unit tests, no camera needed
+npm test                         # 54 unit tests, no camera needed
 npm run typecheck
 ```
 

@@ -6,9 +6,9 @@
 // picks the wrong box. This model:
 //   - adds head pose and face position, from the same landmarks, so a head turn isn't read as a look;
 //   - maps features to a screen point with a ridge regression, refit whenever it learns where the
-//     patient really looked (calibration, practice picks, confirmed answers, re-centering);
+//     patient really looked (calibration);
 //   - notices when the head or camera has moved away from where it was calibrated.
-// Pure functions, no DOM: test/gaze.test.mjs runs it on synthetic data.
+// Pure functions, no DOM. Optional: the dev panel's head-pose setting turns it on.
 
 export const FEATURES = ['gazeX', 'gazeY', 'lookX', 'lookY', 'yaw', 'pitch', 'faceX', 'faceY'];
 // A meaningful change per feature. Spreads are floored at these, so a feature that barely moved

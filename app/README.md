@@ -25,10 +25,7 @@ Every choice sits in a 2×2 grid with the boxes pushed into the screen's corners
 - **Blink twice:** undoes a pick, or goes back one page: up a level in Spell it, then out of Spell it to where it was opened, then from the urgent options to the replies or Listening.
 - **Room talk:** when Claude judges the speech wasn't meant for the patient ("grab the chart from room 4"), the screen stays quiet and offers "Reply anyway" next to the urgent options.
 
-Every launch starts with eye onboarding, because lighting, posture, and the laptop's position change between sessions:
-
-1. **Calibration** (about 15 s): look at the dot in the center, then at each corner where the boxes will be, then squint. Turning your head a little toward a dot is fine.
-2. **Practice:** four rounds, one marked box at a time, each corner once in random order. Look at it and close your eyes for a moment. The demo controls (`D`) show the result, for example "Practice: 4 of 4 correct, 2.3 s each". Press `C` to calibrate again if it's low.
+Every launch starts with eye calibration, because lighting, posture, and the laptop's position change between sessions: look at the dot in the center, then at each corner where the boxes will be, then squint (about 15 s). Turning your head a little toward a dot is fine. Calibrate again any time with three quick blinks, the Calibrate button, or `C`; the Re-center button or `K` runs a quicker 8 s check if the boxes drift.
 
 - **High-stakes answers:** when a yes or no would make a medical decision (consent to a treatment, a procedure, a medication change, CPR), the replies are Yes / No / Explain more, and a Yes or No is confirmed before it's spoken: "You said “Yes” to more pain medication. Is that correct?" with "Yes, that's right" on the left and "No, go back" on the right. Only left or right counts there, the direction the eye tracker reads best. Ordinary questions ("are you in pain?", "okay with the lights off?") aren't confirmed.
 - **Blink three times quickly:** offers "Calibrate your eyes again?". Two quick blinks still go back; quick blinks count even when they're fast.
@@ -41,7 +38,7 @@ The vision module (`../vision`) owns the eyes: calibration (3 s countdown, then 
 
 - **Talk:** the mic streams to Cartesia Ink-2, the caption updates as the nurse speaks, and replies appear when they finish. A turn ends after at most 1.5 s of quiet, and replies start as soon as Ink-2 thinks the nurse is probably done. If the nurse pauses mid-question and keeps going within 6 s, before the patient picks, both parts become one question with one set of replies. It mutes itself while the patient's voice plays.
 - **Fast replies on this laptop (testing only):** a switch in the care panel's Settings. Replies and word suggestions come from a small model running on the laptop instead of Claude: quicker, less accurate, not for patients. It's greyed out until the model is downloaded (`cd conversation && npm run local-model`, ~2.5 GB).
-- **Care panel:** the small button in the bottom-right corner, or `N`. It holds alerts, vitals (not connected yet), the conversation, notes about the patient, and settings. Urgent picks badge the button, play a sound, and send a desktop notification.
+- **Care panel:** the small button in the bottom-right corner, or `N`. It holds alerts, a summary of the conversation, the conversation with who said each line, notes about the patient, and settings. Urgent picks badge the button, play a sound, and send a desktop notification.
 - **Memory:** the notes, and the phrases the patient picks most, go to Claude with every question. They're stored on this machine only.
 - **Who said what:** every line in the conversation is labeled with who said it ("Dr. Lee", "Your daughter"). A speaker-recognition model on this laptop (NVIDIA TitaNet-Large, run by sherpa-onnx in `speakers.js`) tells voices apart, so the same person keeps the same label; Claude names each voice from what it says. Voice prints stay in memory for one launch and never leave the laptop. Typed or sample questions skip the voice model.
 - **Summary:** a couple of seconds after each exchange, Claude (Opus 5.5) summarizes the conversation twice: a few plain sentences for the patient, shown as "So far" on Listening, and bullet points for the care panel's Summary, including anything still unanswered. Without the conversation server, both show the last few lines as said.
@@ -56,7 +53,8 @@ The vision module (`../vision`) owns the eyes: calibration (3 s countdown, then 
 | `N` | Care panel |
 | `D` | Demo controls: type what the nurse says, sample questions, sources |
 | `Q` / `R` | Next sample question / back to Listening |
-| `M` / `C` | Mic on or off / calibrate again |
+| `M` / `C` / `K` | Mic on or off / calibrate again / 8 s drift check |
+| `` ` `` | Dev panel (timings, live eye readout) |
 | `T` / `F` / `L` | Tired mode / pretend the face is lost / light theme |
 
 ## Tests
@@ -82,7 +80,3 @@ window.dispatchEvent(new CustomEvent('patient-input', { detail: { type: 'eyes', 
 - The reply cards and end options follow `ReplyCard` and `EndOption` in the Claude Design project. Listening, Speaking, tired mode, and Can't see you follow the Figma file: https://www.figma.com/design/qhB3qvr3odYDYNlIcyNwy3
 - The 2×2 grid replaces the original single row so the camera can target each box (the vision module's quadrant layout).
 - Icons are Lucide SVGs in `renderer/icons/`, used as CSS masks so they take the text color in both themes.
-
-## Not built yet
-
-- Vitals: the care panel tiles wait for the Presage feed.

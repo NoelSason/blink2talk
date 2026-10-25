@@ -1,5 +1,5 @@
 // Care panel: the drawer behind the small corner button, for the nurse or family. Alerts, a summary
-// of the conversation, vitals (not connected yet), the conversation with who said each line, what the
+// of the conversation, the conversation with who said each line, what the
 // app knows about the patient, and a few settings. It never
 // opens on its own, because the patient screen belongs to the patient; urgent picks badge the button
 // and send a desktop notification instead.
@@ -29,10 +29,6 @@ export function createCarePanel({ memory, onAction }) {
     b.addEventListener('click', () => onAction(action));
     return b;
   };
-  const tile = (label) => el('div', { className: 'care__tile' },
-    el('p', { className: 'care__tile-label', textContent: label }),
-    el('p', { className: 'care__tile-value', textContent: '—' }),
-    el('p', { className: 'care__note', textContent: 'Not connected yet' }));
 
   const title = el('h2', { className: 'care__title' });
   const close = el('button', { type: 'button', className: 'care__button', textContent: 'Close' });
@@ -69,7 +65,6 @@ export function createCarePanel({ memory, onAction }) {
     el('header', { className: 'care__head' }, el('div', {}, title, el('p', { className: 'care__note', textContent: 'Care panel' })), close),
     alertList,
     section('Summary', summaryList, summaryNote, button('Refresh summary', 'summary', 'care__button--quiet')),
-    section('Vitals', el('div', { className: 'care__tiles' }, tile('Heart rate (estimated)'), tile('Breathing (estimated)'))),
     section('Conversation', history, button('Clear conversation', 'clear-history', 'care__button--quiet')),
     section('About the patient',
       el('label', { className: 'care__field' }, el('span', { textContent: 'Name' }), name),
