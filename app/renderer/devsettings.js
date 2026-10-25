@@ -11,7 +11,21 @@ export const DEFAULTS = {
   face: { lostMs: 500, foundMs: 150 },
   headPose: false,
   learnFromPicks: false,  // a spoken, not-undone pick teaches the box classifier where the eyes were. Off: a wrong pick that isn't undone teaches the wrong box
+  layout: 'kahoot',     // 2x2 screens: 'kahoot' (question on top, boxes together) | 'spread' (boxes in the corners, question between)
+  dots: 'corners',      // calibration dots: 'corners' (outer corner of each box) | 'centers' (middle of each box)
 };
+
+// Calibration dot positions on the gaze area (x and y in [-1, 1], +y down). Corners: each box's outer
+// corner, the biggest eye movement the screen allows. Centers: the middle of each box (0.5 of the grid
+// in the Kahoot layout, where the dots are placed on the grid itself; about 0.6 of the area in spread). The vision module's classifier only compares eye features between dots, so either works
+// with it; the view and the head model use these numbers.
+export const DOT_POSITIONS = {
+  corners: { center: [0, 0], topLeft: [-0.9, -0.9], topRight: [0.9, -0.9], bottomLeft: [-0.9, 0.9], bottomRight: [0.9, 0.9] },
+  centers: { center: [0, 0], topLeft: [-0.6, -0.6], topRight: [0.6, -0.6], bottomLeft: [-0.6, 0.6], bottomRight: [0.6, 0.6] },
+  kahootCenters: { center: [0, 0], topLeft: [-0.5, -0.5], topRight: [0.5, -0.5], bottomLeft: [-0.5, 0.5], bottomRight: [0.5, 0.5] },
+};
+export const dotPositions = (dots, layout = 'kahoot') =>
+  dots === 'centers' ? (layout === 'spread' ? DOT_POSITIONS.centers : DOT_POSITIONS.kahootCenters) : DOT_POSITIONS.corners;
 
 export function loadSettings() {
   const out = structuredClone(DEFAULTS);

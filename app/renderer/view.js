@@ -2,6 +2,7 @@
 // DOM when a value changed. Nothing here changes overall screen brightness: state changes only
 // restyle the highlighted item.
 
+import { dotPositions } from './devsettings.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const byId = (id) => document.getElementById(id);
@@ -25,13 +26,11 @@ const CALIBRATION_TEXT = {
 };
 // Calibration dots sit at the outer corner of each box (x and y in [-1, 1] over the gaze area, +y down):
 // the biggest eye movement the screen allows. Each box shows a small mark in that corner (app.css).
-const DOT_AT = {
-  center: [0, 0],
-  topLeft: [-0.9, -0.9],
-  topRight: [0.9, -0.9],
-  bottomLeft: [-0.9, 0.9],
-  bottomRight: [0.9, 0.9],
-};
+// Dev mode can move them to the box centers instead (devsettings.js `dots`, set on <html data-dots>).
+const dotAt = () => dotPositions(document.documentElement.dataset.dots, document.documentElement.dataset.layout);
+// Kahoot layout (default): the question sits above the grid and the four boxes touch. Spread (dev
+// mode): boxes in the corners with the question in a middle band between them.
+const kahoot = () => document.documentElement.dataset.layout !== 'spread';
 
 function icon(name, extra = '') {
   const el = document.createElement('span');
@@ -115,8 +114,6 @@ export function createView() {
     screen: byId('screen'),
     eyeIcon: byId('eye-icon'),
     eyeLabel: byId('eye-label'),
-    micIcon: byId('mic-icon'),
-    micLabel: byId('mic-label'),
     caption: byId('caption'),
     captionWaiting: byId('caption-waiting'),
     captionSpeaker: byId('caption-speaker'),
@@ -166,7 +163,7 @@ export function createView() {
       rowItems = model.items;
       rowEls = model.items.map(buildItem);
       // On the 2×2 screens the middle band (the question) is where the patient rests: no box.
-      els.row.replaceChildren(...rowEls, ...(model.grid && !model.columns ? [middle] : []));
+      els.row.replaceChildren(...rowEls, ...(model.grid && !model.columns && !kahoot() ? [middle] : []));
       els.row.classList.toggle('reply-row--single', model.single);
       els.row.classList.toggle('reply-grid', model.grid);
       els.row.classList.toggle('reply-grid--columns', model.columns);
@@ -212,11 +209,35 @@ export function createView() {
     }
   }
 
-  // A point on the gaze area (x and y in [-1, 1]; DOT_AT) placed in screen coordinates.
+  // Where the Kahoot 2x2 grid is, in screen pixels: the last one drawn, or, before any (calibration at
+  // launch runs on Listening), where it will be: below the question, above the status line.
+  let gridRect = null;
+  window.addEventListener('resize', () => { gridRect = null; });
+  function kahootGrid() {
+    if (gridRect) return gridRect;
+    const area = els.gazeArea.getBoundingClientRect();
+    const cap = els.caption.getBoundingClientRect();
+    if (!area.height || !cap.height) return null;
+    const gap = parseFloat(getComputedStyle(els.gazeArea).rowGap) || 0;
+    const stageGap = parseFloat(getComputedStyle(els.stageChoose).rowGap) || 0;
+    const top = cap.bottom + gap;
+    const bottom = area.bottom - els.statusLine.getBoundingClientRect().height - stageGap;
+    return bottom - top > 100 ? { left: area.left, width: area.width, top, height: bottom - top } : null;
+  }
+  function rememberGrid(model) {
+    if (!kahoot() || !model.grid || model.columns || model.calibration) return;
+    const r = els.row.getBoundingClientRect();
+    if (r.height > 100) gridRect = { left: r.left, width: r.width, top: r.top, height: r.height };
+  }
+
+  // A point on the gaze area (x and y in [-1, 1]; dotAt) placed in screen coordinates.
   function placeOnGrid(node, x, y) {
     const screen = els.screen.getBoundingClientRect();
     let area = els.gazeArea.getBoundingClientRect();
     if (!area.width) area = screen;
+    // Kahoot: dots go on the 2x2 grid itself, not the whole area (that put the bottom dots under the
+    // boxes, on the status line, and the center dot 25 px low). Measured 2026-10-25.
+    if (kahoot()) area = kahootGrid() ?? area;
     node.style.left = `${area.left - screen.left + area.width * (0.5 + x / 2)}px`;
     node.style.top = `${area.top - screen.top + area.height * (0.5 + y / 2)}px`;
   }
@@ -229,7 +250,7 @@ export function createView() {
     els.calibration.hidden = !c;
     if (!c) return;
     // Dots go where the grid's boxes are, so calibration matches what the patient will look at.
-    const [x, y] = DOT_AT[c.phase] ?? DOT_AT.center;
+    const [x, y] = dotAt()[c.phase] ?? dotAt().center;
     placeOnGrid(els.calibDot, x, y);
     els.calibDot.hidden = lead;
     els.calibText.textContent = lead
@@ -250,10 +271,6 @@ export function createView() {
     if (changed('eye', eye)) {
       els.eyeIcon.className = `icon icon--${{ lost: 'eye-off', rest: 'eye-closed', closed: 'eye-closed', open: 'eye' }[eye]}`;
       els.eyeLabel.textContent = { lost: "Can't see you", rest: 'Resting', closed: 'Eyes closed', open: 'I can see you' }[eye];
-    }
-    if (changed('mic', model.micOn)) {
-      els.micIcon.className = `icon icon--${model.micOn ? 'mic' : 'mic-off'}`;
-      els.micLabel.textContent = model.micOn ? 'Mic on' : 'Mic off';
     }
 
     // Caption kinds: waiting (Listening), question (what was said), prompt, and message (what the
@@ -286,7 +303,8 @@ export function createView() {
 
     if (changed('lost', model.faceLost)) els.roomMessage.toggleAttribute('data-shown', model.faceLost);
     renderRow(model);
-    placeCaptionIfChanged(model.grid && !model.columns);
+    placeCaptionIfChanged(model.grid && !model.columns && !kahoot());
+    rememberGrid(model);
 
     if (changed('cue', model.cue ?? '')) {
       els.cue.hidden = !model.cue;

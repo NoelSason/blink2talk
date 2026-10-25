@@ -26,7 +26,7 @@ const TIMING = {
   longBlink: 1000,    // eyes closed this long selects (keyboard stand-in; the camera has its own)
   shortBlink: 400,    // closures shorter than this count toward a double blink (keyboard)
   camShortBlink: 800, // the same for the camera: a closure shorter than a select (selectMs) is a blink
-  doubleBlink: 1000,  // short blinks less than this apart make a run: two go back or undo,
+  doubleBlink: 1400,  // short blinks less than this apart make a run: two go back or undo,
   thirdBlink: 650,    // three offer calibration again; after two, wait this long for a third
   tripleSpan: 1500,   // and all three must fall inside this, so ordinary blinks never add up to it
   selectedMin: 1500,  // "Selected" stays up at least this long,
@@ -106,7 +106,6 @@ let keyboardUntil = 0;
 let micQuietUntil = 0;
 let micWanted = false; // off at launch: always-on listening picked up room chatter. M or the care panel turns it on.
 let mic = null;
-let micGen = 0; // which start of the mic is current
 let eyes = null;
 let camLesson = null;          // { quadrant, look } from the camera's last pick, taught back once the reply is spoken
 
@@ -557,23 +556,20 @@ const hearingNurse = () => s.stage === 'choose' && !['spell', 'confirm', 'recali
 
 async function startNurseMic() {
   if (mic || !micWanted) return;
-  const gen = ++micGen; // M (off) or a newer start while this one connects makes it stale
   s.mic = 'starting';
   syncPanels();
   const token = await sttToken();
-  if (gen !== micGen) return;
   if (!token) {
     s.mic = 'unavailable';
     demo.setMic('Mic: off (needs the conversation server and a Cartesia key)');
     return syncPanels();
   }
   try {
-    const started = await startMic({
+    mic = await startMic({
       token,
       muted: () => s.stage === 'speaking' || now() < micQuietUntil,
       ...heard,
       onError: (message) => {
-        if (gen !== micGen) return; // a mic that was already turned off or replaced
         mic = null;
         s.mic = 'off';
         demo.setMic(`Mic: reconnecting (${message})`);
@@ -581,12 +577,9 @@ async function startNurseMic() {
         setTimeout(startNurseMic, TIMING.micRetry);
       },
     });
-    if (gen !== micGen) return started.stop(); // turned off while it was connecting
-    mic = started;
     s.mic = 'on';
     demo.setMic('Mic: listening for the nurse');
   } catch (err) {
-    if (gen !== micGen) return;
     s.mic = 'off';
     demo.setMic(`Mic: off (${err?.message ?? err})`);
   }
@@ -596,7 +589,6 @@ async function startNurseMic() {
 function setMic(on) {
   micWanted = on;
   if (on) return startNurseMic();
-  micGen++;
   mic?.stop();
   mic = null;
   s.mic = s.mic === 'unavailable' ? 'unavailable' : 'off';
@@ -776,7 +768,6 @@ function tick() {
     resting: s.resting,
     calibration: s.calibration,
     faceLost: s.faceLost,
-    micOn: s.mic === 'on' || s.mic === 'starting', // shown at once on M, before it connects
     caption: s.caption,
     stage: s.stage,
     single: s.rowKind === 'listen',
@@ -917,6 +908,7 @@ loadConfig();
 if (memory.history.length) refreshSummary(); // the conversation from before this launch
 requestAnimationFrame(tick);
 const eyeSettings = loadSettings();
+document.documentElement.dataset.layout = eyeSettings.layout;
 const devPanel = createDevPanel({
   settings: eyeSettings,
   onRebuild: () => eyes?.rebuild(),

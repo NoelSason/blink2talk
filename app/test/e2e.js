@@ -38,19 +38,6 @@ app.whenReady().then(async () => {
   };
   const waitFor = async (expr, ms = 8000) => { for (const t0 = Date.now(); Date.now() - t0 < ms; await sleep(100)) if (await state(expr)) return true; return false; };
 
-  // The top bar says whether the nurse mic is on. Off at launch. With no server here, M asks for the
-  // mic and it stays unavailable, so "on" is set by hand before the second M turns it off.
-  const micLabel = () => js(`document.getElementById('mic-label').textContent`);
-  check('the top bar shows the mic is off at launch', (await micLabel()) === 'Mic off');
-  await key('KeyM');
-  await sleep(100);
-  await js(`window.__test.state.mic = 'on'; 1`);
-  await sleep(80);
-  check('and shows when it is on', (await micLabel()) === 'Mic on');
-  await key('KeyM');
-  await sleep(80);
-  check('M turns it off', (await micLabel()) === 'Mic off' && (await state('s.mic')) === 'off');
-
   // Listening: one item; a long blink opens the urgent options and Spell it.
   check('listening shows one item', (await labels()).length === 1);
   await hold();
@@ -209,6 +196,25 @@ app.whenReady().then(async () => {
   const bottomRight = await dot('bottomRight');
   await cam('calibration(null)');
   check('calibration dots sit on the box centers', topLeft[0] < center[0] && topLeft[1] < center[1] && bottomRight[0] > center[0] && bottomRight[1] > center[1]);
+  // Dev mode's "Middle of each box" pulls the corner dots in toward the center.
+  await js(`document.documentElement.dataset.dots = 'centers'; 1`);
+  const inner = await dot('topLeft');
+  await cam('calibration(null)');
+  await js(`document.documentElement.dataset.dots = 'corners'; 1`);
+  check('box-center dots sit inside the corner dots', inner[0] > topLeft[0] && inner[1] > topLeft[1] && inner[0] < center[0] && inner[1] < center[1]);
+  // Kahoot layout: the dots land on the real boxes, not the status line under them (measured 2026-10-25).
+  const rects = await js(`[...document.querySelectorAll('#reply-row > :is([role=option], .grid-empty)')].map(n => { const r = n.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })`);
+  if (rects.length === 4) {
+    const page = async (phase) => { await cam(`calibration({ phase: '${phase}', remainingMs: 1500 })`); await sleep(50); return js(`(() => { const r = document.getElementById('calib-dot').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`); };
+    const inBox = ([x, y], [l, t, r, b]) => x > l && x < r && y > t && y < b;
+    const tl = await page('topLeft');
+    const br = await page('bottomRight');
+    const mid = await page('center');
+    await cam('calibration(null)');
+    const meetY = (rects[0][3] + rects[2][1]) / 2;
+    check('Kahoot: corner dots sit inside their boxes', inBox(tl, rects[0]) && inBox(br, rects[3]), JSON.stringify({ tl, br, rects }));
+    check('Kahoot: center dot sits where the boxes meet', Math.abs(mid[1] - meetY) < 12, `${mid[1]} vs ${meetY}`);
+  } else check('Kahoot: grid has four boxes to measure', false, `${rects.length}`);
 
   const errors = await js('window.__errors');
   // Dev mode opens from its button and from the backtick key, and closes again.

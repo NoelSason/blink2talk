@@ -100,6 +100,27 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
     saveSettings(settings);
   });
 
+  const layoutInput = el('select', {});
+  for (const [v, text] of [['kahoot', 'Kahoot: question on top, boxes together'], ['spread', 'Spread: boxes in the corners']]) {
+    layoutInput.append(el('option', { value: v, textContent: text }));
+  }
+  layoutInput.addEventListener('change', () => {
+    settings.layout = layoutInput.value;
+    document.documentElement.dataset.layout = settings.layout;
+    saveSettings(settings);
+    markDirty(); // the boxes moved, so the calibration should too
+  });
+
+  const dotsInput = el('select', {});
+  for (const [v, text] of [['corners', 'Outer corner of each box'], ['centers', 'Middle of each box']]) {
+    dotsInput.append(el('option', { value: v, textContent: text }));
+  }
+  dotsInput.addEventListener('change', () => {
+    settings.dots = dotsInput.value;
+    saveSettings(settings);
+    markDirty(); // the dots are only used while calibrating
+  });
+
   const headInput = el('input', { type: 'checkbox' });
   headInput.addEventListener('change', () => {
     settings.headPose = headInput.checked;
@@ -130,6 +151,9 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   const resetBtn = button('Reset to defaults', () => {
     Object.assign(settings, structuredClone(DEFAULTS));
     headInput.checked = settings.headPose;
+    dotsInput.value = settings.dots;
+    layoutInput.value = settings.layout;
+    document.documentElement.dataset.layout = settings.layout;
     learnInput.checked = settings.learnFromPicks;
     saveSettings(settings);
     syncSliders();
@@ -152,6 +176,12 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
       el('label', { className: 'dev__row' }, learnInput,
         el('span', { className: 'dev__label', textContent: 'Learn from spoken picks (teaches the chosen box where the eyes were)' }))),
     el('section', { className: 'dev__section' },
+      el('h2', { className: 'dev__heading', textContent: 'Layout (recal)' }),
+      el('label', { className: 'dev__row' }, layoutInput)),
+    el('section', { className: 'dev__section' },
+      el('h2', { className: 'dev__heading', textContent: 'Calibration dots (recal)' }),
+      el('label', { className: 'dev__row' }, dotsInput)),
+    el('section', { className: 'dev__section' },
       el('h2', { className: 'dev__heading', textContent: 'Head model' }),
       el('label', { className: 'dev__row' }, headInput,
         el('span', { className: 'dev__label', textContent: 'Correct box picks for head turns (retrains on calibration)' }))),
@@ -172,6 +202,8 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   );
   applyBtn.disabled = true;
   headInput.checked = settings.headPose;
+  dotsInput.value = settings.dots;
+  layoutInput.value = settings.layout;
   learnInput.checked = settings.learnFromPicks;
   syncSliders();
 

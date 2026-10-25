@@ -9,6 +9,7 @@
 
 import { createGazeModel, featureVector, headPose, TARGETS } from './gaze.js';
 import { measureDrift, shiftCenters } from './drift.js';
+import { dotPositions } from './devsettings.js';
 
 // Every handler app.js must provide. Checked at startup, so a missing one fails loudly instead of
 // throwing on every camera frame.
@@ -115,6 +116,8 @@ export async function startEyes(on, settings) {
 
   // Full recalibration: a fresh pipeline with the current settings, and a fresh head model.
   function reset() {
+    Object.assign(TARGETS, dotPositions(settings.dots, settings.layout)); // the head model learns from these positions
+    document.documentElement.dataset.dots = settings.dots;
     build();
     gaze = createGazeModel();
     labels = { phase: null, since: 0, looks: {}, poses: [] };
@@ -211,7 +214,6 @@ export async function startEyes(on, settings) {
   // calibrated open level for 2+ frames. Needing 2 frames each way keeps camera noise from turning
   // one blink into several (a first version counted single frames, and ordinary blinks added up to
   // "three blinks"). Quiet for a moment after a pick, so lids settling after a choice don't count.
-  const QUICK_BLINK_MS = 500;
   let blinkLevels = null;  // { close, open }, set by calibration
   let closedSince = null;  // first frame under `close` in the current run
   let closedFrames = 0;
@@ -231,8 +233,10 @@ export async function startEyes(on, settings) {
     } else {
       closedFrames = 0;
       if (ear > blinkLevels.open && blinkStart !== null && ++openFrames >= 2) {
-        // Only quick ones: a closure of QUICK_BLINK_MS or more may be a pick (600 ms on the spelling page).
-        if (t >= blinkQuietUntil && t - blinkStart < QUICK_BLINK_MS) {
+        // Anything shorter than a pick (selectMs) counts. A 500 ms cap dropped deliberate blinks: Marco's
+        // 2026-10-25 log had 13 of 28 blinks at 500-730 ms, too long to count and too short to pick, so a
+        // double blink often did nothing.
+        if (t >= blinkQuietUntil && t - blinkStart < settings.blink.selectMs) {
           log({ t: r(t, 10), event: 'quickBlink', ms: r(t - blinkStart, 1) });
           on.blink(t - blinkStart);
         }
