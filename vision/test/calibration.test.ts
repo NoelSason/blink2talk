@@ -98,7 +98,7 @@ describe("EyePipeline", () => {
   });
 });
 
-describe("lead-in before each dot", () => {
+describe("lead-in before the squint", () => {
   it("shows the countdown first and takes no samples during it", () => {
     const c = new Calibrator({ ...DEFAULT_CALIBRATION, layout: "quadrants", readyMs: 0, leadMs: 1000, phaseMs: 1000, settleMs: 0 });
     const leads: boolean[] = [];
@@ -107,7 +107,7 @@ describe("lead-in before each dot", () => {
     while (c.phase !== "done" && t < 60_000) {
       const phase = c.phase;
       const p = c.add(frame(t, 0.3, 0, 0.1, true));
-      if (phase === "center" && p.leadRemainingMs !== undefined) {
+      if (phase === "squint" && p.leadRemainingMs !== undefined) {
         sawLead = true;
         leads.push(p.leadRemainingMs > 0);
       }
@@ -115,7 +115,7 @@ describe("lead-in before each dot", () => {
     }
     expect(sawLead).toBe(true);
     expect(leads.every(Boolean)).toBe(true);
-    expect(c.totalMs).toBe(0 + 6 * (1000 + 1000));
+    expect(c.totalMs).toBe(6 * 1000 + 1000);
     expect(c.phase).toBe("done");
   });
 

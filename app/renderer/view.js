@@ -21,7 +21,7 @@ const CALIBRATION_TEXT = {
   topRight: 'Look at the dot',
   bottomLeft: 'Look at the dot',
   bottomRight: 'Look at the dot',
-  squint: 'Squint a little, still looking at the dot',
+  squint: 'Narrow your eyes, like in bright sun. Keep looking at the dot.',
 };
 // Calibration dots sit where the boxes will be (x and y in [-1, 1] over the gaze area, +y down;
 // matched by the .reply-grid layout in app.css).
@@ -230,7 +230,7 @@ export function createView() {
     placeOnGrid(els.calibDot, x, y);
     els.calibDot.hidden = lead;
     els.calibText.textContent = lead
-      ? `Next: look at ${CALIBRATION_NEXT[c.phase] ?? 'the dot'}`
+      ? 'Next: narrow your eyes. Keep looking at the dot.'
       : CALIBRATION_TEXT[c.phase] ?? CALIBRATION_TEXT.center;
     els.calibCount.textContent = String(seconds);
   }

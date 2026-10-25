@@ -14,7 +14,7 @@ const SAMPLE_FROM_MS = 800; // ignore the first part of a trial: the eyes are st
 const SCHEMA = [
   { group: 'Calibration', rows: [
     { key: 'calibration.readyMs', label: 'Countdown', min: 1000, max: 6000, step: 250, unit: 'ms' },
-    { key: 'calibration.leadMs', label: 'Read time before each dot', min: 0, max: 6000, step: 250, unit: 'ms' },
+    { key: 'calibration.leadMs', label: 'Countdown before the squint', min: 0, max: 6000, step: 250, unit: 'ms' },
     { key: 'calibration.phaseMs', label: 'Time per dot', min: 1000, max: 5000, step: 250, unit: 'ms' },
     { key: 'calibration.settleMs', label: 'Ignore after dot moves', min: 0, max: 1000, step: 50, unit: 'ms' },
   ] },
@@ -56,7 +56,8 @@ export function createDevPanel({ settings, onRebuild }) {
   const sliders = []; // { key, input, value, row }
   let dirty = false;
   const applyBtn = el('button', { type: 'button', className: 'dev__primary', textContent: 'Apply & recalibrate' });
-  const live = { looking: el('span'), focus: el('span'), face: el('span'), mode: el('span') };
+  const live = { looking: el('span'), focus: el('span'), face: el('span'), mode: el('span'), blinks: el('span') };
+  const recentBlinks = [];
   const results = el('pre', { className: 'dev__results', hidden: true });
   const test = { running: false, order: [], i: 0, target: null, samples: [], shownAt: 0, rows: [], timer: null };
 
@@ -123,7 +124,8 @@ export function createDevPanel({ settings, onRebuild }) {
       el('h2', { className: 'dev__heading', textContent: 'Live' }),
       el('div', { className: 'dev__live' },
         el('span', {}, 'Looking: ', live.looking), el('span', {}, 'Highlight: ', live.focus),
-        el('span', {}, 'Face: ', live.face), el('span', {}, 'Tracker: ', live.mode))),
+        el('span', {}, 'Face: ', live.face), el('span', {}, 'Tracker: ', live.mode),
+        el('span', {}, 'Last blinks: ', live.blinks))),
     el('section', { className: 'dev__section' },
       el('h2', { className: 'dev__heading', textContent: 'Head model' }),
       el('label', { className: 'dev__row' }, headInput,
@@ -213,6 +215,13 @@ export function createDevPanel({ settings, onRebuild }) {
     live.focus.textContent = d.focus ? NAME[d.focus] : 'none';
     live.face.textContent = d.faceFound ? 'seen' : 'lost';
     live.mode.textContent = d.mode;
+  });
+
+  // Every blink the camera sees: its length, and whether it counted toward a double blink (back).
+  window.addEventListener('blink-seen', (e) => {
+    recentBlinks.push(`${Math.round(e.detail.ms)} ms${e.detail.counted ? '' : ' (too long)'}`);
+    recentBlinks.splice(0, recentBlinks.length - 4);
+    live.blinks.textContent = recentBlinks.join(', ');
   });
 
   const isOpen = () => !panel.hidden;

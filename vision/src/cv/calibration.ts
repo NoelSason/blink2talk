@@ -21,7 +21,7 @@ export interface CalibrationConfig {
   readyMs: number;
   /** Length of every dot phase. */
   phaseMs: number;
-  /** Pause before each dot (and the squint) so the patient can read what comes next. No samples are taken. 0 = none. */
+  /** Countdown before the squint, so the patient can read the instruction first. No samples are taken. 0 = none. */
   leadMs: number;
   /** Ignored at the start of each phase while the eyes move to the new dot. */
   settleMs: number;
@@ -99,7 +99,7 @@ export class Calibrator {
   }
 
   get totalMs(): number {
-    return this.cfg.readyMs + (this.phases.length - 2) * (this.cfg.leadMs + this.cfg.phaseMs);
+    return this.cfg.readyMs + (this.phases.length - 2) * this.cfg.phaseMs + this.cfg.leadMs;
   }
 
   add(frame: EyeFrame): CalibrationProgress {
@@ -108,7 +108,7 @@ export class Calibrator {
     this.phaseStart ??= frame.t;
     const elapsed = frame.t - this.phaseStart;
     // The lead-in (before each dot or the squint) is waited out first; the dot's own time follows it.
-    const lead = phase === "ready" ? 0 : this.cfg.leadMs;
+    const lead = phase === "squint" ? this.cfg.leadMs : 0;
     const duration = phase === "ready" ? this.cfg.readyMs : lead + this.cfg.phaseMs;
     const inLead = elapsed < lead;
 
@@ -120,7 +120,7 @@ export class Calibrator {
       this.step++;
       this.phaseStart = frame.t;
       const next = this.phase;
-      const nextLead = next === "done" || next === "ready" ? 0 : this.cfg.leadMs;
+      const nextLead = next === "squint" ? this.cfg.leadMs : 0;
       return { phase: next, progress: next === "done" ? 1 : 0, remainingMs: next === "done" ? 0 : nextLead + this.cfg.phaseMs, ...(nextLead > 0 ? { leadRemainingMs: nextLead } : {}) };
     }
     if (inLead) return { phase, progress: elapsed / duration, remainingMs: duration - elapsed, leadRemainingMs: lead - elapsed };

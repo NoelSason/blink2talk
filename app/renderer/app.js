@@ -25,7 +25,7 @@ const TIMING = {
   holdShow: 200,      // ignore the ring for ordinary blinks
   longBlink: 1000,    // eyes closed this long selects (keyboard stand-in; the camera has its own)
   shortBlink: 400,    // closures shorter than this count toward a double blink (keyboard)
-  camShortBlink: 700, // the same for the camera: anything that closes the eyes and falls short of a pick
+  camShortBlink: 800, // the same for the camera: a closure shorter than a select (selectMs) is a blink
   doubleBlink: 1000,  // two short blinks inside this window go back or undo
   selectedMin: 1500,  // "Selected" stays up at least this long,
   selectedSeen: 1000, // and at least this long after the eyes open, so the patient sees it
@@ -569,7 +569,11 @@ const camera = {
       select(i);
     }
   },
-  blink: (ms) => { if (ms < TIMING.camShortBlink) shortBlink(now()); },
+  blink: (ms) => {
+    const counted = ms < TIMING.camShortBlink;
+    window.dispatchEvent(new CustomEvent('blink-seen', { detail: { ms, counted } })); // dev panel readout
+    if (counted) shortBlink(now());
+  },
   face: (found) => runAction('face', !found),
   fatigue: (level) => window.blinkvoice.setFatigue(level === 'elevated' ? 0.8 : 0),
 };

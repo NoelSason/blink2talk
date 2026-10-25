@@ -24,6 +24,8 @@ app.whenReady().then(async () => {
 
   const key = (code, type = 'keydown') => js(`dispatchEvent(new KeyboardEvent('${type}', { code: '${code}' })); 1`);
   const hold = async () => { await key('Space'); await sleep(1100); await key('Space', 'keyup'); await sleep(150); };
+  // Two camera blinks, the way the vision module reports them: a short closure, then another.
+  const camDoubleBlink = async () => { await cam('blink(220)'); await sleep(300); await cam('blink(220)'); await sleep(200); };
   const doubleBlink = async () => { for (let i = 0; i < 2; i++) { await key('Space'); await sleep(80); await key('Space', 'keyup'); await sleep(120); } };
   const cam = (call) => js(`window.__test.camera.${call}; 1`);
   const state = (expr) => js(`(s => ${expr})(window.__test.state)`);
@@ -102,7 +104,7 @@ app.whenReady().then(async () => {
   check('E in two picks', (await state('s.spell.message + s.spell.prefix')) === 'e');
   // Double blinks walk back one page at a time: a letter level, Spell it, the urgent options.
   await cam(`select('topLeft')`);
-  await doubleBlink();
+  await camDoubleBlink();
   check('double blink goes up a letter level', (await state(`s.rowKind === 'spell' && s.spell.path.length === 0`)) === true);
   await doubleBlink();
   check('double blink leaves Spell it for the urgent options', (await state('s.rowKind')) === 'starters');
