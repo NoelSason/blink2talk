@@ -28,7 +28,7 @@
   <button id="live">Always on</button>
 </footer>
 <script>
-// Input contract for Julien's blink/gaze module: call these instead of the keyboard.
+// Input contract for the blink/gaze module: call these instead of the keyboard.
 //   window.blinkvoice.select() / .gazeLeft() / .gazeRight() / .setFatigue(0..1)
 const $ = (id) => document.getElementById(id);
 const post = (url, body) => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });

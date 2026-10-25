@@ -53,7 +53,7 @@ To try it without a patient, use the keyboard: arrow keys move the highlight, ho
 |---|---|---|
 | `app/` | Electron patient screen, care panel, eye-input adapter, speaker recognition | Noel |
 | `conversation/` | Server: Claude replies and summaries, Cartesia speech-to-text and cloned voice | Samarth |
-| `vision/` | MediaPipe eye tracking: calibration, gaze boxes, blink and squint holds, fatigue | Julian |
+| `vision/` | MediaPipe eye tracking: calibration, gaze boxes, blink and squint holds, fatigue | Team |
 | `context/`, `docs/` | Team context docs, decisions, worklog, submission | Marco |
 
 `CLAUDE.md` is the team contract; each folder has its own README.

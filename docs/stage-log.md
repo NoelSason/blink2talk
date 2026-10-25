@@ -1,6 +1,6 @@
 # Blink2Talk stage log
 
-Figma "Idea to Demo" track, Cal Hacks 13.0. Built from the team's commit history (68 commits by 4 people, 1:22 PM to 10:54 PM on Oct 24) and `docs/worklog.md`, which logged the Figma sessions as they happened. Each stage entry stays under 200 words. The ratings are Noel's to confirm.
+Figma "Idea to Demo" track, Cal Hacks 13.0. Built from the team's commit history (68 commits, 1:22 PM to 10:54 PM on Oct 24) and `docs/worklog.md`, which logged the Figma sessions as they happened. Each stage entry stays under 200 words. The ratings are Noel's to confirm.
 
 Figma Slides deck: https://www.figma.com/slides/8U3Y4Bz4e7EzP9Eq3Ag5sd
 
@@ -78,7 +78,7 @@ Times are PDT, Oct 24, 2026.
 ## Stage 4: Code generation
 
 - **Figma tool:** none after handoff. Claude Code (Opus 5.5) and by hand.
-- **Time:** about 10 hours (13:05 to 22:54), 68 commits by 4 people
+- **Time:** about 10 hours (13:05 to 22:54), 68 commits
 - **Rating:** not used
 - **Repo:** https://github.com/NoelSason/blink2talk
 

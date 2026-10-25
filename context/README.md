@@ -4,7 +4,7 @@ One file per owner. You write only yours. Everyone reads everyone's.
 
 | File | Owner | Code |
 | --- | --- | --- |
-| `input.md` | Julian | `vision/` |
+| `input.md` | Team (no owner) | `vision/` |
 | `conversation.md` | Samarth | `conversation/` |
 | `patient-state.md` | Marco | `docs/` submission files (not gated) |
 | `product.md` | Noel | `app/`, `design/` (`docs/` is shared, not gated) |

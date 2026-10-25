@@ -1,8 +1,8 @@
-# Bedside context (owner: Julien)
+# Bedside context (no owner)
 
 Updated: 2026-10-24 18:20 PDT
 
-Julien also owns `vision/` → `context/input.md`. Separate file because this is a separate subsystem,
+`vision/` → `context/input.md`. Separate file because this is a separate subsystem,
 not a separate person; the merge-conflict rationale in `context/README.md` still holds.
 
 ## Relationship to Noel's local path — read this first

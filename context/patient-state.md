@@ -22,11 +22,11 @@ None. This role emits docs, not events.
 
 ## Decisions (newest first)
 - 2026-10-24: Presage cut. Why: ICU patients are on monitors, a vented patient's breathing rate is the ventilator's, and one sponsor track out of six isn't worth bending the product. Rejected: keep it as a family-facing comfort signal.
-- 2026-10-24: App eye input follows the vision module only (its calibration, quadrant focus, `quadrantSelect`); the app-side gaze model, auto re-center, and practice round come out. Why: two classifiers answering "which box" and a second dot sequence the patient didn't ask for. Rejected: disable re-center only. Noel's head-turn concern goes to Julian's module, where the fix belongs.
+- 2026-10-24: App eye input follows the vision module only (its calibration, quadrant focus, `quadrantSelect`); the app-side gaze model, auto re-center, and practice round come out. Why: two classifiers answering "which box" and a second dot sequence the patient didn't ask for. Rejected: disable re-center only. Noel's head-turn concern goes to the vision module, where the fix belongs.
 
 ## Open questions / needs from others
 - @Noel: vitals tiles in the care drawer can go ("Not connected" forever otherwise). Your "blocked on Marco" line is clear.
-- @Julian: Noel found the quadrant classifier mis-picks on head turns. If that's real, the fix belongs in `vision/` (head pose in the feature vector), not in `app/`.
+- `vision/`: Noel found the quadrant classifier mis-picks on head turns. If that's real, the fix belongs in `vision/` (head pose in the feature vector), not in `app/`.
 
 ## Run and check
 ```sh
