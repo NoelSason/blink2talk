@@ -1,62 +1,68 @@
 # Conversation context (owner: Samarth)
 
-Updated: 2026-10-24 23:30 PDT
+Updated: 2026-10-25 01:30 PDT
 
 ## Now
-- Working on: Ink-2 mic latency (1.5 s turn cap, prefetch on `turn.eager_end`), tested in `patient.html`.
-- Next: match CLAUDE.md contract: exactly 3 replies with `intent`, `highStakes`, `rejected` re-ask, 4-category second round. Then port the Ink-2 mic into `app/` (Noel's code, coordinate).
-- Blocked on: team call on the Cut item below (`/complete` + spelling UI).
+- Working on: `/replies` matches the contract (exactly 3 `{text, intent}`, `highStakes`, `rejected`, `category`), merged with Noel's speaker/highStakes/summary changes. `patient.html`: push-to-talk default, "None of these" -> re-ask -> 4 topics -> spell.
+- Next: Noel wires `rejected`/`category` into the app. Watch Haiku latency (slow tonight; timeout now 5 s default, `.env.example` 8 s).
+- Blocked on: team agreeing to keep Spell it (see below).
 
 ## Build-order status
-- Step 1 (PTT, STT, Claude, TTS): server loop works end to end on `patient.html`. Not yet in Noel's Electron app: it has no nurse mic.
-- Step 2 (mocks): `MOCK_REPLIES`, `MOCK_VOICE` exist and fall back automatically with no keys. No STT mock; typed input in the page stands in.
-- Step 4 ("none of these" flow): NOT built server-side. Needs `rejected` and category round in `/replies`.
+- Step 1 (PTT, STT, Claude, TTS): done. `patient.html` hold N = push-to-talk on Ink-2. Noel's app has its own Ink-2 mic using `/stt-token`.
+- Step 2 (mocks): `MOCK_REPLIES`, `MOCK_VOICE`; fall back automatically with no keys. Mock replies are exactly 3 with intents, and honor `category`. No STT mock; typed input stands in.
+- Step 4 ("none of these" flow): server done (`rejected`, `category`). `patient.html` implements it. Noel's app to wire it.
 
 ## Interfaces as built
 HTTP on `localhost:8790` (Noel's `main.js` proxies it over IPC):
-- `POST /replies {transcript, history?, patientProfile?, fatigue?, speaker?}` -> `{replies: string[3-4], addressed, speaker, urgent[], spellOption, source, ms}`. `speaker` in: `{voice, label?, isNew?}` (app's voice model); out: `{label, role}` or null.
-- `POST /summary {history, patientProfile?}` -> `{forPatient, forCaregiver[], source}` (`SUMMARY_MODEL`, default `claude-opus-5-5`; 204 = mock, 502 = failed)
+- `POST /replies {transcript, history?, patientProfile?, fatigue?, speaker?, rejected?, category?, local?}` -> `{options: [{text, intent}] x3, replies: string[3], highStakes, about, addressed, speaker, urgent[], spellOption, source, ms}`
+  - `highStakes`: Claude decides (`high_stakes`); keyword rule only on mock/fallback. Replies then Yes / No / I need more time; `about` = what a yes agrees to.
+  - `rejected`: replies already turned down. `category`: `pain|comfort|people|question`.
+  - `speaker` in `{voice, label?, isNew?}`, out `{label, role}` or null.
+- `GET /config` -> includes `categories`, `localModel`.
+- `POST /summary {history, patientProfile?}` -> `{forPatient, forCaregiver[], source}` (Opus 5.5; 204 mock, 502 failed). Noel's.
 - `POST /complete {prefix, sentenceSoFar?, context?}` -> `{words[]}`
-- `POST /speak {text}` -> `audio/wav` (204 = mock, client uses system voice)
+- `POST /speak {text}` -> `audio/wav` (204 = mock)
 - `GET /stt-token` -> `{token}` (1 h, STT-only; 204 = mock)
-- STT: browser streams mic to Cartesia Ink-2 (`/stt/turns/websocket`) with that token; `turn.end` = nurse done. `patient.html` only.
+- STT: browser streams to Cartesia Ink-2 with that token. Push-to-talk: release = done. Always-on (M in `patient.html`): `turn.end` = done.
 - Browser hook: `window.blinkvoice.select/gazeLeft/gazeRight/setFatigue`.
 
 ## Deviations from CLAUDE.md
 | Date | CLAUDE.md says | We did | Why | Affects | CLAUDE.md updated? |
 | --- | --- | --- | --- | --- | --- |
-| 2026-10-24 | IPC events `options`/`transcript`/`speak` | HTTP routes; Noel's `main.js` bridges to IPC | Server built standalone first | Product | no, bridge works; revisit only if it breaks |
-| 2026-10-24 | `options.replies` = exactly 3 `{text, intent}` | 3-4 plain strings, no `intent` | Built before the 2x2 decision | Product | no. Fix is in Next |
-| 2026-10-24 | `highStakes: bool`; high-stakes replies Yes / No / "I need more time" | Regex consent rule returns Yes / No / "Explain more", no flag | Built before contract | Product (second confirm) | no. Fix is in Next |
-| 2026-10-24 | Push-to-talk | Always-on mic, Ink-2 turn detection ends the turn | Fewer presses, no hands needed on the nurse side | Product | no |
-| 2026-10-24 | "None of these" added by the UI, never the model | Server returns `spellOption` string | Built before the contract | Product | no. UI should own it |
-| 2026-10-24 | No such thing | Hard-coded `urgent[]` ("I'm in pain", "I can't breathe", "Call the nurse") on every screen | Never rely on a model for emergencies | Product, Input | no. Not an alert system, just fixed options. Team may veto |
+| 2026-10-24 | IPC events `options`/`transcript`/`speak` | HTTP routes; Noel's `main.js` bridges to IPC | Server built standalone first | Product | no, bridge works |
+| 2026-10-25 | `options` = `{ replies: [{text, intent}] }` | `options: [{text, intent}]` plus `replies: string[]` (same 3 texts) | Noel's app reads `replies` as strings; nothing breaks while he switches | Product | no |
+| 2026-10-25 | Push-to-talk only | PTT default; always-on Ink-2 kept behind M in `patient.html` | Hands-free nurse option for later | Product | no |
+| 2026-10-24 | "None of these" added by the UI | Server still returns `spellOption` string (unused by `patient.html` now) | Legacy field | Product | no |
+| 2026-10-24 | No such thing | Hard-coded `urgent[]` ("I'm in pain", "I can't breathe", "Call the nurse") | Never rely on a model for emergencies | Product, Input | no. Fixed options, not alerts |
 | 2026-10-24 | No such thing | `addressed` flag; room talk gets "Reply anyway" | Mic hears everyone | Product | no |
+| 2026-10-24 | Local LLM cut | Noel's testing-only `local: true` (Qwen3-4B), off by default | Noel's testing switch | Product | yes (Noel's log entry) |
 
-## CUT ITEM STILL IN MY CODE (needs a team call, not a deviation)
-`POST /complete` and the spelling mode in `patient.html` are the scanning keyboard / free text that CLAUDE.md cuts. Noel's app also still has Spell it. Proposal: stop using both in the demo, keep the code dormant, say "we don't do free text yet." Not removed yet.
+## CUT ITEM: Samarth wants to keep it (needs team sign-off + CLAUDE.md edit)
+`POST /complete` and spelling are the free text CLAUDE.md cuts. Samarth's call: keep it, as the 3rd "None of these" step. @Marco @Noel: agree, then move it off the Cut list in CLAUDE.md.
 
 ## Decisions (newest first)
-- 2026-10-24 (Noel; testing-only local path): `local.ts` returns short plain lists (`localList`, items split by " | " under a GBNF grammar) instead of JSON, with flash attention and cached grammars; local `/replies` skips the model for keyword-rule high-stakes questions and returns no speaker label. 0.12–0.25 s per reply on an M3 Max. Claude path unchanged.
-- 2026-10-24 (Noel, submission audit): `.env.example` gains `REPLIES_TIMEOUT_MS=8000` (the code default 3000 times out on venue Wi-Fi) and `SUMMARY_MODEL`; `package.json` declares `engines.node >=22.9` (`--env-file-if-exists`); README limits updated (high stakes, speaker recognition). No code change.
-- 2026-10-24 (Noel; Samarth please review): `/replies` returns `highStakes` and `about` from Claude (schema `high_stakes`, `stakes_about`); high-stakes replies are `CONSENT_REPLIES`. The keyword rule (`isConsentQuestion`) now runs only when the model doesn't answer (mock, failure: `ruleReplies`). `voice.ts` shares one synthesis per phrase (`pending`) and retries once. Your `patient.html` turn config message stops Ink-2 transcribing (tested); the app no longer sends it.
-- 2026-10-24 (Noel; Samarth please review): testing-only `local: true` on `/replies` and `/complete` (`src/local.ts`: Qwen3-4B-Instruct, node-llama-cpp as an optional dependency), `POST /local-warm`, `config.localModel`. Falls back to Claude. Prompts and schemas are shared with claude.ts (`SYSTEM`, `REPLIES_SCHEMA`, `COMPLETE_SCHEMA` now exported). CLAUDE.md cuts a local LLM: this is a switch for testing, off by default.
-- 2026-10-24 (Noel, for the patient app; Samarth please review): `/replies` takes `speaker {voice, label?, isNew}` and returns `speaker {label, role}` from the same call (no added latency). New `POST /summary` → `{forPatient, forCaregiver[]}` on `SUMMARY_MODEL` (default `claude-opus-5-5`, background, 30 s). Why: Noel wants who-said-what and summaries for the patient and caregiver. Rejected: a separate labeling call (adds a round trip).
-- 2026-10-24: Ink-2 turn config `end_timeout_ms: 1500`, `end_threshold: 0.3`; Claude request starts on `turn.eager_end`, discarded on `turn.resume`. Why: default waits up to 5.6 s. Rejected: Web Speech (Google servers, Chrome-only, fails in Electron/Brave).
-- 2026-10-24: Mic sends silence while the patient's voice plays. Why: stop the patient being transcribed as the nurse. Rejected: pausing the mic.
-- 2026-10-24: Browser gets a short-lived STT-only token, never the API key. Rejected: key in the page.
-- 2026-10-24: Claude 3 s timeout, then Yes / No / Explain more. Noel raised his client timeout to 8 s; the server's 3 s still decides.
-- 2026-10-24: Default model `claude-haiku-5-5`. Why: median ~1.2 s vs seconds on Opus. Rejected: Opus 5.5 default.
+- 2026-10-25: Removed the Ink-2 turn `config` message from `patient.html` after Noel found it stops transcription. Eager-end prefetch stays.
+- 2026-10-25: Claude timeout default 3 s -> 5 s (`.env.example` 8 s wins if set). If a "None of these" re-ask still falls back, `patient.html` skips to topics, then spelling. Why: fallback Yes/No looked like the button did nothing.
+- 2026-10-25: Server drops model replies starting "None of these", requires exactly 3 (local model may return strings; accepted). Why: contract says the UI owns "none".
+- 2026-10-25: Consent replies Yes / No / "I need more time" (was "Explain more"), per CLAUDE.md.
+- 2026-10-25: Push-to-talk buffers mic audio until the socket opens and reuses a 50-min token. Why: first words lost on key press.
+- 2026-10-24 (Noel; testing-only local path): `local.ts` returns short plain lists (`localList`, " | " under a GBNF grammar) instead of JSON; local `/replies` uses the keyword rule for high stakes, no speaker label, empty `intent`. 0.12-0.25 s per reply on an M3 Max. Claude path unchanged.
+- 2026-10-24 (Noel, submission audit): `.env.example` gains `REPLIES_TIMEOUT_MS=8000` and `SUMMARY_MODEL`; `engines.node >=22.9`.
+- 2026-10-24 (Noel; reviewed by Samarth 10-25, kept): `highStakes` + `about` from Claude; keyword rule only when the model doesn't answer. `voice.ts` dedupes concurrent synthesis and retries once.
+- 2026-10-24 (Noel; reviewed, kept as testing-only): `local: true` on `/replies` and `/complete` (`src/local.ts`), `POST /local-warm`, `config.localModel`.
+- 2026-10-24 (Noel; reviewed, kept): `speaker` in/out on `/replies`, `POST /summary`.
+- 2026-10-24: Mic sends silence while the patient's voice plays. Why: stop the patient being transcribed as the nurse.
+- 2026-10-24: Browser gets a short-lived STT-only token, never the API key.
+- 2026-10-24: Default model `claude-haiku-5-5`. Why: median ~1.2 s vs seconds on Opus.
 - 2026-10-24: Cartesia for STT + TTS + clone (CLAUDE.md log). Rejected: ElevenLabs.
 
 ## Open questions / needs from others
-- @Noel: OK to add the Ink-2 mic to `app/` (I'll branch `samarth/app-mic`)? Electron needs mic permission handling.
-- @Noel, @Marco: team call on dropping Spell it / `/complete` from the demo.
-- @Noel: should `highStakes` drive your second confirm? I'll add it to `/replies`.
+- @Noel: `options[].intent`, `rejected`, `category`, `config.categories` are live. Your first "None of these" can send `rejected: [shown replies]`; second can show the 4 topics and send `category`. Consent third option is now "I need more time".
+- @Noel, @Marco: keep Spell it (Samarth's call)? Needs CLAUDE.md Cut list edit.
 
 ## Run and check
 ```sh
 cd conversation && npm install && cp .env.example .env && npm start   # http://localhost:8790/patient.html (Chrome)
-npm run eval      # 28 nurse phrases: replies, latency, consent rule, NOT ADDRESSED flags
+npm run eval      # nurse phrases: replies, latency, consent rule, NOT ADDRESSED flags
 ```
 Offline: `MOCK_REPLIES=1 MOCK_VOICE=1 npm start`. Keys: same `CARTESIA_API_KEY` and `CARTESIA_VOICE_ID` as Samarth to get his cloned voice.

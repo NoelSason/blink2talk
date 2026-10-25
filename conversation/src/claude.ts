@@ -9,7 +9,8 @@ const SUMMARY_MODEL = process.env.SUMMARY_MODEL ?? "claude-opus-5-5";
 const SUMMARY_TIMEOUT_MS = 30000;
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY
 // Past this the patient gets safe fallback options instead of waiting.
-const REPLIES_TIMEOUT_MS = Number(process.env.REPLIES_TIMEOUT_MS ?? 3000);
+// 5 s default: Haiku took 1.5-3.5 s under load and 3 s sent too many patients to the fallback. .env can raise it.
+const REPLIES_TIMEOUT_MS = Number(process.env.REPLIES_TIMEOUT_MS ?? 5000);
 const mock = () => process.env.MOCK_REPLIES === "1" || !process.env.ANTHROPIC_API_KEY;
 
 export interface Turn {
@@ -39,18 +40,38 @@ export interface RepliesInput {
   fatigue?: number; // 0..1, high = offer fewer, shorter options
   speaker?: VoiceInfo;
   local?: boolean; // testing only: answer with the small on-laptop model (local.ts)
+  rejected?: string[]; // replies the patient already said "none of these" to
+  category?: Category; // second "none": patient picked a topic
 }
+
+export const CATEGORIES = ["pain", "comfort", "people", "question"] as const;
+export type Category = (typeof CATEGORIES)[number];
+const CATEGORY_HINT: Record<Category, string> = {
+  pain: "pain: where it hurts, how bad, wanting pain relief",
+  comfort: "body and comfort: position, temperature, thirst, toilet, tube, sleep",
+  people: "people: family, friends, a specific person, wanting company or privacy",
+  question: "a question the patient wants to ask: what is happening, when, how long",
+};
+
+export interface Option {
+  text: string;
+  intent: string;
+}
+const CONSENT_INTENTS = ["yes", "no", "more-time"];
+const consentOptions = (): Option[] => CONSENT_REPLIES.map((text, i) => ({ text, intent: CONSENT_INTENTS[i] ?? "other" }));
 
 export const SYSTEM = `You help a patient who cannot speak or use their hands reply to a nurse or family member. They select a reply with a deliberate blink, so every option must be a complete, natural first-person sentence the patient could say as-is.
 
 Given what was just said to the patient, propose the most likely replies, in order of likelihood.
 
 Rules:
-- Output 3 or 4 replies, each under 8 words, written in the patient's voice ("I", "my"). No quotation marks.
-- Make the options meaningfully different from each other: usually include a plain yes and a plain no when the question allows it, and one or two specific answers.
+- Output exactly 3 replies, each 8 words or fewer, written in the patient's voice ("I", "my"). No quotation marks. The screen adds "None of these" itself; never output it.
+- Give each reply a short intent label (e.g. "yes", "no", "water", "reposition", "family", "ask-time"). The three intents must all be different: usually a plain yes, a plain no, and one specific answer when the question allows it.
+- If rejected replies are listed, the patient said none of them fit. Do not repeat or reword any of them: if a plain yes or no was rejected, don't offer yes or no again. Offer three new directions, e.g. a different need, a question back to the caregiver, or "something else is wrong".
+- If a topic is given, all three replies must be about that topic.
 - Never invent medical facts, symptoms, or decisions the patient has not signaled. If the question is open-ended, offer short common needs (water, repositioning, family, rest) rather than guessing a diagnosis.
 - Use the patient profile and recent conversation only to pick relevant specifics (names, preferences).
-- If the patient seems fatigued, give 3 options and keep them very short.
+- If the patient seems fatigued, keep the replies very short.
 - Set addressed_to_patient to false only when the speech is clearly meant for someone else (staff talking to each other, a phone call, "grab the chart from room 4"). Anything that could plausibly be for the patient, including greetings and statements about their care, counts as addressed. Still fill in replies either way.
 - If the message is unintelligible, offer: "Please say that again", "I didn't understand", "Yes", "No".
 - high_stakes is true only when a yes or no would make a medical decision: consent to a treatment, procedure, surgery, test, or medication change, or code status (CPR, DNR, life support). Routine questions about comfort, pain level, water, positioning, visitors, or feelings are not high stakes, even if they mention medicine ("are you in pain?" is not; "do you want more pain medication?" is). When high_stakes is true, stakes_about is what a yes would agree to, as a short phrase that fits "You said yes to …" ("more pain medication", "the surgery tomorrow morning", "a breathing tube"); otherwise an empty string.
@@ -60,7 +81,15 @@ export const REPLIES_SCHEMA = {
   type: "object",
   properties: {
     addressed_to_patient: { type: "boolean" },
-    replies: { type: "array", items: { type: "string" } },
+    replies: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { text: { type: "string" }, intent: { type: "string" } },
+        required: ["text", "intent"],
+        additionalProperties: false,
+      },
+    },
     speaker_label: { type: "string" },
     speaker_role: { type: "string", enum: ["nurse", "doctor", "family", "visitor", "staff", "unknown"] },
     high_stakes: { type: "boolean" },
@@ -92,7 +121,8 @@ const historyLines = (turns: Turn[]) =>
   turns.map((t) => `${t.role === "patient" ? "Patient" : t.speaker || "Caregiver"}: ${t.text}`).join("\n");
 
 export interface RepliesOut {
-  replies: string[];
+  replies: string[]; // same texts as options, kept for existing clients
+  options: Option[]; // exactly 3 {text, intent} (CLAUDE.md contract)
   source: string;
   addressed: boolean;
   speaker: Speaker | null;
@@ -103,10 +133,14 @@ export interface RepliesOut {
 }
 
 // Without a model answer (mock mode, or the model failed): the keyword rule decides high stakes.
-export function ruleReplies(transcript: string, replies: string[], source: string): RepliesOut {
+export function ruleReplies(transcript: string, options: Option[], source: string): RepliesOut {
   const highStakes = isConsentQuestion(transcript);
-  return { replies: highStakes ? CONSENT_REPLIES : replies, source: highStakes ? "consent-rule" : source, addressed: true, speaker: null, highStakes, about: null };
+  const opts = highStakes ? consentOptions() : options;
+  return { replies: opts.map((o) => o.text), options: opts, source: highStakes ? "consent-rule" : source, addressed: true, speaker: null, highStakes, about: null };
 }
+
+/** Fallback when the model fails: yes / no / more time, high stakes only if the keyword rule says so. */
+export const fallbackReplies = (transcript: string) => ruleReplies(transcript, consentOptions(), "fallback");
 
 export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
 
@@ -119,6 +153,8 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
     history ? `Recent conversation:\n${history}` : "",
     voice,
     `Just said to the patient: "${inp.transcript}"`,
+    inp.rejected?.length ? `Rejected replies (none of these fit): ${inp.rejected.map((r) => `"${r}"`).join(", ")}` : "",
+    inp.category && CATEGORY_HINT[inp.category] ? `Topic the patient chose: ${CATEGORY_HINT[inp.category]}` : "",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -128,15 +164,17 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
   // writing tokens is what takes the time. High stakes comes from the keyword rule, and there's no
   // speaker label. Claude if it fails.
   if (inp.local && localModelAvailable()) {
-    if (isConsentQuestion(inp.transcript)) return ruleReplies(inp.transcript, CONSENT_REPLIES, "local");
+    if (isConsentQuestion(inp.transcript)) return ruleReplies(inp.transcript, consentOptions(), "local");
     try {
-      const replies = (await localList(LOCAL_SYSTEM, `Just said to the patient: "${inp.transcript}"`, 3)).slice(0, 4);
-      if (replies.length) return { replies, source: "local", addressed: true, speaker: null, highStakes: false, about: null };
+      const replies = (await localList(LOCAL_SYSTEM, `Just said to the patient: "${inp.transcript}"`, 3)).slice(0, 3);
+      // The local list has no intents; the contract still gets {text, intent}.
+      const options = replies.map((text) => ({ text, intent: "" }));
+      if (replies.length) return { replies, options, source: "local", addressed: true, speaker: null, highStakes: false, about: null };
     } catch (err) {
       console.error("local replies failed, using Claude:", err);
     }
   }
-  if (mock()) return ruleReplies(inp.transcript, mockReplies(inp.transcript), "mock");
+  if (mock()) return ruleReplies(inp.transcript, mockReplies(inp.transcript, inp.category), "mock");
 
   const res = await client.messages.create({
     model: MODEL,
@@ -151,7 +189,7 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
 
 interface ParsedReplies {
   addressed_to_patient: boolean;
-  replies: string[];
+  replies: Option[];
   speaker_label: string;
   speaker_role: SpeakerRole;
   high_stakes: boolean;
@@ -161,12 +199,20 @@ interface ParsedReplies {
 function toReplies(parsed: ParsedReplies, source: string): RepliesOut {
   const highStakes = parsed.high_stakes === true;
   const about = highStakes ? parsed.stakes_about?.trim() || null : null;
-  const replies = highStakes ? CONSENT_REPLIES : parsed.replies.map((r) => r.trim()).filter(Boolean).slice(0, 4);
-  if (replies.length === 0) throw new Error("empty replies");
+  // The small local model sometimes returns plain strings; accept both.
+  const options = highStakes
+    ? consentOptions()
+    : parsed.replies
+        .map((r) => (typeof r === "string" ? { text: r, intent: "" } : r))
+        .map((o) => ({ text: String(o.text ?? "").trim(), intent: String(o.intent ?? "").trim() }))
+        .filter((o) => o.text && !/^none of these/i.test(o.text))
+        .slice(0, 3);
+  if (options.length < 3) throw new Error(`expected 3 replies, got ${options.length}`);
+  const replies = options.map((o) => o.text);
   // Replies are kept even when not addressed, so "Reply anyway" is instant.
   const label = parsed.speaker_label?.trim();
   const speaker = label ? { label, role: parsed.speaker_role ?? "unknown" } : null;
-  return { replies, source, addressed: parsed.addressed_to_patient !== false, speaker, highStakes, about };
+  return { replies, options, source, addressed: parsed.addressed_to_patient !== false, speaker, highStakes, about };
 }
 
 const SUMMARY_SYSTEM = `You summarize a conversation in an ICU room. The patient cannot speak; they answer by choosing one of a few suggested replies with their eyes, and the app speaks it for them. Each line is labeled with who said it.

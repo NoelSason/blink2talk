@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { completeWord, getReplies, ruleReplies, summarize } from "./claude.js";
+import { CATEGORIES, completeWord, fallbackReplies, getReplies, summarize, type Category } from "./claude.js";
 import { localModelAvailable, warmLocal } from "./local.js";
 import { CONSENT_REPLIES, SPELL_OPTION, URGENT } from "./safety.js";
 import { sttToken, synthesize, usingClone, warm } from "./voice.js";
@@ -17,6 +17,7 @@ app.get("/config", (_req, res) => {
   res.json({
     urgent: URGENT,
     spellOption: SPELL_OPTION,
+    categories: CATEGORIES, // second "none of these": pain, comfort, people, question
     mockReplies: process.env.MOCK_REPLIES === "1" || !process.env.ANTHROPIC_API_KEY,
     mockVoice: mockVoice(),
     clonedVoice: usingClone(),
@@ -26,19 +27,28 @@ app.get("/config", (_req, res) => {
 
 // Always responds: on any model failure, falls back to safe generic options.
 app.post("/replies", async (req, res) => {
-  const { transcript, history, patientProfile, fatigue, speaker, local } = req.body ?? {};
+  const { transcript, history, patientProfile, fatigue, speaker, local, rejected, category } = req.body ?? {};
   if (typeof transcript !== "string" || !transcript.trim()) {
     res.status(400).json({ error: "transcript required" });
     return;
   }
   const t0 = Date.now();
   try {
-    const out = await getReplies({ transcript, history, patientProfile, fatigue, speaker, local: local === true });
+    const out = await getReplies({
+      transcript,
+      history,
+      patientProfile,
+      fatigue,
+      speaker,
+      local: local === true,
+      rejected: Array.isArray(rejected) ? rejected.map(String).slice(0, 12) : undefined,
+      category: CATEGORIES.includes(category) ? (category as Category) : undefined,
+    });
     res.json({ ...out, urgent: URGENT, spellOption: SPELL_OPTION, ms: Date.now() - t0 });
   } catch (err) {
     console.error("replies failed:", err);
     res.json({
-      ...ruleReplies(transcript, CONSENT_REPLIES, "fallback"), // yes / no / explain: safe when the model is down
+      ...fallbackReplies(transcript), // yes / no / more time: safe when the model is down
       urgent: URGENT,
       spellOption: SPELL_OPTION,
       ms: Date.now() - t0,

@@ -1,9 +1,21 @@
-export function mockReplies(transcript: string): string[] {
+type Opt = { text: string; intent: string };
+const o = (text: string, intent: string): Opt => ({ text, intent });
+
+const BY_CATEGORY: Record<string, Opt[]> = {
+  pain: [o("My chest hurts", "chest"), o("My back hurts", "back"), o("I need pain medicine", "relief")],
+  comfort: [o("I'm thirsty", "water"), o("Please move me", "reposition"), o("I'm cold", "cold")],
+  people: [o("Where is my family?", "family"), o("Please call my wife", "call"), o("I want to be alone", "privacy")],
+  question: [o("What is happening?", "what"), o("How long will I be here?", "how-long"), o("When can I eat?", "eat")],
+};
+
+// Always exactly 3, like the real model.
+export function mockReplies(transcript: string, category?: string): Opt[] {
+  if (category && BY_CATEGORY[category]) return BY_CATEGORY[category];
   const t = transcript.toLowerCase();
-  if (/thirst|water|drink/.test(t)) return ["Yes, water please", "Just a little", "Not now"];
-  if (/pain|hurt/.test(t)) return ["Yes, a lot", "A little", "No pain", "Different place"];
-  if (/comfortable|position|pillow/.test(t)) return ["Yes", "No", "Raise my head", "Adjust my pillow"];
-  return ["Yes", "No", "Not sure", "Please repeat that"];
+  if (/thirst|water|drink/.test(t)) return [o("Yes, water please", "yes"), o("No, I'm fine", "no"), o("Just ice chips", "ice")];
+  if (/pain|hurt/.test(t)) return [o("Yes, a lot", "yes"), o("No pain", "no"), o("Only a little", "mild")];
+  if (/comfortable|position|pillow/.test(t)) return [o("Yes", "yes"), o("No", "no"), o("Raise my head", "raise-head")];
+  return [o("Yes", "yes"), o("No", "no"), o("Please say that again", "repeat")];
 }
 
 export function mockComplete(prefix: string): string[] {
