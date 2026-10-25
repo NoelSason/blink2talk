@@ -52,9 +52,12 @@ p { margin: 0; }
 .icon--glass { mask-image: url(icons/glass-water.svg); }
 .icon--bell { mask-image: url(icons/bell.svg); }
 .icon--wind { mask-image: url(icons/wind.svg); }
+.icon--mic { mask-image: url(icons/mic.svg); }
+.icon--mic-off { mask-image: url(icons/mic-off.svg); }
 
 /* ---------- Top bar ---------- */
 .top-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.top-bar__status { display: flex; align-items: center; gap: var(--sp-4); }
 .patient-name { font-size: var(--fs-name); font-weight: 300; line-height: 1.2; }
 .eye-status {
   display: flex;

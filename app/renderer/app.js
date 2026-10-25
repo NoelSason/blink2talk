@@ -106,6 +106,7 @@ let keyboardUntil = 0;
 let micQuietUntil = 0;
 let micWanted = false; // off at launch: always-on listening picked up room chatter. M or the care panel turns it on.
 let mic = null;
+let micGen = 0; // which start of the mic is current
 let eyes = null;
 let camLesson = null;          // { quadrant, look } from the camera's last pick, taught back once the reply is spoken
 
@@ -556,20 +557,23 @@ const hearingNurse = () => s.stage === 'choose' && !['spell', 'confirm', 'recali
 
 async function startNurseMic() {
   if (mic || !micWanted) return;
+  const gen = ++micGen; // M (off) or a newer start while this one connects makes it stale
   s.mic = 'starting';
   syncPanels();
   const token = await sttToken();
+  if (gen !== micGen) return;
   if (!token) {
     s.mic = 'unavailable';
     demo.setMic('Mic: off (needs the conversation server and a Cartesia key)');
     return syncPanels();
   }
   try {
-    mic = await startMic({
+    const started = await startMic({
       token,
       muted: () => s.stage === 'speaking' || now() < micQuietUntil,
       ...heard,
       onError: (message) => {
+        if (gen !== micGen) return; // a mic that was already turned off or replaced
         mic = null;
         s.mic = 'off';
         demo.setMic(`Mic: reconnecting (${message})`);
@@ -577,9 +581,12 @@ async function startNurseMic() {
         setTimeout(startNurseMic, TIMING.micRetry);
       },
     });
+    if (gen !== micGen) return started.stop(); // turned off while it was connecting
+    mic = started;
     s.mic = 'on';
     demo.setMic('Mic: listening for the nurse');
   } catch (err) {
+    if (gen !== micGen) return;
     s.mic = 'off';
     demo.setMic(`Mic: off (${err?.message ?? err})`);
   }
@@ -589,6 +596,7 @@ async function startNurseMic() {
 function setMic(on) {
   micWanted = on;
   if (on) return startNurseMic();
+  micGen++;
   mic?.stop();
   mic = null;
   s.mic = s.mic === 'unavailable' ? 'unavailable' : 'off';
@@ -768,6 +776,7 @@ function tick() {
     resting: s.resting,
     calibration: s.calibration,
     faceLost: s.faceLost,
+    micOn: s.mic === 'on' || s.mic === 'starting', // shown at once on M, before it connects
     caption: s.caption,
     stage: s.stage,
     single: s.rowKind === 'listen',

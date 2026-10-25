@@ -17,9 +17,14 @@
     <main class="screen" id="screen">
       <header class="top-bar">
         <p class="patient-name" id="patient-name">Rosa</p>
-        <p class="eye-status" role="status">
-          <span class="icon icon--eye" id="eye-icon"></span><span id="eye-label">I can see you</span>
-        </p>
+        <div class="top-bar__status">
+          <p class="eye-status" role="status">
+            <span class="icon icon--mic-off" id="mic-icon"></span><span id="mic-label">Mic off</span>
+          </p>
+          <p class="eye-status" role="status">
+            <span class="icon icon--eye" id="eye-icon"></span><span id="eye-label">I can see you</span>
+          </p>
+        </div>
       </header>
 
       <!-- Everything below the top bar. Calibration dots and the gaze dot are placed on this area. On
