@@ -98,6 +98,13 @@ export async function startEyes(on, settings) {
     label = e.detail?.label ?? null;
     log({ t: r(performance.now(), 10), event: 'label', label });
   });
+  // Calibrations and accuracy tests also go to the README's Eye accuracy section (main.js, accuracy.js),
+  // with who was testing (dev panel) and the time.
+  let tester = null;
+  window.addEventListener('eyes-tester', (e) => { tester = e.detail?.tester ?? null; });
+  window.addEventListener('eyes-test', (e) => {
+    log({ t: r(performance.now(), 10), event: 'test', at: Date.now(), tester, source: settings.gazeSource, rows: e.detail?.rows ?? [] });
+  });
   let faceChange = null;       // { to, since } while a change is waiting out its debounce
   // WebEyeTrack runs alongside the vision module from the first calibration, trained on the same dots and
   // picks, so `G` swaps which one drives the boxes at once (settings.gazeSource). wet: the tracker;
@@ -356,7 +363,7 @@ export async function startEyes(on, settings) {
         blinkLevels = { ...e.result.thresholds }; // the vision module's closed and open levels
         if (settings.headPose) trainHeadModel();
         const q = e.result.quadrants;
-        log({ t: r(e.t, 10), event: 'calibrated', dims: q?.dims, centroids: q?.centroids, scale: q?.scale, accuracy: q?.accuracy, warnings: e.result.warnings, settings });
+        log({ t: r(e.t, 10), event: 'calibrated', at: Date.now(), tester, dims: q?.dims, centroids: q?.centroids, scale: q?.scale, accuracy: q?.accuracy, warnings: e.result.warnings, settings });
         status(`Eyes: camera (${tracker.delegate}), calibrated${settings.headPose && gaze.ready ? ', head model on' : ''}`);
         if (e.result.warnings.length) console.warn('calibration:', e.result.warnings.join('; '));
         on.calibrated(e.result);

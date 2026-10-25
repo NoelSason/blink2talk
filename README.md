@@ -4,6 +4,26 @@ Blink2Talk lets an ICU patient who is awake but can't speak or use their hands a
 
 Built at Cal Hacks 13.0.
 
+## Eye accuracy
+
+<!-- accuracy:start: written by app/accuracy.js after every calibration and accuracy test; edits here are overwritten -->
+**Accuracy test: none recorded yet.**
+
+**Calibrations (8 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again.
+
+| When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
+|---|---|---|---|---|---|---|---|
+| Oct 24, 8:28 PM PDT | — | **0%** | **62%** | 100% | 100% | 100% | eyes narrow looking down; hard to tell apart: center, top left |
+| Oct 24, 6:52 PM PDT | — | **0%** | **36%** | 85% | **67%** | **2%** | eyes narrow looking down; hard to tell apart: center, top left, bottom right, bottom left; squint not found, full blinks select |
+| Oct 24, 6:45 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
+| Oct 24, 6:44 PM PDT | — | 79% | 100% | 100% | 100% | 100% |  |
+| Oct 24, 6:43 PM PDT | — | **64%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+
+Updated automatically after every calibration and accuracy test. Full history: [docs/accuracy.md](docs/accuracy.md).
+<!-- accuracy:end -->
+
+To add a result: open Dev mode (backtick), type who's testing (a first name or "Guest 1"; it goes into the repo), recalibrate, then run **Accuracy test (8 corners)**. The section above updates on its own. After pulling teammates' results, run `npm run accuracy` in `app/`.
+
 ## What it does
 
 - **Hears the room.** The nurse's question appears as a live caption, labeled with who said it ("Dr. Lee", "Your daughter").

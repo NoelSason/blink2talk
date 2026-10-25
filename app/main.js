@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
 const speakers = require('./speakers');
+const accuracy = require('./accuracy');
 
 const windowed = Boolean(process.env.BLINK2TALK_WINDOWED);
 const RENDERER = path.join(__dirname, 'renderer');
@@ -85,14 +86,25 @@ ipcMain.handle('speaker', (_event, pcm) => speakers.identify(pcm));
 
 // Eye-tracker feature log (renderer/eyes.js): one JSON-lines file per launch in app/logs/ (git-ignored).
 // Eye and head numbers about 10 times a second plus calibration, drift, and test labels. No images.
+// Calibrations and accuracy tests also go to the README's Eye accuracy section (accuracy.js, tracked).
 let eyesLogFile = null;
+let eyesSession = null;
 ipcMain.on('eyes-log', (_event, lines) => {
   if (!eyesLogFile) {
     const dir = path.join(__dirname, 'logs');
     fs.mkdirSync(dir, { recursive: true });
-    eyesLogFile = path.join(dir, `eyes-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`);
+    eyesSession = new Date().toISOString().replace(/[:.]/g, '-');
+    eyesLogFile = path.join(dir, `eyes-${eyesSession}.jsonl`);
   }
-  fs.appendFile(eyesLogFile, String(lines), (err) => { if (err) console.error('eyes log:', err.message); });
+  const text = String(lines);
+  fs.appendFile(eyesLogFile, text, (err) => { if (err) console.error('eyes log:', err.message); });
+  if (text.includes('"event":"calibrated"') || text.includes('"event":"test"')) {
+    try {
+      accuracy.record(eyesSession, text);
+    } catch (err) {
+      console.error('accuracy record:', err.message); // never stops the app
+    }
+  }
 });
 
 function createWindow() {

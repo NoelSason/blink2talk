@@ -1,11 +1,11 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-24 18:30 PDT (Marco added one decision)
+Updated: 2026-10-24 21:20 PDT (eye accuracy record in the README)
 
 ## Now
-- Working on: who said each line (voice model + Claude names) and conversation summaries for the patient (Listening) and the care panel.
-- Next: try speaker recognition with real voices in the room (threshold set on synthetic voices); team call on Spell it and urgent alerts, now on the CLAUDE.md Cut list.
-- Blocked on: Presage vitals feed for the care panel tiles (Marco).
+- Working on: eye accuracy record in the root README (done: every calibration and dev-mode accuracy test).
+- Next: accuracy test on 4 people, 2 outside the team, in venue lighting; team call on Spell it and urgent alerts (Cut list).
+- Blocked on: nothing.
 
 ## Build-order status
 - Step 1 (main loop): runs end to end. Samarth's Ink-2 streaming mic, Claude replies, Julian's quadrant tracker, Sonic cloned voice. `app/test/e2e.js` (37 checks), unit tests (6), and `app/test/stress.js` (3000 random inputs, 60 full cycles) pass.
@@ -60,6 +60,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-24: Eye accuracy is front and center in the root README, written by the app. After every calibration and every dev-mode accuracy test, `main.js` hands the logged event to `app/accuracy.js`, which saves it in `docs/accuracy/<launch>.json` (one file per launch, so laptops merge without conflicts) and rewrites `docs/accuracy.md` and the README section between the accuracy markers. Calibration fit (its own looks classified back) is shown apart from the accuracy test and labeled as a fit check, not accuracy. Dev mode has a "Who's testing" box (not kept between launches, so a new person isn't logged under the last). Backfilled tonight's 8 calibrations from `app/logs/`; no accuracy test had been logged yet. Why: Noel's testing showed high accuracy, but nothing recorded it, and judges need a number. Rejected: one shared results file (appends from two laptops conflict in git).
 - 2026-10-24: Double blink leaves the replies only once they've loaded. Why: on a slow first answer (cold Claude, a clinician clip), two ordinary blinks during the wait threw the question away and went back to Listening (Noel).
 - 2026-10-24 (Marco): nurse mic is off at launch; M or the care panel's "Listen for the nurse" turns it on. Why: always-on listening transcribed room chatter as the nurse, and Ink-2 auto-detected it as Hindi.
 - 2026-10-24: "None of these" and "Go back" boxes show the hold fill ring like replies. Why: Noel couldn't tell his hold on None of these was working; his eye log showed the picks going through, but those boxes had no ring.

@@ -127,6 +127,13 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
     return b;
   };
 
+  // Who is in front of the camera, for the README's Eye accuracy section (eyes.js logs it with each
+  // calibration and test). Not saved: every launch starts unnamed, so a new person isn't logged as the last one.
+  const testerInput = el('input', { type: 'text', placeholder: 'First name or Guest 1' });
+  testerInput.addEventListener('input', () => {
+    window.dispatchEvent(new CustomEvent('eyes-tester', { detail: { tester: testerInput.value.trim() || null } }));
+  });
+
   const resetBtn = button('Reset to defaults', () => {
     Object.assign(settings, structuredClone(DEFAULTS));
     headInput.checked = settings.headPose;
@@ -165,6 +172,8 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
       applyBtn,
       button('Recalibrate, no changes', () => { stopTest(); onRebuild(); }),
       button('Drift check, 8 s (K)', () => { stopTest(); panel.hidden = true; onDrift(); }),
+      el('label', { className: 'dev__row dev__row--text' },
+        el('span', { className: 'dev__label', textContent: "Who's testing (then recalibrate)" }), testerInput),
       button('Accuracy test (8 corners)', () => startTest()),
       resetBtn,
       button('Copy settings', () => copy(JSON.stringify(settings, null, 2), 'Settings copied')),
@@ -223,6 +232,8 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
     lines.push('', `Settings: ${JSON.stringify(settings)}`);
     results.textContent = lines.join('\n');
     results.hidden = false;
+    // eyes.js logs it; main.js adds it to the README's Eye accuracy section (accuracy.js).
+    window.dispatchEvent(new CustomEvent('eyes-test', { detail: { rows: test.rows } }));
   }
 
   function stopTest() {

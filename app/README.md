@@ -38,6 +38,8 @@ Dev mode (backtick) can turn on learning from picks: a pick that is spoken and n
 
 **WebEyeTrack (test).** [WebEyeTrack](https://github.com/RedForestAI/WebEyeTrack) (MIT) runs alongside the vision module: a small neural network that predicts a point on the screen from an eye crop plus head pose and adapts from a few labeled points (our five calibration dots, kept for the whole session). It runs in a Web Worker with its own copy of MediaPipe, fed the same camera frames. `G` (or the "Eyes:" button, or dev mode) swaps which one drives the boxes, instantly; a label flashes the active one. The eye log records both trackers' boxes every frame (`vf`, `wf`, `wp`), so one session scores both. Blink, squint, rest, and fatigue still come from the vision module. `npm run gaze` vendors the bundle into `renderer/vendor/` with its URLs pointed at this app; the weights are in `renderer/web/`. Smoke test: `npx electron test/webeyetrack-smoke.js`.
 
+**Accuracy record.** Every calibration and every dev-mode accuracy test is saved to `docs/accuracy/` (one file per launch, so results from different laptops merge) and summarized in the root README's Eye accuracy section and `docs/accuracy.md` (`accuracy.js`, called from `main.js`). Type who's testing in Dev mode, then recalibrate; the name isn't kept between launches. After pulling, `npm run accuracy` rebuilds both; `npm run accuracy -- --import` also adds sessions from `logs/`.
+
 ## For the nurse or family
 
 - **Talk:** the mic streams to Cartesia Ink-2, the caption updates as the nurse speaks, and replies appear when they finish. A turn ends after at most 1.5 s of quiet, and replies start as soon as Ink-2 thinks the nurse is probably done. If the nurse pauses mid-question and keeps going within 6 s, before the patient picks, both parts become one question with one set of replies. It mutes itself while the patient's voice plays.
@@ -64,7 +66,7 @@ Dev mode (backtick) can turn on learning from picks: a pick that is spoken and n
 ## Tests
 
 ```sh
-npm test   # in app/: voice-matching unit tests, then the real page off-screen (about 40 s)
+npm test   # in app/: drift, voice-matching, and accuracy-record unit tests, then the real page off-screen (about 40 s)
 ```
 
 It runs on sample replies with the camera and mic blocked, so it gives the same result every time. Camera events go straight into the handlers the vision module calls, so a broken tracker-to-screen contract fails the test. It covers the grid, the middle band, the summary on Listening and in the care panel, selecting each corner, "None of these" and back, double blinks walking back out of Spell it, Can't see you, tired mode (including while replies load), consent confirmation, undo while speaking, Spell it, and where the calibration dots land. The vision module has its own unit tests (`cd ../vision && npm test`). Neither measures real-camera accuracy.

@@ -1,0 +1,47 @@
+{
+  "session": "2026-10-25T01-43-39-935Z",
+  "calibrations": [
+    {
+      "t": 19158.8,
+      "at": 1792892637401.9,
+      "tester": null,
+      "fit": {
+        "center": 0.6428571428571429,
+        "topLeft": 1,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": [
+        "Hard to tell apart: center. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate."
+      ]
+    },
+    {
+      "t": 57355.3,
+      "at": 1792892675598.4,
+      "tester": null,
+      "fit": {
+        "center": 0.7894736842105263,
+        "topLeft": 1,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": []
+    },
+    {
+      "t": 139025.3,
+      "at": 1792892757268.4,
+      "tester": null,
+      "fit": {
+        "center": 1,
+        "topLeft": 1,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": []
+    }
+  ],
+  "tests": []
+}

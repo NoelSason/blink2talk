@@ -1,0 +1,22 @@
+{
+  "session": "2026-10-25T03-28-23-088Z",
+  "calibrations": [
+    {
+      "t": 20153,
+      "at": 1792898921259.1,
+      "tester": null,
+      "fit": {
+        "center": 0,
+        "topLeft": 0.6153846153846154,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": [
+        "Eyes narrow noticeably when looking down; blink thresholds were lowered to match.",
+        "Hard to tell apart: center, topLeft. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate."
+      ]
+    }
+  ],
+  "tests": []
+}
