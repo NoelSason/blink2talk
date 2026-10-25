@@ -103,7 +103,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
   window.addEventListener('eyes-source', (e) => { sourceInput.value = e.detail.source; });
   const learnInput = el('input', { type: 'checkbox' });
   learnInput.addEventListener('change', () => {
-    settings.learnPicks = learnInput.checked;
+    settings.learnFromPicks = learnInput.checked;
     saveSettings(settings);
   });
 
@@ -131,7 +131,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
     Object.assign(settings, structuredClone(DEFAULTS));
     headInput.checked = settings.headPose;
     sourceInput.value = settings.gazeSource;
-    learnInput.checked = settings.learnPicks;
+    learnInput.checked = settings.learnFromPicks;
     saveSettings(settings);
     syncSliders();
     markDirty();
@@ -173,7 +173,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
   applyBtn.disabled = true;
   headInput.checked = settings.headPose;
   sourceInput.value = settings.gazeSource;
-  learnInput.checked = settings.learnPicks;
+  learnInput.checked = settings.learnFromPicks;
   syncSliders();
 
   // ---- Accuracy test: a corner is shown on screen; we count which box the vision module says the eyes are on.

@@ -404,11 +404,11 @@ export async function startEyes(on, settings) {
       pipeline?.setBlinkConfig(patch);
     },
     // A pick that was spoken and not undone: teach the box classifier where the eyes were for that box.
-    // Both trackers learn from it, whichever one made the pick: the patient meant that box.
+    // Only the vision module learns from picks. WebEyeTrack keeps just its 5 newest labeled points, so a
+    // pick label pushes out a calibration dot, and wrong picks that weren't undone fed back on themselves
+    // (a session where 3 of its 5 points became "top right" and it kept picking "I can't breathe").
     learn(quadrant, look) {
-      if (!quadrant) return;
-      if (wet) wetLabelAt(document.querySelector(`.reply-grid > :nth-child(${CELL[quadrant]})`), quadrant);
-      if (look) pipeline?.learn(quadrant, look);
+      if (quadrant && look) pipeline?.learn(quadrant, look);
     },
     // Which tracker drives the boxes. Returns what is now active and whether WebEyeTrack has learned any points.
     setSource(source) {

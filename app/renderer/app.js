@@ -385,7 +385,7 @@ function toSpeaking(text) {
     later(TIMING.afterSpeech, toListening);
     // Spoken and not undone: the patient meant that box. Teaching the eye tracker must never keep the
     // screen on Speaking, so it runs after the way back to Listening is scheduled, and can't throw out.
-    if (lesson && eyeSettings.learnPicks) {
+    if (lesson && eyeSettings.learnFromPicks) {
       try {
         eyes?.learn(lesson.quadrant, lesson.look);
       } catch (err) {

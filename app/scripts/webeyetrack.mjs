@@ -17,6 +17,9 @@ const patches = [
   // Its own MediaPipe Face Landmarker: use the runtime and model `npm run eyes` already copies in.
   ['https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm', 'app://blink2talk/mediapipe/wasm'],
   ['https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', 'app://blink2talk/models/face_landmarker.task'],
+  // Labeled points reach the model through its "click" path, and it deletes click points after 60 s:
+  // a minute after calibrating, all five dots were gone and it ran uncalibrated. Keep them for the session.
+  ['function e(e,t){void 0===e&&(e=5),void 0===t&&(t=60),', 'function e(e,t){void 0===e&&(e=5),void 0===t&&(t=1e9),'],
 ];
 for (const [from, to] of patches) {
   if (!js.includes(from)) throw new Error(`webeyetrack bundle changed: "${from.slice(0, 60)}" not found; update scripts/webeyetrack.mjs`);

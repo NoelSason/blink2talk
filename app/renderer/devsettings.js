@@ -10,7 +10,7 @@ export const DEFAULTS = {
   blink: { selectMs: 800, refractoryMs: 1200, smoothingFrames: 3 },
   face: { lostMs: 500, foundMs: 150 },
   headPose: false,
-  learnPicks: true,   // a spoken, not-undone pick teaches the box classifier where the eyes were
+  learnFromPicks: false,  // a spoken, not-undone pick teaches the box classifier where the eyes were. Off: a wrong pick that isn't undone teaches the wrong box
   gazeSource: 'vision', // 'vision' (MediaPipe features + per-axis classifier) | 'webeyetrack' (neural gaze point)
 };
 
