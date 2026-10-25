@@ -213,13 +213,29 @@ export function fallbackReplies(transcript: string, rejected: string[] = []): Re
 function rejectedBlock(inp: RepliesInput): string {
   const listed = `The patient rejected all of these: ${inp.rejected!.map((r) => `"${r}"`).join(", ")}. Don't repeat or reword them.`;
   if (inp.category) return listed;
+  const answers = earlierAnswers(inp.history ?? []);
   return [
     listed,
     `They want to say something more specific about "${inp.transcript}". Each new reply must still answer it and add what the rejected ones didn't: a reason, when, how much, which one, or a different person or thing.`,
-    `Anything the patient already answered in the recent conversation stands: a reason that contradicts it is wrong (they said the food was fine, so "The food was cold" can't be why they're hungry). Find another reason.`,
+    // Quoted here, next to the rules, because a rule pointing back at the conversation above was
+    // ignored: after "Yes, pretty well" to a sleep question, re-asks still offered "the alarms woke me".
+    answers ? `The patient already answered ${answers}. Those answers stand: every new reply, its reason included, must still be true for someone who said them. Find another reason rather than contradict them.` : "",
     `If the rejected replies include an answer and its opposite (yes and no, good and bad, on and off), cover both sides in your first two replies (a tired patient sees only two), each with its reason.`,
     `Don't change the subject.`,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
+}
+
+// The patient's own answers in the recent conversation, each with what it answered:
+// "Yes, pretty well" (to "Did you sleep ok?").
+function earlierAnswers(history: Turn[]): string {
+  const recent = history.slice(-6);
+  return recent
+    .flatMap((t, i) => {
+      if (t.role !== "patient") return [];
+      const asked = recent.slice(0, i).reverse().find((x) => x.role !== "patient");
+      return [`"${t.text}"${asked ? ` (to "${asked.text}")` : ""}`];
+    })
+    .join(", ");
 }
 
 export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
