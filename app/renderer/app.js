@@ -357,9 +357,17 @@ function toSpeaking(text) {
   // The token check also runs before playback starts, so audio that arrives after an undo stays silent.
   speak(text, voiceAudio, () => token === speechToken).then(() => {
     if (token !== speechToken) return;
-    if (lesson && settings.learnPicks) eyes?.learn(lesson.quadrant, lesson.look); // spoken and not undone: the patient meant that box
     micQuietUntil = now() + TIMING.micQuiet;
     later(TIMING.afterSpeech, toListening);
+    // Spoken and not undone: the patient meant that box. Teaching the eye tracker must never keep the
+    // screen on Speaking, so it runs after the way back to Listening is scheduled, and can't throw out.
+    if (lesson && eyeSettings.learnPicks) {
+      try {
+        eyes?.learn(lesson.quadrant, lesson.look);
+      } catch (err) {
+        console.warn('eye learning failed:', err);
+      }
+    }
   });
 }
 

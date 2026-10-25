@@ -98,6 +98,15 @@ app.whenReady().then(async () => {
   await doubleBlink();
   check('double blink undoes back to the replies', (await state(`s.stage === 'choose' && s.rowKind === 'replies'`)) === true);
 
+  // A camera pick carries the look before the hold (for learning); after speaking, the screen goes back
+  // to Listening on its own. (Regression: the learning step threw and left the screen on Speaking.)
+  await cam(`select('topLeft', [0.5, 0, 0, 0])`);
+  check('a camera pick with a look is spoken', await waitFor(`s.stage === 'speaking'`, 4000));
+  check('and the screen goes back to Listening', await waitFor(`s.rowKind === 'listen' && s.stage === 'choose'`, 9000));
+  check('no page errors after a camera pick', (await js('window.__errors.length')) === 0, await js('window.__errors.join("; ")'));
+  await key('KeyQ'); // next sample question, back to a replies grid
+  await waitFor(`s.rowKind === 'replies' && !s.loading`, 9000);
+
   // Spell it: E takes two picks (E T A O, then E).
   await cam(`select('bottomRight')`);
   await cam(`select('bottomRight')`);
