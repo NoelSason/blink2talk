@@ -50,7 +50,7 @@ const setPath = (obj, path, value) => {
 };
 const typing = (event) => event.target.matches?.('input, textarea, [contenteditable]');
 
-export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
+export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource }) {
   const panel = el('aside', { className: 'dev', hidden: true });
   const target = el('div', { className: 'dev-target', hidden: true });
   document.body.append(panel, target);
@@ -95,14 +95,12 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   }
 
   const sourceInput = el('select', {});
-  for (const [v, text] of [['vision', 'Vision module (eye features, per-axis boxes)'], ['webeyetrack', 'WebEyeTrack (neural gaze point, test)']]) {
+  for (const [v, text] of [['vision', 'Vision module (eye features, per-axis boxes)'], ['webeyetrack', 'WebEyeTrack (neural gaze point), G swaps']]) {
     sourceInput.append(el('option', { value: v, textContent: text }));
   }
-  sourceInput.addEventListener('change', () => {
-    settings.gazeSource = sourceInput.value;
-    saveSettings(settings);
-    markDirty(); // the source starts at the next calibration
-  });
+  // Both trackers run all the time, so this swaps at once (same as G). It follows G too.
+  sourceInput.addEventListener('change', () => onSource?.(sourceInput.value));
+  window.addEventListener('eyes-source', (e) => { sourceInput.value = e.detail.source; });
   const learnInput = el('input', { type: 'checkbox' });
   learnInput.addEventListener('change', () => {
     settings.learnPicks = learnInput.checked;

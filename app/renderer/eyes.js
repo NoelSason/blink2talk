@@ -10,6 +10,7 @@
 import { createGazeModel, featureVector, headPose, TARGETS } from './gaze.js';
 import { measureDrift, shiftCenters } from './drift.js';
 import { AxisPicker, startWebEyeTrack, toArea } from './webeyetrack.js';
+import { saveSettings } from './devsettings.js';
 
 // Every handler app.js must provide. Checked at startup, so a missing one fails loudly instead of
 // throwing on every camera frame.
@@ -98,16 +99,20 @@ export async function startEyes(on, settings) {
     log({ t: r(performance.now(), 10), event: 'label', label });
   });
   let faceChange = null;       // { to, since } while a change is waiting out its debounce
-  // WebEyeTrack gaze source (dev setting). wet: the tracker; wetPoint: its last point in area units;
-  // wetArmed: the box it had in focus when a hold began, so the pick matches what was highlighted.
+  // WebEyeTrack runs alongside the vision module from the first calibration, trained on the same dots and
+  // picks, so `G` swaps which one drives the boxes at once (settings.gazeSource). wet: the tracker;
+  // wetPoint: its last point in area units; wetArmed: its box when a hold began; wetLabels: points it has learned.
   let wet = null;
   let wetPoint = null;
   let wetPicker = null;
   let wetArmed = null;
   let wetLabeledPhase = null;
+  let wetLabels = 0;
+  const WET_STALE_MS = 500; // a point older than this (worker busy, face lost) doesn't move the box
+  const useWet = () => !!(wet && wetPicker && settings.gazeSource === 'webeyetrack');
   const gazeArea = () => document.getElementById('gaze-area')?.getBoundingClientRect();
   async function startWet() {
-    if (wet || settings.gazeSource !== 'webeyetrack') return;
+    if (wet) return;
     wetPicker = new AxisPicker({ ...settings.quadrant });
     try {
       wet = await startWebEyeTrack(video, (nx, ny, open, t) => {
@@ -117,10 +122,11 @@ export async function startEyes(on, settings) {
         wetPoint = { ax, ay, open, t };
         window.dispatchEvent(new CustomEvent('eyes-point', { detail: { x: ax, y: ay } })); // dev panel dot
       });
-      status('Eyes: WebEyeTrack loading…');
     } catch (err) {
-      status(`Eyes: WebEyeTrack failed (${err?.message ?? err}); using the vision module`);
-      settings.gazeSource = 'vision';
+      console.warn('WebEyeTrack failed to start:', err);
+      wet = null;
+      wetPicker = null;
+      if (settings.gazeSource === 'webeyetrack') status(`Eyes: WebEyeTrack failed (${err?.message ?? err}); using the vision module`);
     }
   }
   function stopWet() {
@@ -137,6 +143,7 @@ export async function startEyes(on, settings) {
     const x = corner ? (corner.endsWith('Right') ? b.right - inset : b.left + inset) : b.left + b.width / 2;
     const y = corner ? (corner.startsWith('bottom') ? b.bottom - inset : b.top + inset) : b.top + b.height / 2;
     wet.label(x, y);
+    wetLabels++;
     log({ t: r(performance.now(), 10), event: 'wetLabel', corner: corner ?? 'dot', x: r(x / window.innerWidth - 0.5), y: r(y / window.innerHeight - 0.5) });
   }
   const CELL = { topLeft: 1, topRight: 2, bottomLeft: 3, bottomRight: 4 };
@@ -164,8 +171,7 @@ export async function startEyes(on, settings) {
     blinkLevels = null;
     reset();
     wetLabeledPhase = null;
-    if (settings.gazeSource === 'webeyetrack') startWet();
-    else stopWet();
+    startWet();
     pipeline.startCalibration();
     status('Eyes: calibrating…');
   }
@@ -317,14 +323,16 @@ export async function startEyes(on, settings) {
     }
 
     let focus = null;
+    let visionFocus = null;
     if (out.mode === 'running' && !drift) {
       countBlink(t, frame.ear);
       on.hold(out.blink ?? null);
-      focus = out.quadrant?.focus ?? null;
-      if (settings.headPose && gaze?.ready) focus = gaze.update(t, f, pose, !!out.blink?.engaged);
-      // WebEyeTrack: its point drives the box while the eyes are open; a hold freezes it (lids drag the point).
-      if (wet && wetPicker && wetPoint && !out.blink?.engaged && wetPoint.open) focus = wetPicker.update(t, wetPoint.ax, wetPoint.ay);
-      else if (wet && wetPicker) focus = wetPicker.focus;
+      visionFocus = out.quadrant?.focus ?? null;
+      if (settings.headPose && gaze?.ready) visionFocus = gaze.update(t, f, pose, !!out.blink?.engaged);
+      // WebEyeTrack keeps its own box current either way, so a swap is instant. Its point moves the box only
+      // while the eyes are open and the point is fresh; a hold freezes it (closing lids drag the point).
+      if (wetPicker && wetPoint && wetPoint.open && !out.blink?.engaged && t - wetPoint.t < WET_STALE_MS) wetPicker.update(t, wetPoint.ax, wetPoint.ay);
+      focus = useWet() ? wetPicker.focus : visionFocus;
       on.focus(focus);
     }
 
@@ -333,10 +341,11 @@ export async function startEyes(on, settings) {
         if (settings.headPose) gaze?.holdStart(e.t);
         wetArmed = wetPicker?.focus ?? null;
       } else if (e.type === 'quadrantSelect') {
-        const box = wet && wetPicker ? wetArmed : settings.headPose && gaze?.ready ? gaze.lockedFocus : e.quadrant;
-        log({ t: r(e.t, 10), event: 'select', box, via: e.via, source: wet ? 'webeyetrack' : 'vision' });
+        const visionBox = settings.headPose && gaze?.ready ? gaze.lockedFocus : e.quadrant;
+        const box = useWet() ? wetArmed : visionBox;
+        log({ t: r(e.t, 10), event: 'select', box, visionBox, wetBox: wetArmed, via: e.via, source: settings.gazeSource });
         blinkQuietUntil = e.t + 1000;
-        if (!drift) on.select(box, wet ? null : e.look);
+        if (!drift) on.select(box, e.look);
       } else if (e.type === 'blink') {
         // Logged only: quick blinks reach the app from countBlink, which doesn't merge fast ones.
         log({ t: r(e.t, 10), event: 'blink', ms: r(e.durationMs, 1) });
@@ -367,13 +376,18 @@ export async function startEyes(on, settings) {
         pose: pose ? [pose.yaw, pose.pitch, pose.scale].map((v) => r(v)) : null,
         looking: out.quadrant?.looking ?? null,
         focus,
+        vf: visionFocus,
+        wf: wetPicker?.focus ?? null,
+        wl: wetPicker?.looking ?? null,
+        wp: wetPoint ? [r(wetPoint.ax), r(wetPoint.ay), wetPoint.open ? 1 : 0, r(t - wetPoint.t, 1)] : null,
+        src: settings.gazeSource,
         target: drift ? `drift:${DRIFT_STEPS[drift.i]?.[0]}` : out.mode === 'calibrating' ? `cal:${out.calibration?.phase}` : label,
       });
     }
 
     // For the dev panel's live readout and accuracy test. Not used by the patient screen.
     window.dispatchEvent(new CustomEvent('eyes-frame', {
-      detail: { mode: out.mode, faceFound: out.faceFound, looking: wet && wetPicker ? wetPicker.looking : out.quadrant?.looking ?? null, focus, source: wet ? 'webeyetrack' : 'vision' },
+      detail: { mode: out.mode, faceFound: out.faceFound, looking: useWet() ? wetPicker.looking : out.quadrant?.looking ?? null, focus, source: useWet() ? 'webeyetrack' : 'vision' },
     }));
   };
 
@@ -390,10 +404,22 @@ export async function startEyes(on, settings) {
       pipeline?.setBlinkConfig(patch);
     },
     // A pick that was spoken and not undone: teach the box classifier where the eyes were for that box.
+    // Both trackers learn from it, whichever one made the pick: the patient meant that box.
     learn(quadrant, look) {
       if (!quadrant) return;
       if (wet) wetLabelAt(document.querySelector(`.reply-grid > :nth-child(${CELL[quadrant]})`), quadrant);
-      else if (look) pipeline?.learn(quadrant, look);
+      if (look) pipeline?.learn(quadrant, look);
+    },
+    // Which tracker drives the boxes. Returns what is now active and whether WebEyeTrack has learned any points.
+    setSource(source) {
+      settings.gazeSource = source === 'webeyetrack' && wet ? 'webeyetrack' : 'vision';
+      saveSettings(settings);
+      log({ t: r(performance.now(), 10), event: 'source', source: settings.gazeSource });
+      status(`Eyes: ${settings.gazeSource === 'webeyetrack' ? 'WebEyeTrack' : 'vision module'} drives the boxes`);
+      return { source: settings.gazeSource, wetReady: !!wet, wetLabels };
+    },
+    toggleSource() {
+      return this.setSource(settings.gazeSource === 'webeyetrack' ? 'vision' : 'webeyetrack');
     },
   };
 }
