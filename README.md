@@ -4,24 +4,20 @@ Blink2Talk lets an ICU patient who is awake but can't speak or use their hands a
 
 Built at Cal Hacks 13.0.
 
-> "I could definitely see this being useful in a clinical setting, especially for patients with ALS."
->
-> — A nurse we called during the hackathon
-
 ## Eye accuracy
 
 <!-- accuracy:start: written by app/accuracy.js after every calibration and accuracy test; edits here are overwritten -->
 **Accuracy test: none recorded yet.**
 
-**Calibrations (10 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again.
+**Calibrations (22 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again.
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
+| Oct 24, 10:08 PM PDT | — | **39%** | 89% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 24, 10:05 PM PDT | — | 77% | 100% | 100% | 100% | 100% |  |
+| Oct 24, 10:03 PM PDT | — | **56%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 24, 10:00 PM PDT | — | **26%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 24, 9:53 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
-| Oct 24, 8:28 PM PDT | — | **0%** | **62%** | 100% | 100% | 100% | eyes narrow looking down; hard to tell apart: center, top left |
-| Oct 24, 6:52 PM PDT | — | **0%** | **36%** | 85% | **67%** | **2%** | eyes narrow looking down; hard to tell apart: center, top left, bottom right, bottom left; squint not found, full blinks select |
-| Oct 24, 6:45 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
 
 Updated automatically after every calibration and accuracy test. Full history: [docs/accuracy.md](docs/accuracy.md).
 <!-- accuracy:end -->
@@ -64,7 +60,7 @@ To try it without a patient, use the keyboard: arrow keys move the highlight, ho
 
 ## Known limitations
 
-- Not a medical device, and not tested with patients. Tested only by the team; clinical feedback so far is one nurse, by phone.
+- Not a medical device, and not tested with patients. Tested only by the team.
 - Needs the patient to hold their gaze; no fallback for nystagmus or a swollen eye. Blink and squint thresholds aren't validated across eye shapes.
 - Needs a network connection for replies, captions, and the voice. Slow Wi-Fi makes replies slow; the app falls back to safe Yes / No replies after a timeout.
 - Speaker recognition was tuned on synthetic voices.

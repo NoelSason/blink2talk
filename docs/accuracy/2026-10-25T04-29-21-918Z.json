@@ -1,0 +1,68 @@
+{
+  "session": "2026-10-25T04-29-21-918Z",
+  "calibrations": [
+    {
+      "t": 18435.8,
+      "at": 1792902578187,
+      "tester": null,
+      "fit": {
+        "center": 0,
+        "topLeft": 0.34782608695652173,
+        "topRight": 0.9574468085106383,
+        "bottomRight": 0,
+        "bottomLeft": 0.8333333333333334
+      },
+      "warnings": [
+        "Hard to tell apart: center, topLeft, bottomRight. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate.",
+        "Squint couldn't be told apart from normal looks; select with full blinks."
+      ]
+    },
+    {
+      "t": 640819.6,
+      "at": 1792903200565,
+      "tester": null,
+      "fit": {
+        "center": 0.32608695652173914,
+        "topLeft": 0.9565217391304348,
+        "topRight": 1,
+        "bottomRight": 0.9574468085106383,
+        "bottomLeft": 1
+      },
+      "warnings": [
+        "Hard to tell apart: center. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate."
+      ]
+    },
+    {
+      "t": 793503,
+      "at": 1792903353249,
+      "tester": null,
+      "fit": {
+        "center": 0,
+        "topLeft": 0.2826086956521739,
+        "topRight": 0.6739130434782609,
+        "bottomRight": 0,
+        "bottomLeft": 0.7872340425531915
+      },
+      "warnings": [
+        "Hard to tell apart: center, topLeft, topRight, bottomRight. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate.",
+        "Squint couldn't be told apart from normal looks; select with full blinks."
+      ]
+    },
+    {
+      "t": 812619.8,
+      "at": 1792903372368,
+      "tester": null,
+      "fit": {
+        "center": 0.5319148936170213,
+        "topLeft": 1,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": [
+        "Hard to tell apart: center. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate."
+      ]
+    }
+  ],
+  "tests": []
+}
