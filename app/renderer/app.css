@@ -727,3 +727,23 @@ p { margin: 0; }
   padding: var(--sp-3) var(--sp-4);
 }
 [data-layout="row"] .caption .caption__text { font-weight: 700; }
+
+/* Compact question bar (row and Kahoot layouts): speaker and question on one line, text about a
+   quarter smaller, so the answer boxes get the room and stand apart from the question (Marco,
+   2026-10-25). The min-height keeps Listening's bar the same height, so the calibration dots still
+   land on the boxes. */
+:is([data-layout="row"], [data-layout="kahoot"]) .caption {
+  --fs-question: calc(var(--fs-caption) * 0.75);
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  column-gap: var(--sp-2);
+  row-gap: 0;
+  padding: var(--sp-2) var(--sp-4);
+  min-height: calc(var(--fs-question) * 1.2 + 2 * var(--sp-2));
+}
+:is([data-layout="row"], [data-layout="kahoot"]) .caption .caption__text,
+:is([data-layout="row"], [data-layout="kahoot"]) .caption .caption__waiting { font-size: var(--fs-question); }
+:is([data-layout="row"], [data-layout="kahoot"]) .caption .caption__speaker { font-size: calc(var(--fs-body) * 0.8); }
+:is([data-layout="row"], [data-layout="kahoot"]) .caption .caption__speaker:not(:empty)::after { content: ':'; }

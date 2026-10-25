@@ -60,6 +60,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-25 (Marco): compact question bar in the row and Kahoot layouts: speaker and question on one line, text 0.75x. Why: more room for the answers and a clearer split between the question and the boxes. Listening's bar keeps the same height, so calibration dots still land on the boxes (measured).
 - 2026-10-25 (Marco): Listening's "I want to say something" card is big: two thirds of the width, the full stage height, text 1.45x. Why: the first screen's only choice should be easy to find.
 - 2026-10-25 (Marco): new default layout "row": question on top, four tall boxes side by side, picked by left-right eye position only (columns.js on the vision module's axisPosition x; same 5-dot calibration). Shown left to right as boxes 1, 3, 2, 4 so the left two are the Left boxes and two-box confirm screens still work; None of these is rightmost. Kahoot 2x2 and spread stay as dev-mode layouts. Pick learning is skipped in row (its boxes aren't the classifier's quadrants); the dev accuracy test still scores 2x2 corners. Why: up-down is the weak, drifting axis in our logs.
 - 2026-10-25 (Marco): Listening's "I want to say something" card uses the Kahoot blue with white text and no icon, matching the 2x2 boxes.
