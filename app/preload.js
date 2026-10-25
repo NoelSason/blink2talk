@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld('blink2talk', {
   conversation: (route, body) => ipcRenderer.invoke('conversation', { route, body }),
   // Which voice spoke a nurse-mic turn: 16 kHz pcm_s16le in, { voice, similarity, isNew } or null out.
   speaker: (pcm) => ipcRenderer.invoke('speaker', pcm),
+  // Eye-tracker feature log (eyes.js): JSON lines appended to app/logs/ on this machine.
+  eyesLog: (lines) => ipcRenderer.send('eyes-log', String(lines)),
 });

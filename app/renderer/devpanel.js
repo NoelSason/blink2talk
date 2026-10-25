@@ -49,7 +49,7 @@ const setPath = (obj, path, value) => {
 };
 const typing = (event) => event.target.matches?.('input, textarea, [contenteditable]');
 
-export function createDevPanel({ settings, onRebuild }) {
+export function createDevPanel({ settings, onRebuild, onDrift }) {
   const panel = el('aside', { className: 'dev', hidden: true });
   const target = el('div', { className: 'dev-target', hidden: true });
   document.body.append(panel, target);
@@ -57,7 +57,7 @@ export function createDevPanel({ settings, onRebuild }) {
   const sliders = []; // { key, input, value, row }
   let dirty = false;
   const applyBtn = el('button', { type: 'button', className: 'dev__primary', textContent: 'Apply & recalibrate' });
-  const live = { looking: el('span'), focus: el('span'), face: el('span'), mode: el('span'), blinks: el('span') };
+  const live = { looking: el('span'), focus: el('span'), face: el('span'), mode: el('span'), blinks: el('span'), drift: el('span', { textContent: 'not run' }) };
   const recentBlinks = [];
   const results = el('pre', { className: 'dev__results', hidden: true });
   const test = { running: false, order: [], i: 0, target: null, samples: [], shownAt: 0, rows: [], timer: null };
@@ -126,7 +126,8 @@ export function createDevPanel({ settings, onRebuild }) {
       el('div', { className: 'dev__live' },
         el('span', {}, 'Looking: ', live.looking), el('span', {}, 'Highlight: ', live.focus),
         el('span', {}, 'Face: ', live.face), el('span', {}, 'Tracker: ', live.mode),
-        el('span', {}, 'Last blinks: ', live.blinks))),
+        el('span', {}, 'Last blinks: ', live.blinks),
+        el('span', {}, 'Last drift: ', live.drift))),
     el('section', { className: 'dev__section' },
       el('h2', { className: 'dev__heading', textContent: 'Head model' }),
       el('label', { className: 'dev__row' }, headInput,
@@ -138,6 +139,7 @@ export function createDevPanel({ settings, onRebuild }) {
       el('h2', { className: 'dev__heading', textContent: 'Actions' }),
       applyBtn,
       button('Recalibrate, no changes', () => { stopTest(); onRebuild(); }),
+      button('Drift check, 8 s (K)', () => { stopTest(); panel.hidden = true; onDrift(); }),
       button('Accuracy test (8 corners)', () => startTest()),
       resetBtn,
       button('Copy settings', () => copy(JSON.stringify(settings, null, 2), 'Settings copied')),
@@ -165,6 +167,7 @@ export function createDevPanel({ settings, onRebuild }) {
     test.shownAt = performance.now();
     target.dataset.at = test.target;
     target.textContent = `Look: ${NAME[test.target]} (${test.i + 1} of ${test.order.length})`;
+    window.dispatchEvent(new CustomEvent('eyes-label', { detail: { label: `test:${test.target}` } }));
     target.hidden = false;
     test.timer = setTimeout(endTrial, TRIAL_MS);
   }
@@ -183,6 +186,7 @@ export function createDevPanel({ settings, onRebuild }) {
     test.running = false;
     target.hidden = true;
     panel.hidden = false;
+    window.dispatchEvent(new CustomEvent('eyes-label', { detail: { label: null } }));
     const hits = test.rows.filter((r) => r.hit).length;
     const noData = test.rows.filter((r) => r.frames === 0).length;
     const lines = [`Accuracy: ${hits} of ${test.rows.length} (${Math.round((100 * hits) / test.rows.length)}%)`];
@@ -195,6 +199,7 @@ export function createDevPanel({ settings, onRebuild }) {
   }
 
   function stopTest() {
+    if (test.running) window.dispatchEvent(new CustomEvent('eyes-label', { detail: { label: null } }));
     clearTimeout(test.timer);
     test.running = false;
     target.hidden = true;
@@ -223,6 +228,12 @@ export function createDevPanel({ settings, onRebuild }) {
     recentBlinks.push(`${Math.round(e.detail.ms)} ms${e.detail.counted ? '' : ' (too long)'}`);
     recentBlinks.splice(0, recentBlinks.length - 4);
     live.blinks.textContent = recentBlinks.join(', ');
+  });
+
+  // Drift check result: 1 is about normal eye jitter, 3 or more is a real shift.
+  window.addEventListener('eyes-drift', (e) => {
+    const worst = Object.entries(e.detail.perTarget).sort((a, b) => b[1] - a[1])[0];
+    live.drift.textContent = `${e.detail.size.toFixed(1)}${worst ? ` (most: ${NAME[worst[0]]} ${worst[1].toFixed(1)})` : ''}`;
   });
 
   const isOpen = () => !panel.hidden;

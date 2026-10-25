@@ -8,11 +8,23 @@
 // rebuild() applies them and recalibrates.
 
 import { createGazeModel, featureVector, headPose, TARGETS } from './gaze.js';
+import { measureDrift, shiftCenters } from './drift.js';
 
 // Every handler app.js must provide. Checked at startup, so a missing one fails loudly instead of
 // throwing on every camera frame.
 const HANDLERS = ['status', 'calibration', 'calibrated', 'hold', 'focus', 'select', 'blink', 'rest', 'face', 'fatigue'];
 
+// Drift check: the center, then two opposite corners, about 8 s. Measures how far the eye readings
+// have moved since calibration and shifts all five calibrated box centers by the average offset.
+// It fixes sliding (head settling, camera nudged); a full calibration still fixes everything else.
+const DRIFT_STEPS = [['center', 2600], ['topLeft', 2700], ['bottomRight', 2700]];
+const DRIFT_SETTLE_MS = 600;  // ignored at the start of each dot while the eyes travel
+const DRIFT_MIN_SAMPLES = 10; // a dot with fewer usable frames (face not seen) is left out
+
+// Feature log: every 3rd camera frame (about 10 a second) to app/logs/, numbers only, no images.
+// Each line has the eye measurements and, when known, where the patient was meant to be looking.
+const LOG_EVERY = 3;
+const r = (v, k = 1e4) => (Number.isFinite(v) ? Math.round(v * k) / k : null);
 const medianPose = (poses) => {
   const med = (k) => {
     const s = poses.map((p) => p[k]).sort((a, b) => a - b);
@@ -33,7 +45,7 @@ export async function startEyes(on, settings) {
     on.status('Eyes: keyboard (eye tracker not built; run npm run eyes)');
     return null;
   }
-  const { EyePipeline, FaceTracker, openWebcam } = vision;
+  const { EyePipeline, FaceTracker, openWebcam, featureVector: visionFeatures } = vision;
   const video = document.getElementById('camera');
 
   on.status('Eyes: loading the face model…');
@@ -66,6 +78,24 @@ export async function startEyes(on, settings) {
   let gaze = null;
   let labels = null;           // head-model training looks, collected during calibration
   let faceState = true;        // what the app has been told
+  let drift = null;            // { i, since, vecs, heads } while a drift check runs
+  let label = null;            // where the dev panel's accuracy test asked the patient to look
+  let frameNo = 0;
+
+  const logOn = typeof window.blink2talk?.eyesLog === 'function'; // off in tests (no preload)
+  let logLines = [];
+  const log = (entry) => { if (logOn) logLines.push(JSON.stringify(entry)); };
+  if (logOn) {
+    setInterval(() => {
+      if (!logLines.length) return;
+      window.blink2talk.eyesLog(`${logLines.join('\n')}\n`);
+      logLines = [];
+    }, 1000);
+  }
+  window.addEventListener('eyes-label', (e) => {
+    label = e.detail?.label ?? null;
+    log({ t: r(performance.now(), 10), event: 'label', label });
+  });
   let faceChange = null;       // { to, since } while a change is waiting out its debounce
 
   let selectMs = null; // set by the app per page (spelling is shorter); survives a rebuild
@@ -108,6 +138,50 @@ export async function startEyes(on, settings) {
     gaze.setBase(medianPose(labels.poses));
   }
 
+  function startDrift() {
+    if (drift || pipeline?.mode !== 'running' || !pipeline.calibration?.quadrants) return false;
+    drift = { i: 0, since: null, vecs: {}, heads: {} };
+    status('Eyes: drift check…');
+    return true;
+  }
+
+  function stepDrift(t, frame, f) {
+    const [target, ms] = DRIFT_STEPS[drift.i];
+    drift.since ??= t;
+    const elapsed = t - drift.since;
+    on.calibration({ phase: target, progress: Math.min(1, elapsed / ms), remainingMs: Math.max(0, ms - elapsed) });
+    if (elapsed >= DRIFT_SETTLE_MS && frame.faceFound) {
+      const v = visionFeatures(frame, pipeline.calibration.quadrants.dims);
+      if (v.every(Number.isFinite)) (drift.vecs[target] ??= []).push(v);
+      if (f) (drift.heads[target] ??= []).push(f);
+    }
+    if (elapsed < ms) return;
+    drift.i++;
+    drift.since = t;
+    if (drift.i === DRIFT_STEPS.length) finishDrift(t);
+  }
+
+  function finishDrift(t) {
+    const cal = pipeline.calibration.quadrants;
+    const { vecs, heads } = drift;
+    drift = null;
+    on.calibration(null);
+    const d = measureDrift(cal, vecs, DRIFT_MIN_SAMPLES);
+    if (!d) {
+      status("Eyes: drift check failed (face not seen). Try again or recalibrate.");
+      return;
+    }
+    // In place: the box classifier holds this same object, so blink and fatigue tracking keep going.
+    shiftCenters(cal, d.offset);
+    if (settings.headPose && gaze?.ready) {
+      gaze.decay(0.6); // older looks count less; the new position counts more
+      for (const [target, looks] of Object.entries(heads)) gaze.add(looks, target, 1.5);
+    }
+    status(`Eyes: drift check done (moved ${d.size.toFixed(1)})`);
+    log({ t: r(t, 10), event: 'drift', dims: cal.dims, offset: d.offset.map((v) => r(v)), size: r(d.size, 100), perTarget: d.perTarget });
+    window.dispatchEvent(new CustomEvent('eyes-drift', { detail: { size: d.size, perTarget: d.perTarget } }));
+  }
+
   // The app gets "face lost" only after it has stayed lost for face.lostMs, and "found" after foundMs.
   function faceUpdate(t, found) {
     if (found === faceState) {
@@ -144,7 +218,8 @@ export async function startEyes(on, settings) {
     const out = pipeline.process(frame);
     faceUpdate(t, out.faceFound);
 
-    if (out.mode === 'calibrating' && out.calibration) {
+    if (drift) stepDrift(t, frame, f);
+    else if (out.mode === 'calibrating' && out.calibration) {
       collectLabels(t, out.calibration, f, pose);
       on.calibration(out.calibration.phase !== 'done' ? out.calibration : null);
     } else {
@@ -152,7 +227,7 @@ export async function startEyes(on, settings) {
     }
 
     let focus = null;
-    if (out.mode === 'running') {
+    if (out.mode === 'running' && !drift) {
       on.hold(out.blink ?? null);
       focus = out.quadrant?.focus ?? null;
       if (settings.headPose && gaze?.ready) focus = gaze.update(t, f, pose, !!out.blink?.engaged);
@@ -163,18 +238,39 @@ export async function startEyes(on, settings) {
       if (e.type === 'holdStart') {
         if (settings.headPose) gaze?.holdStart(e.t);
       } else if (e.type === 'quadrantSelect') {
-        on.select(settings.headPose && gaze?.ready ? gaze.lockedFocus : e.quadrant);
-      } else if (e.type === 'blink') on.blink(e.durationMs);
+        log({ t: r(e.t, 10), event: 'select', box: e.quadrant, via: e.via });
+        if (!drift) on.select(settings.headPose && gaze?.ready ? gaze.lockedFocus : e.quadrant);
+      } else if (e.type === 'blink') {
+        log({ t: r(e.t, 10), event: 'blink', ms: r(e.durationMs, 1) });
+        if (!drift) on.blink(e.durationMs);
+      }
       else if (e.type === 'rest' || e.type === 'restEnd') on.rest(e.type === 'rest');
       else if (e.type === 'fatigue') on.fatigue(e.level);
       else if (e.type === 'calibrated') {
         if (settings.headPose) trainHeadModel();
+        const q = e.result.quadrants;
+        log({ t: r(e.t, 10), event: 'calibrated', dims: q?.dims, centroids: q?.centroids, scale: q?.scale, accuracy: q?.accuracy, warnings: e.result.warnings, settings });
         status(`Eyes: camera (${tracker.delegate}), calibrated${settings.headPose && gaze.ready ? ', head model on' : ''}`);
         if (e.result.warnings.length) console.warn('calibration:', e.result.warnings.join('; '));
         on.calibrated(e.result);
       } else if (e.type === 'calibrationFailed') {
         status(`Eyes: calibration failed (${e.reason}). Press C to retry.`);
       }
+    }
+
+    if (logOn && frameNo++ % LOG_EVERY === 0) {
+      log({
+        t: r(t, 10),
+        mode: out.mode,
+        face: out.faceFound ? 1 : 0,
+        f: ['gazeX', 'gazeY', 'lookX', 'lookY'].map((k) => r(frame[k])),
+        ear: r(frame.ear),
+        squint: r(frame.squint),
+        pose: pose ? [pose.yaw, pose.pitch, pose.scale].map((v) => r(v)) : null,
+        looking: out.quadrant?.looking ?? null,
+        focus,
+        target: drift ? `drift:${DRIFT_STEPS[drift.i]?.[0]}` : out.mode === 'calibrating' ? `cal:${out.calibration?.phase}` : label,
+      });
     }
 
     // For the dev panel's live readout and accuracy test. Not used by the patient screen.
@@ -190,6 +286,7 @@ export async function startEyes(on, settings) {
   return {
     calibrate: rebuild,
     rebuild,
+    driftCheck: startDrift,
     // Hold time for a select, applied at once (the vision module reads it on every hold).
     setSelectMs(ms) {
       selectMs = ms;

@@ -2,6 +2,7 @@
 // server (../conversation) for Claude replies, word completion, and the patient's voice.
 const { app, BrowserWindow, ipcMain, net, protocol, session } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
 const speakers = require('./speakers');
@@ -79,6 +80,18 @@ ipcMain.handle('conversation', async (_event, { route, body }) => {
 // ---------- Who is speaking (speakers.js) ----------
 // One nurse-mic turn in, the voice it matches (or a new one) out. About 50 ms for a few seconds of speech.
 ipcMain.handle('speaker', (_event, pcm) => speakers.identify(pcm));
+
+// Eye-tracker feature log (renderer/eyes.js): one JSON-lines file per launch in app/logs/ (git-ignored).
+// Eye and head numbers about 10 times a second plus calibration, drift, and test labels. No images.
+let eyesLogFile = null;
+ipcMain.on('eyes-log', (_event, lines) => {
+  if (!eyesLogFile) {
+    const dir = path.join(__dirname, 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    eyesLogFile = path.join(dir, `eyes-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`);
+  }
+  fs.appendFile(eyesLogFile, String(lines), (err) => { if (err) console.error('eyes log:', err.message); });
+});
 
 function createWindow() {
   const win = new BrowserWindow({

@@ -46,6 +46,7 @@ const DEMO_KEYS = {
   KeyF: 'face',          // pretend the app lost the patient's face
   KeyL: 'theme',         // dark or light
   KeyC: 'calibrate',     // recalibrate the camera eye tracker
+  KeyK: 'drift-check',   // 8 s drift check: center and two corners, shifts the boxes back
   KeyN: 'care',          // open or close the care panel
   KeyM: 'mic',           // nurse microphone on or off
 };

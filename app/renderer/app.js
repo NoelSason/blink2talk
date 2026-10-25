@@ -93,10 +93,11 @@ let beforeSelect = null;      // what to go back to on a double blink
 let nextQuestion = 0;
 let eyesOn = false;           // the camera is calibrated and reporting where the patient looks
 let eyesCalibrated = false;   // has the camera been calibrated at least once this session
-let holdTicked = false;       // the 'long enough, open now' tick already played for this hold
 let appliedSelectMs = null;   // the hold-to-select time last sent to the camera
 const calibButton = document.getElementById('calib-start');
 calibButton.addEventListener('click', () => { calibButton.blur(); runAction('calibrate'); });
+const driftButton = document.getElementById('drift-start');
+driftButton.addEventListener('click', () => { driftButton.blur(); runAction('drift-check'); });
 let keyboardUntil = 0;
 let micQuietUntil = 0;
 let micWanted = true;
@@ -609,13 +610,6 @@ const camera = {
     const wasEngaged = s.cam.engaged;
     s.cam = { engaged: !!b?.engaged, closed: !!b?.closed, progress: b?.progress ?? 0 };
     if (wasEngaged && !s.cam.engaged) openedAt = now();
-    // The select fires when the eyes open, and the patient can't see the ring with them shut:
-    // a tick says the hold is long enough, so they know to open now.
-    if (!s.cam.engaged) holdTicked = false;
-    else if (!holdTicked && s.cam.progress >= 1 && choosing()) {
-      holdTicked = true;
-      chime('tick');
-    }
   },
   // The box the patient is looking at gets the highlight; the middle band (the question) highlights nothing.
   focus: (quadrant) => {
@@ -699,6 +693,7 @@ function tick() {
   // The Calibrate button: hidden while the dots run, highlighted until the first calibration.
   calibButton.hidden = !!s.calibration;
   calibButton.dataset.needed = String(!eyesCalibrated);
+  driftButton.hidden = !!s.calibration || !eyesCalibrated; // needs a calibration to correct
   view.render({
     name: memory.profile.name,
     eyesClosed: s.eyesClosed || s.cam.closed,
@@ -772,6 +767,7 @@ function runAction(action, arg) {
   if (action === 'mic') setMic(arg ?? !micWanted);
   if (action === 'theme') root.dataset.theme = (arg ?? root.dataset.theme !== 'light') ? 'light' : 'dark';
   if (action === 'calibrate') eyes?.calibrate();
+  if (action === 'drift-check') eyes?.driftCheck();
   if (action === 'profile') memory.setProfile(arg);
   if (action === 'summary') refreshSummary();
   if (action === 'local-replies') setLocalReplies(arg ?? !s.localReplies);
@@ -843,7 +839,7 @@ loadConfig();
 if (memory.history.length) refreshSummary(); // the conversation from before this launch
 requestAnimationFrame(tick);
 const eyeSettings = loadSettings();
-createDevPanel({ settings: eyeSettings, onRebuild: () => eyes?.rebuild() });
+createDevPanel({ settings: eyeSettings, onRebuild: () => eyes?.rebuild(), onDrift: () => eyes?.driftCheck() });
 startEyes(camera, eyeSettings).then((handle) => {
   eyes = handle;
 });
