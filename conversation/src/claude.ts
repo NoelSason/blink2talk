@@ -67,7 +67,7 @@ Given what was just said to the patient, propose the most likely replies, in ord
 Rules:
 - Output exactly 3 replies, each 8 words or fewer, written in the patient's voice ("I", "my"). No quotation marks. The screen adds "None of these" itself; never output it.
 - Give each reply a short intent label (e.g. "yes", "no", "water", "reposition", "family", "ask-time"). The three intents must all be different: usually a plain yes, a plain no, and one specific answer when the question allows it.
-- If rejected replies are listed, the patient said none of them fit. Do not repeat or reword any of them: if a plain yes or no was rejected, don't offer yes or no again. Offer three new directions, e.g. a different need, a question back to the caregiver, or "something else is wrong".
+- If rejected replies are listed, the patient said none of them fit. Stay on what was asked, but give three different answers to it: more specific, partial, conditional, or a question back about it (for "Are you thirsty?" after yes/no/water were rejected: "Just ice chips", "Only a small sip", "Maybe in a little while"). Do not repeat or reword a rejected reply. Do not switch to an unrelated need; the screen has its own topic picker for that.
 - If a topic is given, all three replies must be about that topic.
 - Never invent medical facts, symptoms, or decisions the patient has not signaled. If the question is open-ended, offer short common needs (water, repositioning, family, rest) rather than guessing a diagnosis.
 - Use the patient profile and recent conversation only to pick relevant specifics (names, preferences).

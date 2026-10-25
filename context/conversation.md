@@ -41,6 +41,7 @@ HTTP on `localhost:8790` (Noel's `main.js` proxies it over IPC):
 `POST /complete` and spelling are the free text CLAUDE.md cuts. Samarth's call: keep it, as the 3rd "None of these" step. @Marco @Noel: agree, then move it off the Cut list in CLAUDE.md.
 
 ## Decisions (newest first)
+- 2026-10-25: "None of these" re-ask stays on the question (more specific / partial / later), never an unrelated need. Why: first version jumped from "thirsty" to "raise my head". The topic picker handles changing subject.
 - 2026-10-24 (Noel; testing-only local path): local `/replies` passes `rejected` to the model, and the local prompt has five worked examples (choice questions get the choices, yes/no questions get Yes / No / A little); the list grammar allows plain words only (no periods, ≤ 40 chars) after a reply ran on into emoji. 0.10–0.15 s per reply.
 - 2026-10-25: Removed the Ink-2 turn `config` message from `patient.html` after Noel found it stops transcription. Eager-end prefetch stays.
 - 2026-10-25: Claude timeout default 3 s -> 5 s (`.env.example` 8 s wins if set). If a "None of these" re-ask still falls back, `patient.html` skips to topics, then spelling. Why: fallback Yes/No looked like the button did nothing.
