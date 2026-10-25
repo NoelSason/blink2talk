@@ -20,7 +20,7 @@ Keys go in `conversation/.env` (see `conversation/README.md`): `ANTHROPIC_API_KE
 Every choice sits in a 2×2 grid with the boxes pushed into the screen's corners, so each target is a big box as far from the others as the screen allows. Look at a box to highlight it, then close your eyes or squint for about a second and open them to choose it. The question sits in the band between the two rows: looking there highlights nothing.
 
 - **Listening:** "I want to say something" opens the urgent options and Spell it.
-- **Replies:** Claude's three suggestions and "None of these", which opens the urgent options ("I'm in pain", "I can't breathe", "Call the nurse") and Spell it.
+- **Replies:** Claude's three suggestions and "None of these", which brings two fresh sets on the same question, then the urgent options ("I'm in pain", "I can't breathe", "Call the nurse") and Spell it.
 - **Spell it:** each pick narrows the letters until one is left. E, T, A, and O take two picks; every other letter takes three. The bottom-right box holds Claude's suggested words, then Space, Delete, Speak, and Back.
 - **Blink twice:** undoes a pick, or goes back one page: up a level in Spell it, then out of Spell it to where it was opened, then from the urgent options to the replies or Listening.
 - **Room talk:** when Claude judges the speech wasn't meant for the patient ("grab the chart from room 4"), the screen stays quiet and offers "Reply anyway" next to the urgent options.

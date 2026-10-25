@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { isConsentQuestion, CONSENT_REPLIES } from "./safety.js";
+import { isConsentQuestion, questionKind, CLARIFY_REPLIES, CONSENT_REPLIES, FALLBACK_REPLIES, FALLBACK_SPARE } from "./safety.js";
 import { mockComplete, mockReplies } from "./mock.js";
 import { localList, localModelAvailable } from "./local.js";
 
@@ -63,7 +63,15 @@ export interface Option {
   intent: string;
 }
 const CONSENT_INTENTS = ["yes", "no", "more-time"];
-const consentOptions = (): Option[] => CONSENT_REPLIES.map((text, i) => ({ text, intent: CONSENT_INTENTS[i] ?? "other" }));
+const isRejected = (text: string, rejected: string[]) => rejected.some((r) => sameText(r, text));
+// Yes / No / I need more time. Once the patient said none of those fit, a fixed set of questions that
+// never decide (safety.ts): showing the same three again made "None of these" look broken.
+function consentOptions(rejected: string[] = []): Option[] {
+  if (!CONSENT_REPLIES.some((c) => isRejected(c, rejected))) {
+    return CONSENT_REPLIES.map((text, i) => ({ text, intent: CONSENT_INTENTS[i] ?? "other" }));
+  }
+  return CLARIFY_REPLIES.find((set) => !set.some((o) => isRejected(o.text, rejected))) ?? CLARIFY_REPLIES[CLARIFY_REPLIES.length - 1];
+}
 
 export const SYSTEM = `You write reply options for a patient in an ICU who is awake but cannot speak or use their hands. Someone in the room has just said something to them. The screen shows your three replies, the patient picks one with their eyes, and the app speaks it aloud in their voice. The patient reads slowly and every pick takes effort, so each reply has to earn its place.
 
@@ -78,13 +86,14 @@ Fit the replies to what was said:
 - News or a statement: a short acknowledgement, a short question back about it, and a short feeling or need.
 
 Other rules:
-- If rejected replies are listed, the patient said none of them fit. Stay on what was asked, but each new reply must add something the rejected ones didn't: a when or how ("Call her after lunch", "Just send her a text"), a different person or thing ("Call my son instead"), or a message to pass on ("Tell her I love her"). Use a question back only when a patient would naturally ask it; don't force one in. If a yes and a no were rejected, no new reply may be a plain yes or no in other words: "Call her now" is just yes, "Not right now" is just no. Never repeat or reword a rejected reply. Do not switch to an unrelated need; the screen has its own topic picker for that.
+- If rejected replies are listed, the patient said none of them fit. Stay on what was asked, but each new reply must add something the rejected ones didn't: a reason, a when or how ("Call her after lunch", "Just send her a text"), a different person or thing ("Call my son instead"), or a message to pass on ("Tell her I love her"). Use a question back only when a patient would naturally ask it; don't force one in. If a yes and a no were rejected, no new reply may be a plain yes or no in other words: "Call her now" is just yes, "Not right now" is just no. A yes or no with its reason is fine, and the patient may mean either side, so cover both: "Comfortable since you turned me", "My heels are sore". Never repeat or reword a rejected reply. Do not switch to an unrelated need; the screen has its own topic picker for that.
 - If a topic is given, all three replies must be about that topic.
 - Never invent medical facts, symptoms, or decisions the patient has not signaled.
-- Use the patient profile and recent conversation only to pick relevant specifics (names, preferences).
-- If the patient seems fatigued, keep the replies to 1 to 3 words.
+- Never contradict what the patient already said in the recent conversation: if they said the pain is gone, don't offer "My back hurts".
+- Use the patient profile and recent conversation only to pick relevant specifics (names, preferences), and only when they answer what was asked. Never bring in a profile detail to fill a box (a favorite drink in an answer about pain), never read the profile back to the speaker ("My son lives in Fresno"), and never offer what the patient's condition rules out (food or drink to someone intubated).
+- Fatigue 0.8 or more: the screen shows only your first two replies. Keep every reply to 1 to 3 words, and make the first two the pair that answers on its own: yes and no, both choices, or the two halves of a scale with their numbers ("Under 5", "5 or more").
 - Set addressed_to_patient to false only when the speech is clearly meant for someone else (staff talking to each other, a phone call, "grab the chart from room 4"). Anything that could plausibly be for the patient, including greetings and statements about their care, counts as addressed. When it isn't addressed, still write replies: what the patient might say to join in ("I can hear you", "Is that about me?", "Please talk to me").
-- If the message is unintelligible, offer: "Please say that again", "I didn't understand", "Yes".
+- If the message is unintelligible, offer: "Please say that again", "I didn't understand", "Yes". If those were rejected, don't guess what it was about; offer ways to get the question again ("Ask me yes or no", "Please speak slower", "Come back in a minute").
 - high_stakes is true only when a yes or no would make a medical decision: consent to a treatment, procedure, surgery, test, or medication change, or code status (CPR, DNR, life support). Routine questions about comfort, pain level, water, positioning, visitors, or feelings are not high stakes, even if they mention medicine ("are you in pain?" is not; "do you want more pain medication?" is). When high_stakes is true, stakes_about is what a yes would agree to, as a short phrase that fits "You said yes to …" ("more pain medication", "the surgery tomorrow morning", "a breathing tube"); otherwise an empty string.
 - Also say who is speaking. A voice model tells voices apart (voice-1, voice-2, …) and gives the label used for this voice before, if any. Keep that label unless this message gives a better one (a name, a title, a relationship). speaker_label is what the patient would call them: "Dr. Lee", "Nurse Sam", "Your daughter", "Nurse", "Doctor", "Family". Use "Someone" only when there is no clue. speaker_role is nurse, doctor, family, visitor, staff, or unknown.`;
 
@@ -176,14 +185,42 @@ export interface RepliesOut {
 }
 
 // Without a model answer (mock mode, or the model failed): the keyword rule decides high stakes.
-export function ruleReplies(transcript: string, options: Option[], source: string): RepliesOut {
+export function ruleReplies(transcript: string, options: Option[], source: string, rejected: string[] = []): RepliesOut {
   const highStakes = isConsentQuestion(transcript);
-  const opts = highStakes ? consentOptions() : options;
+  const opts = highStakes ? consentOptions(rejected) : options;
   return { replies: opts.map((o) => o.text), options: opts, source: highStakes ? "consent-rule" : source, addressed: true, speaker: null, highStakes, about: null };
 }
 
-/** Fallback when the model fails: yes / no / more time, high stakes only if the keyword rule says so. */
-export const fallbackReplies = (transcript: string) => ruleReplies(transcript, consentOptions(), "fallback");
+/**
+ * Fallback when the model fails: fixed replies for the kind of thing said (yes/no question, open
+ * question, statement), never one the patient already rejected, so a failed "None of these" still
+ * changes the screen. High stakes only if the keyword rule says so.
+ */
+export function fallbackReplies(transcript: string, rejected: string[] = []): RepliesOut {
+  const kind = questionKind(transcript);
+  const all = [...FALLBACK_REPLIES[kind], ...FALLBACK_SPARE]
+    .filter((o, i, list) => list.findIndex((x) => x.text === o.text) === i)
+    .filter((o) => !(kind === "yesNo" && o.intent === "yes-no")); // "Ask me yes or no" after a yes/no question
+  const fresh = all.filter((o) => !isRejected(o.text, rejected));
+  // Always three (the contract): a client that rejected every one of them gets the first ones back.
+  const options = [...fresh, ...all.filter((o) => !fresh.includes(o))].slice(0, 3);
+  return ruleReplies(transcript, options, "fallback", rejected);
+}
+
+// The re-ask after "None of these". With a topic (patient.html's topic picker) the topic leads; without
+// one the replies stay on the question. Covering both sides fixes re-asks that only gave bad-night
+// reasons after "Did you sleep ok?": the patient who rejects "Yes" and "No" may mean either.
+function rejectedBlock(inp: RepliesInput): string {
+  const listed = `The patient rejected all of these: ${inp.rejected!.map((r) => `"${r}"`).join(", ")}. Don't repeat or reword them.`;
+  if (inp.category) return listed;
+  return [
+    listed,
+    `They want to say something more specific about "${inp.transcript}". Each new reply must still answer it and add what the rejected ones didn't: a reason, when, how much, which one, or a different person or thing.`,
+    `Anything the patient already answered in the recent conversation stands: a reason that contradicts it is wrong (they said the food was fine, so "The food was cold" can't be why they're hungry). Find another reason.`,
+    `If the rejected replies include an answer and its opposite (yes and no, good and bad, on and off), cover both sides in your first two replies (a tired patient sees only two), each with its reason.`,
+    `Don't change the subject.`,
+  ].join("\n");
+}
 
 export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
 
@@ -196,11 +233,7 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
     history ? `Recent conversation:\n${history}` : "",
     voice,
     `Just said to the patient: "${inp.transcript}"`,
-    inp.rejected?.length
-      ? `The patient rejected all of these: ${inp.rejected.map((r) => `"${r}"`).join(", ")}.\n` +
-        `So a plain yes or no won't help. Each new reply must still answer "${inp.transcript}" and add a specific detail: when, how much, which one, or a different person or thing. ` +
-        `Don't start a reply with Yes, No, Not, or I'm fine/comfortable, and don't change the subject.`
-      : "",
+    inp.rejected?.length ? rejectedBlock(inp) : "",
     inp.category && CATEGORY_HINT[inp.category] ? `Topic the patient chose: ${CATEGORY_HINT[inp.category]}` : "",
   ]
     .filter(Boolean)
@@ -211,7 +244,7 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
   // writing tokens is what takes the time. High stakes comes from the keyword rule, and there's no
   // speaker label. Claude if it fails.
   if (inp.local && localModelAvailable()) {
-    if (isConsentQuestion(inp.transcript)) return ruleReplies(inp.transcript, consentOptions(), "local");
+    if (isConsentQuestion(inp.transcript)) return ruleReplies(inp.transcript, [], "local", inp.rejected);
     try {
       const rejected = inp.rejected?.length ? `\nRejected (none of these fit): ${inp.rejected.join(", ")}` : "";
       const replies = (await localList(LOCAL_SYSTEM, `Just said to the patient: "${inp.transcript}"${rejected}`, 3)).slice(0, 3);
@@ -222,7 +255,7 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
       console.error("local replies failed, using Claude:", err);
     }
   }
-  if (mock()) return ruleReplies(inp.transcript, mockReplies(inp.transcript, inp.category), "mock");
+  if (mock()) return ruleReplies(inp.transcript, mockReplies(inp.transcript, inp.category), "mock", inp.rejected);
 
   const json = await ask({
     model: MODEL,
@@ -231,7 +264,7 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: prompt }],
   }, { timeout: REPLIES_TIMEOUT_MS, maxRetries: 0 }, FAST);
-  return toReplies(JSON.parse(json) as ParsedReplies, MODEL);
+  return toReplies(JSON.parse(json) as ParsedReplies, MODEL, inp.rejected);
 }
 
 interface ParsedReplies {
@@ -245,12 +278,12 @@ interface ParsedReplies {
 
 const sameText = (a: string, b: string) => a.toLowerCase().replace(/[^a-z0-9]/g, "") === b.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-function toReplies(parsed: ParsedReplies, source: string): RepliesOut {
+function toReplies(parsed: ParsedReplies, source: string, rejected: string[] = []): RepliesOut {
   const highStakes = parsed.high_stakes === true;
   const about = highStakes ? parsed.stakes_about?.trim() || null : null;
   // The small local model sometimes returns plain strings; accept both.
   const options = highStakes
-    ? consentOptions()
+    ? consentOptions(rejected)
     : parsed.replies
         .map((r) => (typeof r === "string" ? { text: r, intent: "" } : r))
         .map((o) => ({ text: String(o.text ?? "").trim(), intent: String(o.intent ?? "").trim() }))

@@ -1,9 +1,9 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-25 00:51 PDT (arrow keys in the row layout)
+Updated: 2026-10-25 00:51 PDT (arrow keys in the row layout; "None of these" stress test and fixes)
 
 ## Now
-- Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README, nurse mic listens from launch, red Mic off, accuracy test for the row layout, arrow keys in the row layout.
+- Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README, nurse mic listens from launch, red Mic off, accuracy test for the row layout, arrow keys in the row layout, "None of these" re-asks stress-tested and fixed.
 - Next: accuracy test on 4 people, 2 outside the team, in venue lighting; stage-log ratings and Figma share links; team call on Spell it and urgent alerts (Cut list).
 - Blocked on: nothing.
 
@@ -11,7 +11,7 @@ Updated: 2026-10-25 00:51 PDT (arrow keys in the row layout)
 - Step 1 (main loop): runs end to end. Samarth's Ink-2 streaming mic, Claude replies, Julian's quadrant tracker, Sonic cloned voice. `app/test/e2e.js` (58 checks), unit tests (16), and `app/test/stress.js` (3000 random inputs, 60 full cycles) pass.
 - Step 2 (mocks): no env flags yet. Without a server the app falls back to sample replies and the system voice; the demo panel (`D`) shows which sources are live.
 - Step 3 (nurse window): care drawer in the same window (alerts, summary, conversation with who said each line, notes, settings). Vitals tiles say "Not connected yet".
-- Step 4 ("none of these"): differs from CLAUDE.md (see Deviations).
+- Step 4 ("none of these"): matches CLAUDE.md, rewritten 2026-10-25 to this flow (two re-asks on the question, then urgent + Spell it).
 - Step 5: `app/README.md` and `docs/slides-outline.md` exist. Video, Devpost, and consent note aren't in the repo.
 - Step 6 (fatigue): built early. The tracker's fatigue event switches tired mode (see Deviations).
 
@@ -34,7 +34,7 @@ Conversation: `main.js` relays to `localhost:8790` over `ipcMain.handle('convers
 | Route | App use |
 | --- | --- |
 | `GET /config` | `urgent[]`, mock flags for the demo panel |
-| `POST /replies { transcript, history, patientProfile, fatigue, speaker }` → `{ replies: string[], urgent, addressed, source, speaker, highStakes, about }` | `patientProfile` = name, nurse's notes, most-picked phrases. First 3 replies shown. `addressed: false` → "Reply anyway". `source: "consent-rule"` → confirm screen on Yes/No. `speaker` in = `{ voice, label, isNew }`; out = `{ label, role }` names the caption and every line of that voice |
+| `POST /replies { transcript, history, patientProfile, fatigue, speaker, rejected? }` (`rejected`: every reply shown for this question, sent on "None of these") → `{ replies: string[], urgent, addressed, source, speaker, highStakes, about }` | `patientProfile` = name, nurse's notes, most-picked phrases. First 3 replies shown. `addressed: false` → "Reply anyway". `source: "consent-rule"` → confirm screen on Yes/No. `speaker` in = `{ voice, label, isNew }`; out = `{ label, role }` names the caption and every line of that voice |
 | `/replies`, `/complete` with `local: true`; `POST /local-warm`; `/config` → `localModel` | Testing-only care panel switch (off by default, saved locally): replies from the on-laptop model; greyed out without it |
 | `POST /summary { history, patientProfile }` → `{ forPatient, forCaregiver[] }` (204 mock, 502 error) | 2 s after the conversation changes. `forPatient` = "So far" on Listening; `forCaregiver` = care panel Summary. Otherwise the last lines as said |
 | `POST /speak { text }` → WAV, or 204 | Fetched for every reply as it shows; played in the renderer. 204 → system voice |
@@ -48,7 +48,6 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 ## Deviations from CLAUDE.md
 | Date | CLAUDE.md says | We did | Why | Affects | CLAUDE.md updated? |
 | --- | --- | --- | --- | --- | --- |
-| 2026-10-24 | Free text cut; first "none" re-asks Claude with `rejected`; second shows 4 categories | "None of these" re-asks twice with `rejected` (all replies shown so far), then the third opens a page with the 3 urgent phrases + Spell it (4-box speller). No 4 categories | Noel: "it should cycle with new options 2 more times and then get to more help"; the urgent phrases need a place in a 4-box grid | Conversation (`rejected`; `category` unused) | No. Team to decide; the 4-category flow would replace this page. |
 | 2026-10-24 | Push-to-talk | Always-on mic with Ink-2 turn detection; muted while the patient's voice plays; room talk waits behind "Reply anyway" | Samarth's streaming mic in `patient.html` works this way | Conversation | No. Samarth's design; worth a CLAUDE.md line. |
 | 2026-10-24 | Cut: local LLM | Testing-only care panel switch "Fast replies on this laptop (testing only)": Qwen3-4B-Instruct via node-llama-cpp in the conversation server; off by default, greyed out until `npm run local-model`; Claude if it fails | Noel asked for it for testing only | Conversation (`local` flag, optional dependency) | No. Team: keep as a testing switch or remove before judging. |
 | 2026-10-24 | `MOCK_STT` / `MOCK_LLM` / `MOCK_TTS` env flags and a mock badge per subsystem | Automatic fallbacks plus a "Sources" list in the demo panel | Fallbacks keep the demo running if a service drops mid-demo | Nobody | No. |
@@ -57,10 +56,11 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | `transcript` / `options` / `speak` as IPC; `{ text, intent }`, exactly 3, `highStakes` | HTTP via `main.js`; plain strings; high stakes = `source: "consent-rule"`; STT runs in the renderer on a server-issued token | Matches Samarth's server; the API key stays in the server | Conversation | No. Samarth's rows to restate. |
 | 2026-10-24 | Dwell ≥ 700 ms highlights a corner | Highlight after 300 ms (vision quadrant default) | Not tuned yet | Input | No. See Open questions. |
 | 2026-10-24 | Closure ≥ 3 s toggles `PAUSED` | Closure ≥ 3 s cancels that hold and shows "Resting"; no paused state | Vision emits rest per closure, not as a toggle | Input | No. |
-| 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
+| 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude (0.8 or more: Claude makes the first two replies stand on their own). On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
 - 2026-10-25 (Noel): arrow keys follow the row layout. `gridMove` still moved by 2x2 row and column, but the row draws the cells as 1, 3, 2, 4 (columns.js `COLUMN_BOX`), so Right only reached the first and third bars. Now left and right step through the bars as drawn (`ROW_ORDER`), skipping an empty one (tired mode), and up and down do nothing; the 2x2 layouts keep all four directions. e2e checks the highlighted box moves right across all four bars on screen.
+- 2026-10-25 (Noel): "None of these" stays two re-asks on the same question, then urgent + Spell it; CLAUDE.md's flow now says so (the topic picker stays in `patient.html`). Why: the second set should still answer the question ("Did you sleep ok?" → why it was good or bad). The re-ask fixes are server-side (context/conversation.md). Rejected: sending which reply the patient looked at longest; the longest look mostly marks the reply that took longest to read.
 - 2026-10-25 (Noel): the dev accuracy test scores the layout in use. Row of 4: each column twice, the target at the column's center on the gaze area, counted by the row picker (`eyes-frame` now carries `column`). 2x2: corners, as before. Tests record `layout`; the README reports row and 2x2 apart, and the calibration fit note says it scores the 2x2. Why: the row became the default, but the test still scored the 2x2 classifier, so nothing measured the shipped layout. Rejected: scoring the row by the 2x2 classifier's left/right (it isn't what picks).
 - 2026-10-25 (Noel): "Mic off" in the top bar is red and bold (`--alert`; 4.7:1 dark, 4.3:1 light, large text). Why: Noel asked; a muted mic should stand out.
 - 2026-10-25 (Julian): calibration dots last 3 s instead of 2 s (`calibration.phaseMs` in `app/renderer/devsettings.js`); the squint step shares it. Vision side in context/input.md.

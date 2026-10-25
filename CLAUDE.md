@@ -56,9 +56,11 @@ Cartesia Ink (STT) + Sonic-3.6 (TTS, cloned voice). API keys live in the main pr
 
 ## "None of these" flow
 
-1. First "none": re-ask Claude with `rejected: [...]`, demand three different intents.
-2. Second "none": show four fixed categories (pain, body/comfort, people, question); one more Claude round from the chosen category.
-3. After that, the nurse asks a different question.
+1. First "none": re-ask Claude with `rejected: [...]` (every reply shown for this question). Three new replies on the same question, each adding a reason or detail; if an answer and its opposite were rejected (yes and no), at least one reply for each side.
+2. Second "none": the same again, with both sets rejected.
+3. Third "none": the urgent phrases + Spell it (Spell it is on the Cut list; team call pending).
+
+High-stakes question: the re-asks are fixed clarifying replies (`conversation/src/safety.ts`: "Please explain it again", "What are the risks?", …), never a reworded yes or no. Claude down: fixed replies for the kind of question, never one already rejected. `patient.html` (test page) keeps a topic picker at step 2.
 
 ## Interfaces — emit exactly these
 
@@ -87,7 +89,7 @@ Env flags read once at startup. UI shows a "mock" badge per active subsystem. Th
 ## Claude contract
 
 Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-status / medication questions
-→ only Yes / No / "I need more time" and `highStakes: true`. Never invent symptoms. JSON schema output.
+→ only Yes / No / "I need more time" and `highStakes: true`; after "None of these", the fixed clarifying replies. Never invent symptoms. JSON schema output.
 "None of these" is added by the UI, never by the model.
 
 ## Known limitations (say these in README and Q&A, don't fix them now)
@@ -97,6 +99,8 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 - No free text. No vitals: the monitor above the bed does that.
 
 ## Decisions log (append, newest first; date + who)
+
+- 2026-10-25 — Noel: "None of these" flow rewritten above to match the app (two re-asks on the same question, then urgent + Spell it); the topic picker stays in `patient.html`. A stress test of the re-asks found: high-stakes re-asks repeated Yes / No / I need more time, a failed Claude call repeated rejected replies (and answered "Where does it hurt?" with Yes / No), and yes/no re-asks gave only one side. All fixed in `conversation/` (context/conversation.md). Rejected: weighting the box the patient looked at longest, because that mostly measures how long a reply takes to read. Arrow keys now follow the row layout.
 
 - 2026-10-25 — Marco: default patient layout is a row of 4 tall boxes (left-right eye movement only) instead of the 2x2. Up-down was the weak axis. 2x2 layouts remain in dev mode. Details in context/product.md.
 - 2026-10-25 — Marco: Claude asks before every push (commits locally until then). Auto-pushing was annoying. Still straight to `main`, no PRs.

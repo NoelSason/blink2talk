@@ -33,6 +33,7 @@ app.post("/replies", async (req, res) => {
     return;
   }
   const t0 = Date.now();
+  const rejectedList = Array.isArray(rejected) ? rejected.map(String).slice(0, 12) : undefined;
   try {
     const out = await getReplies({
       transcript,
@@ -41,14 +42,14 @@ app.post("/replies", async (req, res) => {
       fatigue,
       speaker,
       local: local === true,
-      rejected: Array.isArray(rejected) ? rejected.map(String).slice(0, 12) : undefined,
+      rejected: rejectedList,
       category: CATEGORIES.includes(category) ? (category as Category) : undefined,
     });
     res.json({ ...out, urgent: URGENT, spellOption: SPELL_OPTION, ms: Date.now() - t0 });
   } catch (err) {
     console.error("replies failed:", err);
     res.json({
-      ...fallbackReplies(transcript), // yes / no / more time: safe when the model is down
+      ...fallbackReplies(transcript, rejectedList), // fixed replies for the kind of question, none already rejected
       urgent: URGENT,
       spellOption: SPELL_OPTION,
       ms: Date.now() - t0,
