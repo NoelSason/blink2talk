@@ -17,6 +17,13 @@
   --on-highlight: #151A24;
   --highlight-track: #D9A53F;
   --focus-ring: #F4F1EA;
+  /* Answer colors (Kahoot): one per box, white text. The yellow is darkened from Kahoot's #D89E00
+     so white text on it passes the 3:1 large-text contrast check. */
+  --tile-1: #E21B3C;
+  --tile-2: #1368CE;
+  --tile-3: #C58600;
+  --tile-4: #26890C;
+  --on-tile: #FFFFFF;
   --selected: #3FC1A5;
   --on-selected: #151A24;
   --alert: #E5484D;

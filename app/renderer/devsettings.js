@@ -11,6 +11,7 @@ export const DEFAULTS = {
   face: { lostMs: 500, foundMs: 150 },
   headPose: false,
   learnFromPicks: false,  // a spoken, not-undone pick teaches the box classifier where the eyes were. Off: a wrong pick that isn't undone teaches the wrong box
+  layout: 'kahoot',     // 2x2 screens: 'kahoot' (question on top, boxes together) | 'spread' (boxes in the corners, question between)
   dots: 'corners',      // calibration dots: 'corners' (outer corner of each box) | 'centers' (middle of each box)
   gazeSource: 'vision', // 'vision' (MediaPipe features + per-axis classifier) | 'webeyetrack' (neural gaze point)
 };

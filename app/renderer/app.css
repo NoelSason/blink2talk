@@ -204,8 +204,6 @@ p { margin: 0; }
 .reply-grid > :nth-child(3)::after { bottom: 10px; left: 10px; }
 .reply-grid > :nth-child(4)::after { bottom: 10px; right: 10px; }
 .reply-grid--columns > :nth-child(-n+4)::after { display: none; }
-/* Dots at the box centers (dev mode): the box itself is the target, so no corner marks. */
-[data-dots="centers"] .reply-grid > :nth-child(-n+4)::after { display: none; }
 /* Confirming a consent answer: two tall boxes, left and right, with the question above them. The
    middle column is the rest zone. */
 .reply-grid--columns { grid-template-rows: 1fr; }
@@ -634,3 +632,61 @@ p { margin: 0; }
 .eye-button[data-needed="true"] { background: var(--selected); color: #151A24; border-color: transparent; font-weight: 600; }
 .dev__tag { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
 .dev__tag--now { color: var(--selected); }
+
+/* ---------- Kahoot look ---------- */
+/* Every 2x2 screen: each box has its own color and shape (red triangle, blue diamond, yellow circle,
+   green square), so a box can be named by color as well as by its words. The shape sits in the box's
+   outer corner, where the calibration dot was. */
+.reply-grid > :nth-child(1) { --tile: var(--tile-1); --shape: polygon(50% 8%, 96% 92%, 4% 92%); }
+.reply-grid > :nth-child(2) { --tile: var(--tile-2); --shape: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.reply-grid > :nth-child(3) { --tile: var(--tile-3); --shape: circle(50%); }
+.reply-grid > :nth-child(4) { --tile: var(--tile-4); --shape: inset(8%); }
+.reply-grid > .reply-card:not([data-state="loading"]),
+.reply-grid > .end-option {
+  background: var(--tile);
+  color: var(--on-tile);
+  border-color: transparent;
+  transition: transform var(--motion) ease-out, filter var(--motion) ease-out;
+}
+.reply-grid > :nth-child(-n+4)::after {
+  width: 34px;
+  height: 34px;
+  border-radius: 0;
+  background: var(--on-tile);
+  opacity: 0.9;
+  clip-path: var(--shape);
+}
+.reply-grid > .reply-card[data-state="loading"]::after { display: none; }
+/* One box lit: the others go dark, so the lit one stands out like a pressed Kahoot answer. */
+.reply-grid:has(> [data-state="highlighted"], > [data-state="progress"], > [data-state="hold"], > [data-state="selected"])
+  > :is(.reply-card, .end-option):not([data-state="highlighted"], [data-state="progress"], [data-state="hold"], [data-state="selected"]) {
+  filter: brightness(0.5) saturate(0.6);
+}
+.reply-grid > .reply-card[data-state="dimmed"] { filter: brightness(0.45) saturate(0.5); }
+.reply-grid .reply-card__progress { background: color-mix(in srgb, var(--on-tile) 35%, transparent); }
+.reply-grid .reply-card__progress-fill { background: var(--on-tile); }
+.reply-grid .reply-card__hold-track { stroke: color-mix(in srgb, var(--on-tile) 35%, transparent); }
+.reply-grid .reply-card__hold-fill { stroke: var(--on-tile); }
+
+/* Kahoot layout (default; dev mode can switch back to spread): the question in a bar on top, the
+   four boxes together below it. */
+/* The boxes touch, so the lit one grows less than in spread (1.05 ran into its neighbor). */
+[data-layout="kahoot"] .reply-grid { --hl-scale: 1.015; }
+[data-layout="kahoot"] .reply-grid {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--sp-2);
+}
+[data-layout="kahoot"] .reply-grid > :nth-child(1) { grid-area: 1 / 1; }
+[data-layout="kahoot"] .reply-grid > :nth-child(2) { grid-area: 1 / 2; }
+[data-layout="kahoot"] .reply-grid > :nth-child(3) { grid-area: 2 / 1; }
+[data-layout="kahoot"] .reply-grid > :nth-child(4) { grid-area: 2 / 2; }
+[data-layout="kahoot"] .reply-grid--columns { grid-template-rows: 1fr; }
+[data-layout="kahoot"] .reply-grid > :is(.reply-card, .end-option) { border-radius: var(--r-end, 8px); }
+[data-layout="kahoot"] .caption {
+  align-items: center;
+  text-align: center;
+  background: var(--surface);
+  padding: var(--sp-3) var(--sp-4);
+}
+[data-layout="kahoot"] .caption .caption__text { font-weight: 700; }

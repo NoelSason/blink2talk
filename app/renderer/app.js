@@ -926,6 +926,7 @@ loadConfig();
 if (memory.history.length) refreshSummary(); // the conversation from before this launch
 requestAnimationFrame(tick);
 const eyeSettings = loadSettings();
+document.documentElement.dataset.layout = eyeSettings.layout;
 const devPanel = createDevPanel({
   settings: eyeSettings,
   onRebuild: () => eyes?.rebuild(),

@@ -98,6 +98,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-25 — Marco: patient screen is Kahoot style (question on top, 2x2 colored boxes together below). Spread layout kept as a dev-mode switch. Details and the reading-the-question risk in context/product.md.
 - 2026-10-24 — Marco: head-movement input and the phone face-tracking model cut. Our target patients mostly can't move their head; eye input must work alone. The dev-mode head-pose switch only corrects eye picks for head turns and isn't an input.
 - 2026-10-24 — Input/Product (Marco): box picking decides left/right and top/bottom on separate axes; calibration dots and corner marks at the box corners (±0.9); kept picks teach the classifier; WebEyeTrack available as a test gaze source in dev mode. Dwell to highlight stays 300 ms (vision default), not 700. Measured cause in context/input.md.
 - 2026-10-24 — Product/Conversation (Noel): `/replies` now returns `highStakes` (Claude classifies; keyword rule only as fallback) and `about`, closer to the `options.highStakes` row above. Eye calibration auto-starts at launch again; three quick blinks offer recalibration.

@@ -28,6 +28,9 @@ const CALIBRATION_TEXT = {
 // the biggest eye movement the screen allows. Each box shows a small mark in that corner (app.css).
 // Dev mode can move them to the box centers instead (devsettings.js `dots`, set on <html data-dots>).
 const dotAt = () => dotPositions(document.documentElement.dataset.dots);
+// Kahoot layout (default): the question sits above the grid and the four boxes touch. Spread (dev
+// mode): boxes in the corners with the question in a middle band between them.
+const kahoot = () => document.documentElement.dataset.layout !== 'spread';
 
 function icon(name, extra = '') {
   const el = document.createElement('span');
@@ -160,7 +163,7 @@ export function createView() {
       rowItems = model.items;
       rowEls = model.items.map(buildItem);
       // On the 2×2 screens the middle band (the question) is where the patient rests: no box.
-      els.row.replaceChildren(...rowEls, ...(model.grid && !model.columns ? [middle] : []));
+      els.row.replaceChildren(...rowEls, ...(model.grid && !model.columns && !kahoot() ? [middle] : []));
       els.row.classList.toggle('reply-row--single', model.single);
       els.row.classList.toggle('reply-grid', model.grid);
       els.row.classList.toggle('reply-grid--columns', model.columns);
@@ -211,6 +214,11 @@ export function createView() {
     const screen = els.screen.getBoundingClientRect();
     let area = els.gazeArea.getBoundingClientRect();
     if (!area.width) area = screen;
+    // Kahoot: the boxes fill the gaze area below the question, so the dots do too.
+    const cap = els.caption.getBoundingClientRect();
+    if (kahoot() && cap.height && cap.bottom < area.bottom - 100) {
+      area = { left: area.left, width: area.width, top: cap.bottom, height: area.bottom - cap.bottom };
+    }
     node.style.left = `${area.left - screen.left + area.width * (0.5 + x / 2)}px`;
     node.style.top = `${area.top - screen.top + area.height * (0.5 + y / 2)}px`;
   }
@@ -276,7 +284,7 @@ export function createView() {
 
     if (changed('lost', model.faceLost)) els.roomMessage.toggleAttribute('data-shown', model.faceLost);
     renderRow(model);
-    placeCaptionIfChanged(model.grid && !model.columns);
+    placeCaptionIfChanged(model.grid && !model.columns && !kahoot());
 
     if (changed('cue', model.cue ?? '')) {
       els.cue.hidden = !model.cue;
