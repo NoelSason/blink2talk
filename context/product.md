@@ -60,6 +60,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-24: "None of these" and "Go back" boxes show the hold fill ring like replies. Why: Noel couldn't tell his hold on None of these was working; his eye log showed the picks going through, but those boxes had no ring.
 - 2026-10-24: Double blink on the replies (no page before them) goes back to Listening. Why: Noel's eye log showed his double blinks detected and paired, but on the replies and Listening there was nothing to go back to, so it felt broken.
 - 2026-10-24 (Marco): fixed the screen sticking on Speaking after a camera pick (my learn-from-picks line used an undefined `settings`). The return to Listening is scheduled before learning, learning can't throw out, and an e2e check now drives a camera pick through to Listening.
 - 2026-10-24 (Marco): WebEyeTrack now runs alongside the vision module from every calibration; `G`, an "Eyes:" button, or dev mode swaps which drives the boxes at once, and the eye log records both trackers per frame. Why: Marco wants to compare them live, and one session can score both. Cost: a second MediaPipe instance in a worker (about 15 fps); watch the frame rate in the demo panel.

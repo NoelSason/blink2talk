@@ -316,7 +316,8 @@ p { margin: 0; }
   width: var(--icon-l);
   height: var(--icon-l);
 }
-.reply-card[data-state="hold"] .reply-card__hold { display: block; }
+.reply-card[data-state="hold"] .reply-card__hold,
+.end-option[data-state="hold"] .reply-card__hold { display: block; }
 .reply-card__hold-track { fill: none; stroke: var(--highlight-track); stroke-width: 6; }
 .reply-card__hold-fill {
   fill: none;
@@ -329,6 +330,7 @@ p { margin: 0; }
 
 /* ---------- EndOption ---------- */
 .end-option {
+  position: relative; /* for the hold ring */
   flex: 0 0 var(--end-w);
   width: var(--end-w);
   height: var(--end-h);

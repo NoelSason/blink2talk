@@ -58,6 +58,13 @@ app.whenReady().then(async () => {
   check('focus(null) highlights nothing', (await state('s.hl')) === -1);
   await cam('select(null)');
   check('select(null) in the middle band picks nothing', (await state('s.selected')) === -1 && (await state('s.rowKind')) === 'replies');
+  // Holding on None of these shows the same fill ring as a reply.
+  await cam(`focus('bottomRight')`);
+  await cam(`hold({ engaged: true, closed: true, progress: 0.6 })`);
+  await sleep(150);
+  check('a hold on None of these shows the fill ring', await js(`(() => { const el = document.querySelectorAll('#reply-row > [role=option]')[3]; const ring = el?.querySelector('.reply-card__hold'); return el?.dataset.state === 'hold' && !!ring && getComputedStyle(ring).display === 'block'; })()`));
+  await cam('hold(null)');
+
   // None of these: two fresh sets of replies (without the rejected ones), then the urgent options.
   const firstSet = await labels();
   await cam(`select('bottomRight')`);

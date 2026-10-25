@@ -74,7 +74,8 @@ function buildItem(item) {
   el.setAttribute('role', 'option');
   if (item.type === 'end') {
     el.className = 'end-option';
-    el.append(icon({ none: 'refresh', back: 'arrow-left' }[item.kind] ?? 'keyboard'), span('', item.label));
+    // The same fill ring as the reply cards, so a hold on "None of these" or "Go back" shows progress.
+    el.append(icon({ none: 'refresh', back: 'arrow-left' }[item.kind] ?? 'keyboard'), span('', item.label), holdRing());
     return el;
   }
   el.className = 'reply-card';
