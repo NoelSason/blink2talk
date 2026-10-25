@@ -9,15 +9,15 @@ Built at Cal Hacks 13.0.
 <!-- accuracy:start: written by app/accuracy.js after every calibration and accuracy test; edits here are overwritten -->
 **Accuracy test: none recorded yet.**
 
-**Calibrations (22 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again.
+**Calibrations (25 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again.
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
+| Oct 24, 11:02 PM PDT | — | 100% | 80% | 100% | 100% | 100% |  |
+| Oct 24, 10:34 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
+| Oct 24, 10:19 PM PDT | — | **22%** | **43%** | 93% | 80% | **49%** | hard to tell apart: center, top left, bottom right |
 | Oct 24, 10:08 PM PDT | — | **39%** | 89% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 24, 10:05 PM PDT | — | 77% | 100% | 100% | 100% | 100% |  |
-| Oct 24, 10:03 PM PDT | — | **56%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
-| Oct 24, 10:00 PM PDT | — | **26%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
-| Oct 24, 9:53 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
 
 Updated automatically after every calibration and accuracy test. Full history: [docs/accuracy.md](docs/accuracy.md).
 <!-- accuracy:end -->

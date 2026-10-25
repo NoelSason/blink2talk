@@ -1,0 +1,19 @@
+{
+  "session": "2026-10-25T05-34-27-585Z",
+  "calibrations": [
+    {
+      "t": 18722,
+      "at": 1792906483624,
+      "tester": null,
+      "fit": {
+        "center": 1,
+        "topLeft": 1,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": []
+    }
+  ],
+  "tests": []
+}
