@@ -14,6 +14,8 @@ How well each calibration's own looks sort back into the right box. This checks 
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
+| Oct 24, 10:00 PM PDT | — | **26%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 24, 9:53 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
 | Oct 24, 8:28 PM PDT | — | **0%** | **62%** | 100% | 100% | 100% | eyes narrow looking down; hard to tell apart: center, top left |
 | Oct 24, 6:52 PM PDT | — | **0%** | **36%** | 85% | **67%** | **2%** | eyes narrow looking down; hard to tell apart: center, top left, bottom right, bottom left; squint not found, full blinks select |
 | Oct 24, 6:45 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
