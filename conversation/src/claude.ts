@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { isConsentQuestion, CONSENT_REPLIES } from "./safety.js";
 import { mockComplete, mockReplies } from "./mock.js";
-import { localJson, localModelAvailable } from "./local.js";
+import { localList, localModelAvailable } from "./local.js";
 
 const MODEL = process.env.CLAUDE_MODEL ?? "claude-haiku-5-5";
 // Summaries run in the background, so they use the strongest model.
@@ -70,6 +70,12 @@ export const REPLIES_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+// The local model's short prompts (see getReplies and completeWord): plain lists, not JSON.
+const LOCAL_SYSTEM =
+  "A patient who can't speak picks a reply with their eyes. Write 3 different short first-person replies they could say, at most 5 words each, separated by ' | '. For a yes/no question, include Yes and No. Write only the replies.";
+const LOCAL_COMPLETE_SYSTEM =
+  "A patient is spelling a word with their eyes. Write the 4 most likely whole words that start with the letters typed so far, separated by ' | '. Write only the words.";
+
 export const COMPLETE_SCHEMA = {
   type: "object",
   properties: { words: { type: "array", items: { type: "string" } } },
@@ -117,10 +123,15 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
     .filter(Boolean)
     .join("\n\n");
 
-  // Testing only: the small on-laptop model, when the caregiver switched it on. Claude if it fails.
+  // Testing only: the small on-laptop model, when the caregiver switched it on. Built for speed
+  // (median 87 ms on an M3 Max): a short prompt and three replies as plain text (local.ts), because
+  // writing tokens is what takes the time. High stakes comes from the keyword rule, and there's no
+  // speaker label. Claude if it fails.
   if (inp.local && localModelAvailable()) {
+    if (isConsentQuestion(inp.transcript)) return ruleReplies(inp.transcript, CONSENT_REPLIES, "local");
     try {
-      return toReplies(await localJson<ParsedReplies>(SYSTEM, REPLIES_SCHEMA, prompt), "local");
+      const replies = (await localList(LOCAL_SYSTEM, `Just said to the patient: "${inp.transcript}"`, 3)).slice(0, 4);
+      if (replies.length) return { replies, source: "local", addressed: true, speaker: null, highStakes: false, about: null };
     } catch (err) {
       console.error("local replies failed, using Claude:", err);
     }
@@ -219,7 +230,7 @@ export async function completeWord(inp: {
   const user = `Last asked: ${inp.context ?? "(unknown)"}\nSentence so far: ${inp.sentenceSoFar ?? ""}\nPrefix: ${inp.prefix}`;
   let parsed: { words: string[] } | null = null;
   if (inp.local && localModelAvailable()) {
-    parsed = await localJson<{ words: string[] }>(COMPLETE_SYSTEM, COMPLETE_SCHEMA, user).catch((err) => {
+    parsed = await localList(LOCAL_COMPLETE_SYSTEM, user, 4).then((words) => ({ words })).catch((err) => {
       console.error("local completion failed, using Claude:", err);
       return null;
     });
