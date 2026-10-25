@@ -30,6 +30,10 @@ One file per owner. You write only yours. Everyone reads everyone's.
 git config core.hooksPath .githooks
 ```
 
+## Agent relay (so agents don't edit the same files)
+
+Once per laptop: `git pull --rebase`, then `node .claude/hooks/relay.mjs setup <your-token>` (Noel DMs you the token), then restart Claude Code. Details and what to do when an edit is blocked: `relay/README.md`.
+
 ## Checking each other's work
 
 Open someone's context file and `CLAUDE.md` side by side:

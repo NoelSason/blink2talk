@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/mcp", "destination": "/api/mcp" },
+    { "source": "/check", "destination": "/api/check" },
+    { "source": "/inbox", "destination": "/api/inbox" },
+    { "source": "/whoami", "destination": "/api/whoami" }
+  ]
+}

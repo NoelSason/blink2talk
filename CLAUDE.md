@@ -13,6 +13,7 @@ Follow this file by default. If you deviate, add a row to your Deviations table 
 the deviation changes an interface someone else consumes, also fix the table below and append to the decisions log.
 `git config core.hooksPath .githooks` once, so a push with code changes but no context update is refused.
 Convention and templates: `context/README.md`. Use `/handoff` before pushing.
+Agent relay (`relay/README.md`): once set up, call `claim_work` before editing and `release_work` after. If an edit is blocked, stop and tell your human whose agent has the file.
 
 ## What we are building
 
@@ -100,6 +101,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-25 — Noel: agent relay at agents.blink2talk2.us (`relay/`, `.claude/hooks/relay.mjs`). Agents claim files before editing; a hook blocks an edit to another teammate's claimed file and tells both humans, who resolve it. Team tooling, not product. Setup in `relay/README.md`.
 - 2026-10-25 — Noel: "None of these" flow rewritten above to match the app (two re-asks on the same question, then urgent + Spell it); the topic picker stays in `patient.html`. A stress test of the re-asks found: high-stakes re-asks repeated Yes / No / I need more time, a failed Claude call repeated rejected replies (and answered "Where does it hurt?" with Yes / No), and yes/no re-asks gave only one side. All fixed in `conversation/` (context/conversation.md). Rejected: weighting the box the patient looked at longest, because that mostly measures how long a reply takes to read. Arrow keys now follow the row layout.
 
 - 2026-10-25 — Marco: default patient layout is a row of 4 tall boxes (left-right eye movement only) instead of the 2x2. Up-down was the weak axis. 2x2 layouts remain in dev mode. Details in context/product.md.
