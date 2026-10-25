@@ -1,5 +1,5 @@
 // Dev mode: tune the eye tracker and measure it. Toggle with the backtick key (`). Patients never see it.
-// Face and head-model settings apply at once. Calibration and box settings apply on "Apply & recalibrate".
+// Rows marked "now" apply the moment the slider moves. The rest apply on "Apply & recalibrate".
 // The accuracy test shows a corner on the screen and checks where the patient's eyes were. It writes
 // nothing to disk; the results show in the panel, and you can copy them from there.
 
@@ -10,7 +10,8 @@ const NAME = { topLeft: 'Top left', topRight: 'Top right', bottomLeft: 'Bottom l
 const TRIAL_MS = 2000;
 const SAMPLE_FROM_MS = 800; // ignore the first part of a trial: the eyes are still travelling
 
-// Every slider. `live` settings apply immediately; the others need a recalibration.
+// Every slider. live: 'blink' goes to the vision module at once; live: true is read every frame;
+// no live flag means it is used when the pipeline is built, so it needs a recalibration.
 const SCHEMA = [
   { group: 'Calibration', rows: [
     { key: 'calibration.readyMs', label: 'Countdown', min: 1000, max: 6000, step: 250, unit: 'ms' },
@@ -24,14 +25,13 @@ const SCHEMA = [
     { key: 'quadrant.smoothingFrames', label: 'Smoothing (frames)', min: 1, max: 15, step: 1, unit: '' },
   ] },
   { group: 'Long blink / squint', rows: [
-    { key: 'blink.selectMs', label: 'Hold to select', min: 400, max: 1500, step: 50, unit: 'ms' },
-    { key: 'blink.spellSelectMs', label: 'Hold to select (spelling)', min: 300, max: 1500, step: 50, unit: 'ms' },
-    { key: 'blink.refractoryMs', label: 'Wait after a select', min: 500, max: 2500, step: 100, unit: 'ms' },
+    { key: 'blink.selectMs', label: 'Hold to select', min: 400, max: 1500, step: 50, unit: 'ms', live: 'blink' },
+    { key: 'blink.refractoryMs', label: 'Wait after a select', min: 500, max: 2500, step: 100, unit: 'ms', live: 'blink' },
     { key: 'blink.smoothingFrames', label: 'Blink smoothing (frames)', min: 1, max: 8, step: 1, unit: '' },
   ] },
   { group: "Can't see you", rows: [
-    { key: 'face.lostMs', label: 'Face gone for', min: 100, max: 1500, step: 50, unit: 'ms' },
-    { key: 'face.foundMs', label: 'Face back for', min: 0, max: 500, step: 50, unit: 'ms' },
+    { key: 'face.lostMs', label: 'Face gone for', min: 100, max: 1500, step: 50, unit: 'ms', live: true },
+    { key: 'face.foundMs', label: 'Face back for', min: 0, max: 500, step: 50, unit: 'ms', live: true },
   ] },
 ];
 
@@ -49,7 +49,7 @@ const setPath = (obj, path, value) => {
 };
 const typing = (event) => event.target.matches?.('input, textarea, [contenteditable]');
 
-export function createDevPanel({ settings, onRebuild, onDrift }) {
+export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   const panel = el('aside', { className: 'dev', hidden: true });
   const target = el('div', { className: 'dev-target', hidden: true });
   document.body.append(panel, target);
@@ -78,12 +78,16 @@ export function createDevPanel({ settings, onRebuild, onDrift }) {
   function rowFor(r) {
     const input = el('input', { type: 'range', min: r.min, max: r.max, step: r.step });
     const value = el('span', { className: 'dev__value' });
-    const row = el('label', { className: 'dev__row' }, el('span', { className: 'dev__label', textContent: r.label }), input, value);
+    const name = el('span', { className: 'dev__label', textContent: r.label });
+    name.append(el('span', { className: r.live ? 'dev__tag dev__tag--now' : 'dev__tag', textContent: r.live ? ' now' : ' recal' }));
+    const row = el('label', { className: 'dev__row' }, name, input, value);
     input.addEventListener('input', () => {
-      setPath(settings, r.key, Number(input.value));
+      const v = Number(input.value);
+      setPath(settings, r.key, v);
       value.textContent = `${input.value}${r.unit ? ` ${r.unit}` : ''}`;
       saveSettings(settings);
-      markDirty();
+      if (r.live === 'blink') onBlink?.({ [r.key.split('.')[1]]: v });
+      else if (!r.live) markDirty();
     });
     sliders.push({ key: r.key, input, value, unit: r.unit });
     return row;

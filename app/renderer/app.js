@@ -96,7 +96,6 @@ let beforeSelect = null;      // what to go back to on a double blink
 let nextQuestion = 0;
 let eyesOn = false;           // the camera is calibrated and reporting where the patient looks
 let eyesCalibrated = false;   // has the camera been calibrated at least once this session
-let appliedSelectMs = null;   // the hold-to-select time last sent to the camera
 const calibButton = document.getElementById('calib-start');
 calibButton.addEventListener('click', () => { calibButton.blur(); runAction('calibrate'); });
 const driftButton = document.getElementById('drift-start');
@@ -696,12 +695,6 @@ function itemState(i, holdShown) {
 const view = createView();
 
 function tick() {
-  // Spelling needs many picks, so its hold is shorter (dev mode sets both).
-  const wantSelectMs = s.rowKind === 'spell' ? eyeSettings.blink.spellSelectMs : eyeSettings.blink.selectMs;
-  if (eyes && wantSelectMs !== appliedSelectMs) {
-    eyes.setSelectMs(wantSelectMs);
-    appliedSelectMs = wantSelectMs;
-  }
   const t = now();
   let hold = 0;
   if (choosing() && s.eyesClosed && closedAt != null) {
@@ -871,7 +864,14 @@ loadConfig();
 if (memory.history.length) refreshSummary(); // the conversation from before this launch
 requestAnimationFrame(tick);
 const eyeSettings = loadSettings();
-createDevPanel({ settings: eyeSettings, onRebuild: () => eyes?.rebuild(), onDrift: () => eyes?.driftCheck() });
+const devPanel = createDevPanel({
+  settings: eyeSettings,
+  onRebuild: () => eyes?.rebuild(),
+  onDrift: () => eyes?.driftCheck(),
+  onBlink: (patch) => eyes?.setBlink(patch),
+});
+const devButton = document.getElementById('dev-open');
+devButton.addEventListener('click', () => { devButton.blur(); devPanel.toggle(); });
 startEyes(camera, eyeSettings).then((handle) => {
   eyes = handle;
 });

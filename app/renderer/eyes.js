@@ -98,13 +98,11 @@ export async function startEyes(on, settings) {
   });
   let faceChange = null;       // { to, since } while a change is waiting out its debounce
 
-  let selectMs = null; // set by the app per page (spelling is shorter); survives a rebuild
-
   function build() {
     pipeline = new EyePipeline({
       calibration: { layout: 'quadrants', ...settings.calibration },
       quadrant: { ...settings.quadrant },
-      blink: { ...settings.blink, ...(selectMs ? { selectMs } : {}) },
+      blink: { ...settings.blink },
     });
   }
 
@@ -329,10 +327,10 @@ export async function startEyes(on, settings) {
     calibrate: rebuild,
     rebuild,
     driftCheck: startDrift,
-    // Hold time for a select, applied at once (the vision module reads it on every hold).
-    setSelectMs(ms) {
-      selectMs = ms;
-      pipeline?.setBlinkConfig({ selectMs: ms });
+    // Blink settings applied at once (the vision module reads them on every hold). The same values
+    // are in `settings`, so a rebuild keeps them.
+    setBlink(patch) {
+      pipeline?.setBlinkConfig(patch);
     },
   };
 }

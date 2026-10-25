@@ -603,4 +603,5 @@ p { margin: 0; }
 }
 .eye-button[hidden] { display: none; }
 .eye-button[data-needed="true"] { background: var(--selected); color: #151A24; border-color: transparent; font-weight: 600; }
-
+.dev__tag { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.dev__tag--now { color: var(--selected); }

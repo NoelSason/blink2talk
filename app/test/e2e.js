@@ -156,6 +156,11 @@ app.whenReady().then(async () => {
   check('calibration dots sit on the box centers', topLeft[0] < center[0] && topLeft[1] < center[1] && bottomRight[0] > center[0] && bottomRight[1] > center[1]);
 
   const errors = await js('window.__errors');
+  // Dev mode opens from its button and from the backtick key, and closes again.
+  await js(`document.getElementById('dev-open').click(); 1`);
+  check('Dev mode button opens the panel', await js(`!document.querySelector('.dev').hidden`));
+  await key('Backquote');
+  check('backtick closes it', await js(`document.querySelector('.dev').hidden`));
   check('no page errors', errors.length === 0, errors.join('; '));
   const failed = results.filter((ok) => !ok).length;
   console.log(`\n${results.length - failed} of ${results.length} passed`);
