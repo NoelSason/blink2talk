@@ -677,6 +677,10 @@ p { margin: 0; }
 [data-layout="kahoot"] .reply-grid--columns { grid-template-rows: 1fr; }
 [data-layout="kahoot"] .reply-grid > :is(.reply-card, .end-option) { border-radius: var(--r-end, 8px); }
 [data-layout="kahoot"] .caption {
+  /* Always at least as tall as a one-line question with its speaker, so the grid sits in the same place
+     on Listening (where calibration runs at launch) as on the replies. */
+  min-height: calc(var(--fs-body) * 1.2 + var(--fs-caption) * 1.2 + var(--sp-1) + 2 * var(--sp-3));
+  justify-content: center;
   align-items: center;
   text-align: center;
   background: var(--surface);

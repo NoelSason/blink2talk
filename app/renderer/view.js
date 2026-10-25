@@ -27,7 +27,7 @@ const CALIBRATION_TEXT = {
 // Calibration dots sit at the outer corner of each box (x and y in [-1, 1] over the gaze area, +y down):
 // the biggest eye movement the screen allows. Each box shows a small mark in that corner (app.css).
 // Dev mode can move them to the box centers instead (devsettings.js `dots`, set on <html data-dots>).
-const dotAt = () => dotPositions(document.documentElement.dataset.dots);
+const dotAt = () => dotPositions(document.documentElement.dataset.dots, document.documentElement.dataset.layout);
 // Kahoot layout (default): the question sits above the grid and the four boxes touch. Spread (dev
 // mode): boxes in the corners with the question in a middle band between them.
 const kahoot = () => document.documentElement.dataset.layout !== 'spread';
@@ -209,16 +209,35 @@ export function createView() {
     }
   }
 
+  // Where the Kahoot 2x2 grid is, in screen pixels: the last one drawn, or, before any (calibration at
+  // launch runs on Listening), where it will be: below the question, above the status line.
+  let gridRect = null;
+  window.addEventListener('resize', () => { gridRect = null; });
+  function kahootGrid() {
+    if (gridRect) return gridRect;
+    const area = els.gazeArea.getBoundingClientRect();
+    const cap = els.caption.getBoundingClientRect();
+    if (!area.height || !cap.height) return null;
+    const gap = parseFloat(getComputedStyle(els.gazeArea).rowGap) || 0;
+    const stageGap = parseFloat(getComputedStyle(els.stageChoose).rowGap) || 0;
+    const top = cap.bottom + gap;
+    const bottom = area.bottom - els.statusLine.getBoundingClientRect().height - stageGap;
+    return bottom - top > 100 ? { left: area.left, width: area.width, top, height: bottom - top } : null;
+  }
+  function rememberGrid(model) {
+    if (!kahoot() || !model.grid || model.columns || model.calibration) return;
+    const r = els.row.getBoundingClientRect();
+    if (r.height > 100) gridRect = { left: r.left, width: r.width, top: r.top, height: r.height };
+  }
+
   // A point on the gaze area (x and y in [-1, 1]; dotAt) placed in screen coordinates.
   function placeOnGrid(node, x, y) {
     const screen = els.screen.getBoundingClientRect();
     let area = els.gazeArea.getBoundingClientRect();
     if (!area.width) area = screen;
-    // Kahoot: the boxes fill the gaze area below the question, so the dots do too.
-    const cap = els.caption.getBoundingClientRect();
-    if (kahoot() && cap.height && cap.bottom < area.bottom - 100) {
-      area = { left: area.left, width: area.width, top: cap.bottom, height: area.bottom - cap.bottom };
-    }
+    // Kahoot: dots go on the 2x2 grid itself, not the whole area (that put the bottom dots under the
+    // boxes, on the status line, and the center dot 25 px low). Measured 2026-10-25.
+    if (kahoot()) area = kahootGrid() ?? area;
     node.style.left = `${area.left - screen.left + area.width * (0.5 + x / 2)}px`;
     node.style.top = `${area.top - screen.top + area.height * (0.5 + y / 2)}px`;
   }
@@ -285,6 +304,7 @@ export function createView() {
     if (changed('lost', model.faceLost)) els.roomMessage.toggleAttribute('data-shown', model.faceLost);
     renderRow(model);
     placeCaptionIfChanged(model.grid && !model.columns && !kahoot());
+    rememberGrid(model);
 
     if (changed('cue', model.cue ?? '')) {
       els.cue.hidden = !model.cue;

@@ -120,7 +120,7 @@ export async function startEyes(on, settings) {
   const gazeArea = () => document.getElementById('gaze-area')?.getBoundingClientRect();
   async function startWet() {
     if (wet) return;
-    wetPicker = new AxisPicker({ ...settings.quadrant, reach: dotPositions(settings.dots).topRight[0] });
+    wetPicker = new AxisPicker({ ...settings.quadrant, reach: dotPositions(settings.dots, settings.layout).topRight[0] });
     try {
       wet = await startWebEyeTrack(video, (nx, ny, open, t) => {
         const area = gazeArea();
@@ -166,7 +166,7 @@ export async function startEyes(on, settings) {
 
   // Full recalibration: a fresh pipeline with the current settings, and a fresh head model.
   function reset() {
-    Object.assign(TARGETS, dotPositions(settings.dots)); // the head model learns from these positions
+    Object.assign(TARGETS, dotPositions(settings.dots, settings.layout)); // the head model learns from these positions
     document.documentElement.dataset.dots = settings.dots;
     build();
     gaze = createGazeModel();

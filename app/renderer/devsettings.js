@@ -17,14 +17,16 @@ export const DEFAULTS = {
 };
 
 // Calibration dot positions on the gaze area (x and y in [-1, 1], +y down). Corners: each box's outer
-// corner, the biggest eye movement the screen allows. Centers: the middle of each box (about 0.6 on the
-// 2x2 layout). The vision module's classifier only compares eye features between dots, so either works
+// corner, the biggest eye movement the screen allows. Centers: the middle of each box (0.5 of the grid
+// in the Kahoot layout, where the dots are placed on the grid itself; about 0.6 of the area in spread). The vision module's classifier only compares eye features between dots, so either works
 // with it; the view, the head model and WebEyeTrack use these numbers.
 export const DOT_POSITIONS = {
   corners: { center: [0, 0], topLeft: [-0.9, -0.9], topRight: [0.9, -0.9], bottomLeft: [-0.9, 0.9], bottomRight: [0.9, 0.9] },
   centers: { center: [0, 0], topLeft: [-0.6, -0.6], topRight: [0.6, -0.6], bottomLeft: [-0.6, 0.6], bottomRight: [0.6, 0.6] },
+  kahootCenters: { center: [0, 0], topLeft: [-0.5, -0.5], topRight: [0.5, -0.5], bottomLeft: [-0.5, 0.5], bottomRight: [0.5, 0.5] },
 };
-export const dotPositions = (dots) => DOT_POSITIONS[dots] ?? DOT_POSITIONS.corners;
+export const dotPositions = (dots, layout = 'kahoot') =>
+  dots === 'centers' ? (layout === 'spread' ? DOT_POSITIONS.centers : DOT_POSITIONS.kahootCenters) : DOT_POSITIONS.corners;
 
 export function loadSettings() {
   const out = structuredClone(DEFAULTS);
