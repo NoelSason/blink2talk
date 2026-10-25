@@ -25,6 +25,7 @@ const SCHEMA = [
   ] },
   { group: 'Long blink / squint', rows: [
     { key: 'blink.selectMs', label: 'Hold to select', min: 400, max: 1500, step: 50, unit: 'ms' },
+    { key: 'blink.spellSelectMs', label: 'Hold to select (spelling)', min: 300, max: 1500, step: 50, unit: 'ms' },
     { key: 'blink.refractoryMs', label: 'Wait after a select', min: 500, max: 2500, step: 100, unit: 'ms' },
     { key: 'blink.smoothingFrames', label: 'Blink smoothing (frames)', min: 1, max: 8, step: 1, unit: '' },
   ] },

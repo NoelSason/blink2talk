@@ -68,11 +68,13 @@ export async function startEyes(on, settings) {
   let faceState = true;        // what the app has been told
   let faceChange = null;       // { to, since } while a change is waiting out its debounce
 
+  let selectMs = null; // set by the app per page (spelling is shorter); survives a rebuild
+
   function build() {
     pipeline = new EyePipeline({
       calibration: { layout: 'quadrants', ...settings.calibration },
       quadrant: { ...settings.quadrant },
-      blink: { ...settings.blink },
+      blink: { ...settings.blink, ...(selectMs ? { selectMs } : {}) },
     });
   }
 
@@ -185,5 +187,13 @@ export async function startEyes(on, settings) {
   status('Eyes: not calibrated. Press Calibrate.');
   video.requestVideoFrameCallback(loop);
 
-  return { calibrate: rebuild, rebuild };
+  return {
+    calibrate: rebuild,
+    rebuild,
+    // Hold time for a select, applied at once (the vision module reads it on every hold).
+    setSelectMs(ms) {
+      selectMs = ms;
+      pipeline?.setBlinkConfig({ selectMs: ms });
+    },
+  };
 }

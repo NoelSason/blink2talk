@@ -93,6 +93,8 @@ let beforeSelect = null;      // what to go back to on a double blink
 let nextQuestion = 0;
 let eyesOn = false;           // the camera is calibrated and reporting where the patient looks
 let eyesCalibrated = false;   // has the camera been calibrated at least once this session
+let holdTicked = false;       // the 'long enough, open now' tick already played for this hold
+let appliedSelectMs = null;   // the hold-to-select time last sent to the camera
 const calibButton = document.getElementById('calib-start');
 calibButton.addEventListener('click', () => { calibButton.blur(); runAction('calibrate'); });
 let keyboardUntil = 0;
@@ -607,6 +609,13 @@ const camera = {
     const wasEngaged = s.cam.engaged;
     s.cam = { engaged: !!b?.engaged, closed: !!b?.closed, progress: b?.progress ?? 0 };
     if (wasEngaged && !s.cam.engaged) openedAt = now();
+    // The select fires when the eyes open, and the patient can't see the ring with them shut:
+    // a tick says the hold is long enough, so they know to open now.
+    if (!s.cam.engaged) holdTicked = false;
+    else if (!holdTicked && s.cam.progress >= 1 && choosing()) {
+      holdTicked = true;
+      chime('tick');
+    }
   },
   // The box the patient is looking at gets the highlight; the middle band (the question) highlights nothing.
   focus: (quadrant) => {
@@ -661,6 +670,12 @@ function itemState(i, holdShown) {
 const view = createView();
 
 function tick() {
+  // Spelling needs many picks, so its hold is shorter (dev mode sets both).
+  const wantSelectMs = s.rowKind === 'spell' ? eyeSettings.blink.spellSelectMs : eyeSettings.blink.selectMs;
+  if (eyes && wantSelectMs !== appliedSelectMs) {
+    eyes.setSelectMs(wantSelectMs);
+    appliedSelectMs = wantSelectMs;
+  }
   const t = now();
   let hold = 0;
   if (choosing() && s.eyesClosed && closedAt != null) {
