@@ -105,7 +105,7 @@ const driftButton = document.getElementById('drift-start');
 driftButton.addEventListener('click', () => { driftButton.blur(); runAction('drift-check'); });
 let keyboardUntil = 0;
 let micQuietUntil = 0;
-let micWanted = false; // off at launch: always-on listening picked up room chatter. M or the care panel turns it on.
+let micWanted = true; // listening from launch. M or the care panel mutes it (it can pick up room chatter).
 let mic = null;
 let micGen = 0; // which start of the mic is current
 let eyes = null;
@@ -898,7 +898,7 @@ async function loadConfig(tries = 15) {
     s.urgent = config.urgent ?? FALLBACK_URGENT;
     prefetchVoice(s.urgent);
     if (micWanted) startNurseMic();
-    else demo.setMic('Mic: off (M or the care panel turns it on)');
+    else demo.setMic('Mic: off (M or the care panel turns it back on)');
   } else if (tries > 0) {
     setTimeout(() => loadConfig(tries - 1), 1000);
   } else {
