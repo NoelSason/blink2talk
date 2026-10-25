@@ -121,7 +121,7 @@ function showSource({ source, wetReady, wetLabels }, flash) {
 }
 let keyboardUntil = 0;
 let micQuietUntil = 0;
-let micWanted = true;
+let micWanted = false; // off at launch: always-on listening picked up room chatter. M or the care panel turns it on.
 let mic = null;
 let eyes = null;
 let camLesson = null;          // { quadrant, look } from the camera's last pick, taught back once the reply is spoken
@@ -901,7 +901,8 @@ async function loadConfig(tries = 15) {
   if (config) {
     s.urgent = config.urgent ?? FALLBACK_URGENT;
     prefetchVoice(s.urgent);
-    startNurseMic();
+    if (micWanted) startNurseMic();
+    else demo.setMic('Mic: off (M or the care panel turns it on)');
   } else if (tries > 0) {
     setTimeout(() => loadConfig(tries - 1), 1000);
   } else {

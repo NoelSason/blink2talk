@@ -60,6 +60,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-24 (Marco): nurse mic is off at launch; M or the care panel's "Listen for the nurse" turns it on. Why: always-on listening transcribed room chatter as the nurse, and Ink-2 auto-detected it as Hindi.
 - 2026-10-24: "None of these" and "Go back" boxes show the hold fill ring like replies. Why: Noel couldn't tell his hold on None of these was working; his eye log showed the picks going through, but those boxes had no ring.
 - 2026-10-24: Double blink on the replies (no page before them) goes back to Listening. Why: Noel's eye log showed his double blinks detected and paired, but on the replies and Listening there was nothing to go back to, so it felt broken.
 - 2026-10-24 (Marco): learning from picks is off by default, and WebEyeTrack never learns from picks. Why: in Marco's session the app kept saying "I can't breathe" (5 of 11 picks top right): 3 of WebEyeTrack's 5 labeled points had become top-right picks that weren't undone, so it leaned top right and picked it again. Also patched WebEyeTrack's 60 s expiry on labeled points, which dropped all five calibration dots a minute in.
