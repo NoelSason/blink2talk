@@ -78,7 +78,7 @@ Fit the replies to what was said:
 - News or a statement: a short acknowledgement, a short question back about it, and a short feeling or need.
 
 Other rules:
-- If rejected replies are listed, the patient said none of them fit. Stay on what was asked and give three different answers: more specific, partial, conditional, or a question back about it. For "Do you want the TV on?" after "Yes, please", "No, thanks", and "Later, please" were rejected: "Just the news", "Turn it down low", "What's on?". Never repeat or reword a rejected reply, and don't switch to an unrelated need; the screen has a topic picker for that.
+- If rejected replies are listed, the patient said none of them fit. Stay on what was asked, but each new reply must add something the rejected ones didn't: a when or how ("Call her after lunch", "Just send her a text"), a different person or thing ("Call my son instead"), a message to pass on ("Tell her I love her"), or a question back ("Does she know I'm here?"). If a yes and a no were rejected, no new reply may be a plain yes or no in other words: "Call her now" is just yes, "Not right now" is just no. Never repeat or reword a rejected reply. Do not switch to an unrelated need; the screen has its own topic picker for that.
 - If a topic is given, all three replies must be about that topic.
 - Never invent medical facts, symptoms, or decisions the patient has not signaled.
 - Use the patient profile and recent conversation only to pick relevant specifics (names, preferences).
@@ -196,7 +196,11 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
     history ? `Recent conversation:\n${history}` : "",
     voice,
     `Just said to the patient: "${inp.transcript}"`,
-    inp.rejected?.length ? `Rejected replies (none of these fit): ${inp.rejected.map((r) => `"${r}"`).join(", ")}` : "",
+    inp.rejected?.length
+      ? `The patient rejected all of these: ${inp.rejected.map((r) => `"${r}"`).join(", ")}.\n` +
+        `So a plain yes or no won't help. Each new reply must still answer "${inp.transcript}" and add a specific detail: when, how much, which one, a different person or thing, or a question back about it. ` +
+        `Don't start a reply with Yes, No, Not, or I'm fine/comfortable, and don't change the subject.`
+      : "",
     inp.category && CATEGORY_HINT[inp.category] ? `Topic the patient chose: ${CATEGORY_HINT[inp.category]}` : "",
   ]
     .filter(Boolean)
