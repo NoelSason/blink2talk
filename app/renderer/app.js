@@ -102,23 +102,6 @@ const calibButton = document.getElementById('calib-start');
 calibButton.addEventListener('click', () => { calibButton.blur(); runAction('calibrate'); });
 const driftButton = document.getElementById('drift-start');
 driftButton.addEventListener('click', () => { driftButton.blur(); runAction('drift-check'); });
-const sourceButton = document.getElementById('source-toggle');
-sourceButton.addEventListener('click', () => { sourceButton.blur(); runAction('gaze-source'); });
-const sourceBadge = document.getElementById('source-badge');
-let sourceBadgeTimer = 0;
-// Shows which eye tracker drives the boxes, on the button and briefly mid-screen after a swap.
-function showSource({ source, wetReady, wetLabels }, flash) {
-  const name = source === 'webeyetrack' ? 'WebEyeTrack' : 'vision';
-  sourceButton.textContent = `Eyes: ${name} (G)`;
-  window.dispatchEvent(new CustomEvent('eyes-source', { detail: { source } })); // dev panel select
-  if (!flash) return;
-  sourceBadge.textContent = source === 'webeyetrack'
-    ? `Eyes: WebEyeTrack${wetLabels ? '' : ' (not trained yet: calibrate)'}`
-    : `Eyes: vision module${wetReady ? '' : ' (WebEyeTrack unavailable)'}`;
-  sourceBadge.hidden = false;
-  clearTimeout(sourceBadgeTimer);
-  sourceBadgeTimer = setTimeout(() => { sourceBadge.hidden = true; }, 1800);
-}
 let keyboardUntil = 0;
 let micQuietUntil = 0;
 let micWanted = false; // off at launch: always-on listening picked up room chatter. M or the care panel turns it on.
@@ -853,7 +836,6 @@ function runAction(action, arg) {
   if (action === 'theme') root.dataset.theme = (arg ?? root.dataset.theme !== 'light') ? 'light' : 'dark';
   if (action === 'calibrate') eyes?.calibrate();
   if (action === 'drift-check') eyes?.driftCheck();
-  if (action === 'gaze-source' && eyes) showSource(arg ? eyes.setSource(arg) : eyes.toggleSource(), true);
   if (action === 'profile') memory.setProfile(arg);
   if (action === 'summary') refreshSummary();
   if (action === 'local-replies') setLocalReplies(arg ?? !s.localReplies);
@@ -931,11 +913,9 @@ const devPanel = createDevPanel({
   onRebuild: () => eyes?.rebuild(),
   onDrift: () => eyes?.driftCheck(),
   onBlink: (patch) => eyes?.setBlink(patch),
-  onSource: (source) => runAction('gaze-source', source),
 });
 const devButton = document.getElementById('dev-open');
 devButton.addEventListener('click', () => { devButton.blur(); devPanel.toggle(); });
 startEyes(camera, eyeSettings).then((handle) => {
   eyes = handle;
-  if (eyes) showSource({ source: eyeSettings.gazeSource }, false);
 });

@@ -6,19 +6,17 @@
   "main": "main.js",
   "scripts": {
     "eyes": "cd ../vision && npx --no-install rolldown src/cv/index.ts -f esm -p browser -o ../app/renderer/vendor/eyes.js && node scripts/fetch-assets.mjs ../app/renderer",
-    "prestart": "npm run eyes || echo 'Eye tracking not built (run npm install --legacy-peer-deps in ../vision). Keyboard only.'; npm run voices || echo 'Speaker-recognition model not downloaded; voices will not be told apart.'; npm run gaze || echo 'WebEyeTrack not vendored (npm install in app/); the vision module is used.'",
+    "prestart": "npm run eyes || echo 'Eye tracking not built (run npm install --legacy-peer-deps in ../vision). Keyboard only.'; npm run voices || echo 'Speaker-recognition model not downloaded; voices will not be told apart.'",
     "start": "electron .",
     "prewindowed": "npm run prestart",
     "windowed": "BLINK2TALK_WINDOWED=1 electron .",
     "test": "node --no-warnings --test test/drift.test.mjs test/speakers.test.mjs test/accuracy.test.mjs && electron test/e2e.js",
     "accuracy": "node scripts/accuracy.mjs",
     "voices": "node scripts/fetch-voice-model.mjs",
-    "stress": "electron test/stress.js",
-    "gaze": "node scripts/webeyetrack.mjs"
+    "stress": "electron test/stress.js"
   },
   "devDependencies": {
-    "electron": "^45.0.0",
-    "webeyetrack": "0.0.2"
+    "electron": "^45.0.0"
   },
   "dependencies": {
     "sherpa-onnx-node": "^2.0.0"

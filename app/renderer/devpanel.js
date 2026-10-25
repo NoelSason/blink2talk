@@ -50,7 +50,7 @@ const setPath = (obj, path, value) => {
 };
 const typing = (event) => event.target.matches?.('input, textarea, [contenteditable]');
 
-export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource }) {
+export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   const panel = el('aside', { className: 'dev', hidden: true });
   const target = el('div', { className: 'dev-target', hidden: true });
   document.body.append(panel, target);
@@ -94,13 +94,6 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
     return row;
   }
 
-  const sourceInput = el('select', {});
-  for (const [v, text] of [['vision', 'Vision module (eye features, per-axis boxes)'], ['webeyetrack', 'WebEyeTrack (neural gaze point), G swaps']]) {
-    sourceInput.append(el('option', { value: v, textContent: text }));
-  }
-  // Both trackers run all the time, so this swaps at once (same as G). It follows G too.
-  sourceInput.addEventListener('change', () => onSource?.(sourceInput.value));
-  window.addEventListener('eyes-source', (e) => { sourceInput.value = e.detail.source; });
   const learnInput = el('input', { type: 'checkbox' });
   learnInput.addEventListener('change', () => {
     settings.learnFromPicks = learnInput.checked;
@@ -137,7 +130,6 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
   const resetBtn = button('Reset to defaults', () => {
     Object.assign(settings, structuredClone(DEFAULTS));
     headInput.checked = settings.headPose;
-    sourceInput.value = settings.gazeSource;
     learnInput.checked = settings.learnFromPicks;
     saveSettings(settings);
     syncSliders();
@@ -156,8 +148,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
         el('span', {}, 'Last blinks: ', live.blinks),
         el('span', {}, 'Last drift: ', live.drift))),
     el('section', { className: 'dev__section' },
-      el('h2', { className: 'dev__heading', textContent: 'Gaze source' }),
-      el('label', { className: 'dev__row' }, sourceInput),
+      el('h2', { className: 'dev__heading', textContent: 'Learning' }),
       el('label', { className: 'dev__row' }, learnInput,
         el('span', { className: 'dev__label', textContent: 'Learn from spoken picks (teaches the chosen box where the eyes were)' }))),
     el('section', { className: 'dev__section' },
@@ -181,7 +172,6 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink, onSource
   );
   applyBtn.disabled = true;
   headInput.checked = settings.headPose;
-  sourceInput.value = settings.gazeSource;
   learnInput.checked = settings.learnFromPicks;
   syncSliders();
 

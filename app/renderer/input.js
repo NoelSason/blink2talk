@@ -49,7 +49,6 @@ const DEMO_KEYS = {
   KeyK: 'drift-check',   // 8 s drift check: center and two corners, shifts the boxes back
   KeyN: 'care',          // open or close the care panel
   KeyM: 'mic',           // nurse microphone on or off
-  KeyG: 'gaze-source',   // swap which eye tracker drives the boxes: vision module / WebEyeTrack
 };
 export function onDemoKey(handler) {
   window.addEventListener('keydown', (event) => {

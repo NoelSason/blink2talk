@@ -13,7 +13,7 @@ const END = '<!-- accuracy:end -->';
 const BOXES = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 const TARGETS = ['center', ...BOXES];
 const NAME = { center: 'Center', topLeft: 'Top left', topRight: 'Top right', bottomLeft: 'Bottom left', bottomRight: 'Bottom right' };
-const TRACKER = { vision: 'vision module', webeyetrack: 'WebEyeTrack' };
+const TRACKER = { vision: 'vision module', 'vision+head': 'vision + head model' };
 const README_ROWS = 5; // newest runs and calibrations shown in the README; docs/accuracy.md has all
 
 const files = (root) => ({

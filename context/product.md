@@ -1,10 +1,10 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-24 21:20 PDT (eye accuracy record in the README)
+Updated: 2026-10-24 22:10 PDT (WebEyeTrack removed; replies, stage log)
 
 ## Now
-- Working on: eye accuracy record in the root README (done: every calibration and dev-mode accuracy test).
-- Next: accuracy test on 4 people, 2 outside the team, in venue lighting; team call on Spell it and urgent alerts (Cut list).
+- Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README.
+- Next: accuracy test on 4 people, 2 outside the team, in venue lighting; stage-log ratings and Figma share links; team call on Spell it and urgent alerts (Cut list).
 - Blocked on: nothing.
 
 ## Build-order status
@@ -60,6 +60,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-24: WebEyeTrack removed: `renderer/webeyetrack.js`, its weights, `npm run gaze`, the smoke test, the `webeyetrack` dependency, the `G` key, the Eyes button and badge, and the dev-panel source switch. The vision module is the only gaze source; the eye log drops `wf`/`wl`/`wp`, and accuracy-test records say `vision` or `vision+head`. Why: a second MediaPipe instance (~15 fps) ran all the time with no measured win, and it was a fourth way to decide the box. Rejected: keeping it off by default (dead code in the demo build).
 - 2026-10-24: Eye accuracy is front and center in the root README, written by the app. After every calibration and every dev-mode accuracy test, `main.js` hands the logged event to `app/accuracy.js`, which saves it in `docs/accuracy/<launch>.json` (one file per launch, so laptops merge without conflicts) and rewrites `docs/accuracy.md` and the README section between the accuracy markers. Calibration fit (its own looks classified back) is shown apart from the accuracy test and labeled as a fit check, not accuracy. Dev mode has a "Who's testing" box (not kept between launches, so a new person isn't logged under the last). Backfilled tonight's 8 calibrations from `app/logs/`; no accuracy test had been logged yet. Why: Noel's testing showed high accuracy, but nothing recorded it, and judges need a number. Rejected: one shared results file (appends from two laptops conflict in git).
 - 2026-10-24: Double blink leaves the replies only once they've loaded. Why: on a slow first answer (cold Claude, a clinician clip), two ordinary blinks during the wait threw the question away and went back to Listening (Noel).
 - 2026-10-24 (Marco): nurse mic is off at launch; M or the care panel's "Listen for the nurse" turns it on. Why: always-on listening transcribed room chatter as the nurse, and Ink-2 auto-detected it as Hindi.
