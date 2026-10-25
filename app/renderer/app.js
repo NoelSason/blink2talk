@@ -9,11 +9,11 @@ import { PATIENT, QUESTIONS } from './samples.js';
 import { createView } from './view.js';
 import { createDemoPanel } from './demo.js';
 import { createCarePanel } from './care.js';
-import { createMemory } from './memory.js';
+import { createMemory, timeLabel } from './memory.js';
 import { spellBoxes } from './speller.js';
 import { onPatientInput, onDemoKey } from './input.js';
 import { chime, speak, stopSpeaking } from './sound.js';
-import { FALLBACK_URGENT, completeWord, getConfig, getReplies, getSummary, identifySpeaker, prefetchVoice, sttToken, voiceAudio, warmLocalModel } from './conversation.js';
+import { FALLBACK_URGENT, completeWord, condense, getConfig, getReplies, getStarters, getSummary, guessCategory, identifySpeaker, plainCondense, prefetchVoice, startCandidates, sttToken, voiceAudio, warmLocalModel } from './conversation.js';
 import { startEyes } from './eyes.js';
 import { loadSettings } from './devsettings.js';
 import { createDevPanel } from './devpanel.js';
@@ -43,6 +43,12 @@ const END_NONE = { type: 'end', kind: 'none', label: 'None of these', action: 'm
 const card = (label, extra = {}) => ({ type: 'card', label, action: 'say', ...extra });
 const LISTEN_ITEMS = [card('I want to say something', { icon: 'message', action: 'start' })];
 const URGENT_ICONS = { "I'm in pain": 'bandage', "I can't breathe": 'wind', 'Call the nurse': 'bell' };
+// Start a conversation: one generic Emergency box beside the starters, fixed here and never generated.
+// Picking it always alerts the care panel.
+const EMERGENCY = card('Emergency', { icon: 'bell', say: 'I need help now', alert: true });
+// The last page of a category: "None of these" would have nothing new to show, so it opens Spell it.
+const END_SPELL = { type: 'end', kind: 'spell', label: 'Spell it', action: 'more' };
+const BROWSE_CAPTION = { need: 'What do you need?', say: 'What do you want to say?' };
 // Grid cells in reading order; the vision module names them by quadrant.
 const GRID = { topLeft: 0, topRight: 1, bottomLeft: 2, bottomRight: 3 };
 const QUADRANT = Object.keys(GRID); // cell index -> quadrant name
@@ -53,7 +59,7 @@ const memory = createMemory({ name: PATIENT });
 const s = {
   stage: 'choose',            // 'choose' | 'speaking'
   caption: { kind: 'waiting' },
-  rowKind: 'listen',          // 'listen' | 'replies' | 'starters' | 'unaddressed' | 'spell'
+  rowKind: 'listen',          // 'listen' | 'start' | 'browse' | 'replies' | 'starters' | 'unaddressed' | 'spell'
   items: LISTEN_ITEMS,
   replies: [],                // the current reply set
   held: [],                   // replies kept back when the speech wasn't meant for the patient
@@ -79,6 +85,8 @@ const s = {
   resting: false,             // eyes closed 3 s: the camera treats it as a rest, not a choice
   mic: 'off',                 // 'off' | 'starting' | 'on' | 'unavailable'
   turn: null,                 // who said the current question: { speaker, voice, given }
+  browse: null,               // the open category: { cat, list, at, size } (its fixed order, first shown, page size)
+  speakRequest: null,         // the pick being spoken is the patient's own request: its category ('need' | 'say')
   noneCount: 0,               // "None of these" presses for the current question
   rejected: [],               // replies shown for it that the patient said none of
   summary: null,              // { forPatient, forCaregiver, source, t }: the conversation so far
@@ -138,11 +146,41 @@ function replyItems(replies) {
 }
 
 // The conversation server's options that are always offered: its urgent phrases and Spell it.
-function starterItems() {
+function urgentItems() {
   return [...s.urgent.slice(0, 3).map((u) => card(u, { icon: URGENT_ICONS[u] ?? 'message' })), card('Spell it', { icon: 'keyboard', action: 'spell' })];
 }
 
-const sayable = (items) => items.filter((it) => it?.action === 'say').map((it) => it.label);
+const textKey = (text) => String(text).toLowerCase().replace(/[^a-z0-9]/g, '');
+const sayable = (items) => items.filter((it) => it?.action === 'say').map((it) => it.say ?? it.label);
+
+// "I want to say something": the same four every time (references/quadrant-content.md, idle board).
+// In the row layout: I need something, I want to ask or say, Emergency, I'm in pain.
+function startItems() {
+  const pain = s.urgent[0];
+  return [
+    card('I need something', { icon: 'glass', action: 'browse', cat: 'need' }),
+    EMERGENCY,
+    card('I want to ask or say', { icon: 'message', action: 'browse', cat: 'say' }),
+    card(pain, { icon: URGENT_ICONS[pain] ?? 'message' }),
+  ];
+}
+
+// A category, three phrases at a time (two when tired) with the escape last. The order is set when
+// it opens, so "None of these" only moves forward: nothing shown comes back, and on the last page the
+// escape is Spell it.
+function browseItems() {
+  const { list, at, size } = s.browse;
+  const items = [0, 1, 2].map((i) => (i < size && list[at + i] != null ? card(list[at + i]) : null));
+  return [...items, at + size >= list.length ? END_SPELL : END_NONE];
+}
+
+function showBrowse() {
+  s.browse = { ...s.browse, size: s.tired ? 2 : 3 };
+  s.caption = { kind: 'prompt', text: BROWSE_CAPTION[s.browse.cat] };
+  const items = browseItems();
+  prefetchVoice(sayable(items));
+  setRow('browse', items);
+}
 
 // ---------- Listening and replies ----------
 function toListening() {
@@ -201,7 +239,9 @@ let prefetch = null; // { text, promise }
 function repliesBody(transcript, history, turn) {
   return {
     transcript,
-    history: history.slice(-6),
+    history, // the last ~100 turns, each with its time; older ones arrive condensed as `earlier`
+    earlier: memory.earlier().text || undefined,
+    now: timeLabel(Date.now()),
     patientProfile: memory.forClaude(),
     fatigue: s.tired ? Math.max(s.fatigue, 0.8) : s.fatigue,
     speaker: turn?.voiceId ? { voice: turn.voiceId, label: turn.speaker ?? undefined, isNew: turn.isNew } : undefined,
@@ -247,7 +287,7 @@ async function requestReplies(audio = null) {
     conversationChanged();
     s.held = d.replies;
     s.caption = { kind: 'question', speaker: 'In the room', text: s.transcript };
-    setRow('unaddressed', [card('Reply anyway', { icon: 'message', action: 'anyway' }), ...starterItems().slice(0, 3)]);
+    setRow('unaddressed', [card('Reply anyway', { icon: 'message', action: 'anyway' }), ...urgentItems().slice(0, 3)]);
     return;
   }
   showReplies(d.replies);
@@ -263,7 +303,12 @@ async function reaskReplies() {
   s.urgent = d.urgent;
   s.consent = d.highStakes;
   s.stakesAbout = d.about;
-  showReplies(d.replies);
+  // Never a reply already turned down (the model can repeat one, and the safe basics may be among
+  // them). With nothing new left: the urgent options and Spell it, instead of going round again.
+  const seen = new Set(s.rejected.map(textKey));
+  const fresh = d.replies.filter((r) => !seen.has(textKey(r)));
+  if (!fresh.length) return setRow('starters', urgentItems());
+  showReplies(fresh);
 }
 
 // Claude's guess at who spoke ({ label, role }): it names this line, the caption, and every line of
@@ -291,7 +336,20 @@ function select(i) {
     chime();
     s.prevPage = page(i);
     s.caption = { kind: 'prompt', text: 'What do you want to say?' };
-    setRow('starters', starterItems());
+    setRow('start', startItems());
+  } else if (item.action === 'browse') {
+    chime();
+    s.prevPage = page(i);
+    s.browse = { cat: item.cat, list: browseList(item.cat), at: 0, size: 3 };
+    showBrowse();
+  } else if (item.action === 'more' && s.rowKind === 'browse') {
+    // The next page of the same fixed list; past the end, Spell it. Never back to a phrase already shown.
+    chime();
+    const at = s.browse.at + s.browse.size;
+    if (at >= s.browse.list.length) return openSpell(); // Spell it remembers this page itself
+    s.prevPage = page(i);
+    s.browse = { ...s.browse, at };
+    showBrowse();
   } else if (item.action === 'more') {
     // "None of these": up to NONE_REASKS fresh sets of replies (the server is told what was already
     // shown, so it doesn't repeat them), then the urgent options and Spell it. A double blink goes
@@ -303,7 +361,7 @@ function select(i) {
       s.rejected.push(...sayable(s.items));
       reaskReplies();
     } else {
-      setRow('starters', starterItems());
+      setRow('starters', urgentItems());
     }
   } else if (item.action === 'anyway') {
     chime();
@@ -326,7 +384,7 @@ function select(i) {
   } else if (item.action === 'say') {
     // A yes or no to consent or treatment is asked twice before it's spoken.
     if (s.consent && s.rowKind === 'replies' && /^(yes|no)\b/i.test(item.label)) askConfirm(i, item.label);
-    else choose(i, item.label);
+    else choose(i, item.say ?? item.label);
   }
 }
 
@@ -346,6 +404,32 @@ function askConfirm(i, text) {
   ]);
 }
 
+// ---------- Start a conversation ("I want to say something") ----------
+// Each category's phrases are past requests first, then the common list (startCandidates). Claude
+// puts them in order for right now, asked ahead of time (at launch and after every change to the
+// conversation) so a category never waits; until it answers, or without the server, that plain order.
+const starterSets = new Map(); // key -> ordered phrases, or null while asked for
+let startersTimer = 0;
+const startersKey = (cat) => `${new Date().getHours()}|${memory.history.length}:${memory.history.at(-1)?.t ?? 0}|${cat}`;
+const pastFor = (cat) => memory.pastRequests(12).filter((r) => (r.cat ?? guessCategory(r.text)) === cat);
+
+function prefetchStarters() {
+  for (const cat of ['need', 'say']) {
+    const key = startersKey(cat);
+    if (starterSets.has(key)) continue;
+    starterSets.set(key, null);
+    const past = pastFor(cat);
+    const candidates = startCandidates(cat, past);
+    getStarters({ category: cat, candidates, history: memory.turns(), earlier: memory.earlier().text || undefined, patientProfile: memory.forClaude(), pastRequests: past, now: timeLabel(Date.now()) }).then((list) => {
+      if (!starterSets.has(key)) return; // the conversation changed meanwhile
+      if (list?.length) starterSets.set(key, list);
+      else starterSets.delete(key); // no server yet: ask again next time
+    });
+  }
+}
+
+const browseList = (cat) => starterSets.get(startersKey(cat)) ?? startCandidates(cat, pastFor(cat));
+
 // Selected: the card turns green with a check and a chime; Speaking follows (see tick).
 function choose(i, text) {
   chime();
@@ -353,14 +437,19 @@ function choose(i, text) {
   s.selected = i;
   s.selectedAt = now();
   s.speakText = text;
-  if (s.urgent.includes(text)) alertCare(text);
+  const item = s.items[i];
+  const urgent = item?.alert || s.urgent.includes(text);
+  // A phrase from a category or a short spelled message is the patient's own request: memory puts it
+  // first in that category next time (spelled ones under "I want to ask or say").
+  s.speakRequest = urgent ? null : s.rowKind === 'browse' ? s.browse.cat : s.rowKind === 'spell' && text.split(/\s+/).length <= 8 ? 'say' : null;
+  if (urgent) alertCare(text);
 }
 
 function toSpeaking(text) {
   s.stage = 'speaking';
   s.spoken = text;
   s.selected = -1;
-  memory.addTurn('patient', text);
+  memory.addTurn('patient', text, { request: s.speakRequest });
   memory.picked(text);
   conversationChanged();
   const token = ++speechToken;
@@ -386,11 +475,12 @@ function toSpeaking(text) {
 // The current page, to come back to. Its own back page comes along, so double blinks walk back one
 // page at a time: Spell it → the urgent options → the replies.
 function page(hl) {
-  return { caption: s.caption, rowKind: s.rowKind, items: s.items, hl, prevPage: s.prevPage };
+  return { caption: s.caption, rowKind: s.rowKind, items: s.items, hl, prevPage: s.prevPage, browse: s.browse };
 }
 
 function showPage(p) {
   s.prevPage = p.prevPage ?? null;
+  s.browse = p.browse ?? null; // back to a category page: None of these goes on from that page
   s.caption = p.caption;
   setRow(p.rowKind, p.items, { hl: p.hl ?? startHl() });
 }
@@ -508,8 +598,9 @@ function spellPick(box, i) {
 // ---------- Patient state ----------
 function setTired(on) {
   s.tired = on;
-  if (s.stage !== 'choose' || s.rowKind !== 'replies' || s.selected >= 0 || s.loading) return;
+  if (s.stage !== 'choose' || !['replies', 'browse'].includes(s.rowKind) || s.selected >= 0 || s.loading) return;
   const label = s.items[s.hl]?.label;
+  if (s.rowKind === 'browse') return showBrowse(); // the page drops its third phrase; the next page starts after what's shown
   const items = replyItems(s.replies);
   setRow('replies', items, { hl: items.findIndex((it) => it && it.label === label) });
 }
@@ -824,13 +915,43 @@ function conversationChanged() {
   care.conversationChanged();
   clearTimeout(summaryTimer);
   summaryTimer = setTimeout(refreshSummary, TIMING.summaryWait);
+  starterSets.clear();
+  clearTimeout(startersTimer);
+  startersTimer = setTimeout(() => prefetchStarters(), TIMING.summaryWait);
+  maybeCondense();
+}
+
+// ---------- Long-term memory ----------
+// Past the last ~100 turns, the oldest 20 fold into the condensed notes every call gets as `earlier`
+// (memory.js). One at a time. Without the server or a model, a plain digest; on a model error the
+// turns stay and it tries again on the next change.
+let condensing = false;
+async function maybeCondense() {
+  const batch = memory.toCondense();
+  if (!batch || condensing) return;
+  condensing = true;
+  let done = false;
+  try {
+    const earlier = memory.earlier().text;
+    const turns = batch.map(({ role, text, speaker, t }) => ({ role, text, ...(speaker && { speaker }), at: timeLabel(t) }));
+    const d = await condense({ earlier, turns, patientProfile: memory.forClaude() });
+    done = memory.condensed(d?.text ?? plainCondense(earlier, turns), batch);
+  } catch (err) {
+    console.warn('condensing failed; keeping those turns for now:', err);
+  } finally {
+    condensing = false;
+  }
+  if (done) {
+    care.conversationChanged();
+    maybeCondense(); // more than one batch waiting
+  }
 }
 
 async function refreshSummary() {
   const token = ++summaryToken;
   const turns = memory.turns().slice(-40);
   const summary = turns.length
-    ? (await getSummary({ history: turns, patientProfile: memory.forClaude() })) ?? plainSummary(turns)
+    ? (await getSummary({ history: turns, earlier: memory.earlier().text || undefined, patientProfile: memory.forClaude() })) ?? plainSummary(turns)
     : null;
   if (token !== summaryToken) return;
   s.summary = summary && { ...summary, t: Date.now() };
@@ -909,7 +1030,8 @@ async function loadConfig(tries = 15) {
   setLocalReplies(s.localReplies);
   if (config) {
     s.urgent = config.urgent ?? FALLBACK_URGENT;
-    prefetchVoice(s.urgent);
+    prefetchVoice([...s.urgent, EMERGENCY.say]);
+    prefetchStarters();
     if (micWanted) startNurseMic();
     else demo.setMic('Mic: off (M or the care panel turns it back on)');
   } else if (tries > 0) {
@@ -927,7 +1049,7 @@ onPatientInput((event) => {
 });
 onDemoKey((action) => runAction(action));
 // test/e2e.js loads the page with ?test and drives the camera handlers with recorded-style events.
-if (new URLSearchParams(location.search).has('test')) window.__test = { camera, heard, state: s };
+if (new URLSearchParams(location.search).has('test')) window.__test = { camera, heard, state: s, memory, conversationChanged };
 toListening();
 syncPanels();
 loadConfig();

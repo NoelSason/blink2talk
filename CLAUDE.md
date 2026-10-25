@@ -74,6 +74,7 @@ High-stakes question: the re-asks are fixed clarifying replies (`conversation/sr
 | `transcript` | Conversation → Product | `{ text, final: bool }` |
 | `options` | Conversation → Product | `{ replies: [{ text, intent }], highStakes: bool }` (exactly 3; UI adds "none") |
 | `speak` | Product → Conversation | `{ text }` (resolves when playback ends) |
+| `starters` | Conversation → Product | `{ starters: string[] }` = the given `candidates` reordered for now, from `{ category: "need"\|"say", candidates, history, patientProfile, pastRequests, now }` (never new text) |
 
 Transport: `ipcRenderer`/`ipcMain` for events. All events carry `t` (ms epoch).
 
@@ -104,6 +105,9 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 - 2026-10-25 — Marco: default patient layout back to the Kahoot 2x2 (question on top, 2x2 below). Four columns didn't work in testing. Row of 4 stays a dev-mode switch.
 - 2026-10-25 — Noel: agent relay at agents.blink2talk2.us (`relay/`, `.claude/hooks/relay.mjs`). Agents claim files before editing; a hook blocks an edit to another teammate's claimed file and tells both humans, who resolve it. Team tooling, not product. Setup in `relay/README.md`.
 - 2026-10-25 — Noel: "None of these" flow rewritten above to match the app (two re-asks on the same question, then urgent + Spell it); the topic picker stays in `patient.html`. A stress test of the re-asks found: high-stakes re-asks repeated Yes / No / I need more time, a failed Claude call repeated rejected replies (and answered "Where does it hurt?" with Yes / No), and yes/no re-asks gave only one side. All fixed in `conversation/` (context/conversation.md). Rejected: weighting the box the patient looked at longest, because that mostly measures how long a reply takes to read. Arrow keys now follow the row layout.
+- 2026-10-25 — Product/Conversation (Julian): Claude gets the last ~100 turns verbatim with timestamps; older turns are condensed 20 at a time into long-term notes (`/condense`) kept in `patient_memory.json`. Details in context/product.md.
+- 2026-10-24 — Product (Julian): patient memory (profile, conversation, picks, requests) lives in `patient_memory.json` at the repo root, git-ignored, instead of browser localStorage. One patient per computer for now. Details in context/product.md.
+- 2026-10-24 — Product/Conversation (Julian): "I want to say something" opens a fixed Start screen from references/quadrant-content.md: I need something → / I want to ask or say → / Emergency ("I need help now", always alerts) / I'm in pain. Categories list past requests first, then common phrases; Claude only reorders them. "None of these" never repeats anything: categories page forward to Spell it, and rejected replies are filtered out (nothing new → urgent options). Urgent items stay fixed and never model-made. Details in context/product.md.
 
 - 2026-10-25 — Marco: default patient layout is a row of 4 tall boxes (left-right eye movement only) instead of the 2x2. Up-down was the weak axis. 2x2 layouts remain in dev mode. Details in context/product.md.
 - 2026-10-25 — Marco: Claude asks before every push (commits locally until then). Auto-pushing was annoying. Still straight to `main`, no PRs.
@@ -131,4 +135,5 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 cp conversation/.env.example conversation/.env   # fill keys; never commit .env
 ./start                 # installs what's missing, starts the server, opens the app full screen
 # offline: set MOCK_REPLIES=1 and MOCK_VOICE=1 in conversation/.env (canned replies, system voice)
+# patient memory: patient_memory.json at the repo root (git-ignored); delete it to start a new patient
 ```

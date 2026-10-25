@@ -22,7 +22,11 @@ export interface Turn {
   role: "nurse" | "patient";
   text: string;
   speaker?: string; // who said a nurse-side line, as last labeled ("Dr. Lee", "Your daughter")
+  at?: string; // when it was said, the patient's local time ("Sat, Oct 24, 22:41")
 }
+// The app sends the last ~100 turns word for word; anything older arrives condensed as `earlier`
+// (see condense below). Cut here only as a guard.
+const MAX_HISTORY = 120;
 // Which voice said the transcript, from the app's speaker-recognition model, and its label so far.
 export interface VoiceInfo {
   voice?: string; // "voice-2": the same person keeps the same id for this session
@@ -47,6 +51,8 @@ export interface RepliesInput {
   local?: boolean; // testing only: answer with the small on-laptop model (local.ts)
   rejected?: string[]; // replies the patient already said "none of these" to
   category?: Category; // second "none": patient picked a topic
+  earlier?: string; // condensed memory of the conversation before `history`
+  now?: string; // the patient's local time ("Sat, Oct 24, 22:41")
 }
 
 export const CATEGORIES = ["pain", "comfort", "people", "question"] as const;
@@ -90,7 +96,7 @@ Other rules:
 - If a topic is given, all three replies must be about that topic.
 - Never invent medical facts, symptoms, or decisions the patient has not signaled.
 - Never contradict what the patient already said in the recent conversation: if they said the pain is gone, don't offer "My back hurts".
-- Use the patient profile and recent conversation only to pick relevant specifics (names, preferences), and only when they answer what was asked. Never bring in a profile detail to fill a box (a favorite drink in an answer about pain), never read the profile back to the speaker ("My son lives in Fresno"), and never offer what the patient's condition rules out (food or drink to someone intubated).
+- Use the patient profile, the earlier notes, and the recent conversation only to pick relevant specifics (names, preferences), and only when they answer what was asked. Each line has the time it was said and the local time is given: lines from hours or days ago are background, not what is happening now. Never bring in a profile detail to fill a box (a favorite drink in an answer about pain), never read the profile back to the speaker ("My son lives in Fresno"), and never offer what the patient's condition rules out (food or drink to someone intubated).
 - Fatigue 0.8 or more: the screen shows only your first two replies. Keep every reply to 1 to 3 words, and make the first two the pair that answers on its own: yes and no, both choices, or the two halves of a scale with their numbers ("Under 5", "5 or more").
 - Set addressed_to_patient to false only when the speech is clearly meant for someone else (staff talking to each other, a phone call, "grab the chart from room 4"). Anything that could plausibly be for the patient, including greetings and statements about their care, counts as addressed. When it isn't addressed, still write replies: what the patient might say to join in ("I can hear you", "Is that about me?", "Please talk to me").
 - If the message is unintelligible, offer: "Please say that again", "I didn't understand", "Yes". If those were rejected, don't guess what it was about; offer ways to get the question again ("Ask me yes or no", "Please speak slower", "Come back in a minute").
@@ -170,7 +176,7 @@ async function ask(params: AskParams, opts: { timeout: number; maxRetries: numbe
 }
 
 const historyLines = (turns: Turn[]) =>
-  turns.map((t) => `${t.role === "patient" ? "Patient" : t.speaker || "Caregiver"}: ${t.text}`).join("\n");
+  turns.map((t) => `${t.at ? `[${t.at}] ` : ""}${t.role === "patient" ? "Patient" : t.speaker || "Caregiver"}: ${t.text}`).join("\n");
 
 export interface RepliesOut {
   replies: string[]; // same texts as options, kept for existing clients
@@ -238,15 +244,17 @@ function earlierAnswers(history: Turn[]): string {
     .join(", ");
 }
 
-export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
-
-  const history = historyLines((inp.history ?? []).slice(-6));
+/** The user message sent with SYSTEM for one /replies call. */
+export function buildRepliesPrompt(inp: RepliesInput): string {
+  const history = historyLines((inp.history ?? []).slice(-MAX_HISTORY));
   const v = inp.speaker;
   const voice = v?.voice ? `Voice: ${v.voice}${v.isNew ? " (first time heard)" : ""}${v.label ? `, labeled "${v.label}" before` : ""}` : "";
-  const prompt = [
+  return [
     inp.patientProfile ? `Patient profile: ${JSON.stringify(inp.patientProfile)}` : "",
     inp.fatigue !== undefined ? `Fatigue (0-1): ${inp.fatigue.toFixed(2)}` : "",
-    history ? `Recent conversation:\n${history}` : "",
+    inp.now ? `Local time: ${inp.now}` : "",
+    inp.earlier ? `Earlier (condensed):\n${inp.earlier}` : "",
+    history ? `Recent conversation, oldest first:\n${history}` : "",
     voice,
     `Just said to the patient: "${inp.transcript}"`,
     inp.rejected?.length ? rejectedBlock(inp) : "",
@@ -254,6 +262,10 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
+  const prompt = buildRepliesPrompt(inp);
 
   // Testing only: the small on-laptop model, when the caregiver switched it on. Built for speed
   // (median 87 ms on an M3 Max): a short prompt and three replies as plain text (local.ts), because
@@ -314,6 +326,94 @@ function toReplies(parsed: ParsedReplies, source: string, rejected: string[] = [
   return { replies, options, source, addressed: parsed.addressed_to_patient !== false, speaker, highStakes, about };
 }
 
+// "I want to say something": the app opens a category ("I need something", "I want to ask or say") and
+// shows its items three at a time. The items are a fixed list: the patient's past requests in that
+// category, then common ones (references/quadrant-content.md). Claude only puts that list in order
+// for right now; it never writes new items, so "None of these" can page through without ever showing
+// the same thing twice, reworded or not.
+export interface PastRequest {
+  text: string;
+  n: number; // times the patient asked for it
+  agoMin?: number; // minutes since they last did
+}
+export type StartCategory = "need" | "say";
+export interface StartersInput {
+  category: StartCategory;
+  candidates: string[]; // the category's items, past requests first
+  history?: Turn[];
+  patientProfile?: PatientProfile;
+  pastRequests?: PastRequest[];
+  now?: string; // the patient's local time ("Sat, Oct 24, 22:41")
+  earlier?: string; // condensed memory of the conversation before `history`
+}
+export interface StartersOut {
+  starters: string[]; // every candidate exactly once, most likely first
+  source: string;
+}
+
+const CATEGORY_LABEL: Record<StartCategory, string> = {
+  need: 'needs ("I need something")',
+  say: 'questions and feelings ("I want to ask or say")',
+};
+
+export const STARTERS_SYSTEM = `A patient in an ICU is awake but cannot speak or use their hands. Nobody asked them anything: they chose "I want to say something", then a category, and now look through its phrases three at a time, picking one with their eyes. Every page costs them effort, so what they most likely want right now must come first.
+
+You get the category's phrases, numbered. Put them in order, most likely first, and return the numbers. Never add, drop, or reword a phrase.
+
+How to order:
+- Past requests are the strongest signal: patients mostly want something they asked for before. Rank the ones asked for most often and most recently first.
+- Move a need down if the recent conversation shows it was just dealt with (they asked for water and got it a few minutes ago), unless it has been a while.
+- Use the local time: at night, sleep, the light, and noise matter more; in the morning, family and what is planned.
+- Use the recent conversation, the earlier notes, and the patient profile for what is on their mind (a family member mentioned, a procedure coming up). Each line has the time it was said: judge "just dealt with" by that time against the local time.
+- With no other clue, keep the given order: it is already sorted by how often ICU patients want each one.`;
+
+export const STARTERS_SCHEMA = {
+  type: "object",
+  properties: { order: { type: "array", items: { type: "integer" } } },
+  required: ["order"],
+  additionalProperties: false,
+} as const;
+
+const ago = (min: number) => (min < 60 ? `${Math.round(min)} min ago` : min < 1440 ? `${Math.round(min / 60)} h ago` : `${Math.round(min / 1440)} days ago`);
+
+/** The user message sent with STARTERS_SYSTEM for one /starters call. */
+export function buildStartersPrompt(inp: StartersInput): string {
+  const history = historyLines((inp.history ?? []).slice(-MAX_HISTORY));
+  const past = (inp.pastRequests ?? [])
+    .map((p) => `- "${p.text}" (${p.n} ${p.n === 1 ? "time" : "times"}${p.agoMin !== undefined ? `, last ${ago(p.agoMin)}` : ""})`)
+    .join("\n");
+  return [
+    inp.patientProfile ? `Patient profile: ${JSON.stringify(inp.patientProfile)}` : "",
+    inp.now ? `Local time: ${inp.now}` : "",
+    past ? `Past requests:\n${past}` : "No past requests yet.",
+    inp.earlier ? `Earlier (condensed):\n${inp.earlier}` : "",
+    history ? `Recent conversation, oldest first:\n${history}` : "",
+    `Category: ${CATEGORY_LABEL[inp.category] ?? inp.category}`,
+    `Phrases:\n${inp.candidates.map((c, i) => `${i + 1}. ${c}`).join("\n")}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+// Each candidate once: Claude's order first, then any it left out, in the given order.
+function applyOrder(candidates: string[], order: number[]): string[] {
+  const picked = order.filter((n) => Number.isInteger(n) && n >= 1 && n <= candidates.length).map((n) => candidates[n - 1]);
+  return [...new Set([...picked, ...candidates])];
+}
+
+export async function getStarters(inp: StartersInput): Promise<StartersOut> {
+  const candidates = [...new Set(inp.candidates.map((c) => c.trim()).filter(Boolean))];
+  if (mock() || candidates.length < 2) return { starters: candidates, source: "mock" };
+  const json = await ask({
+    model: MODEL,
+    max_tokens: 1024,
+    output_config: { effort: "low", format: { type: "json_schema", schema: STARTERS_SCHEMA } },
+    system: [{ type: "text", text: STARTERS_SYSTEM, cache_control: { type: "ephemeral" } }],
+    messages: [{ role: "user", content: buildStartersPrompt({ ...inp, candidates }) }],
+  }, { timeout: REPLIES_TIMEOUT_MS, maxRetries: 0 }, FAST);
+  return { starters: applyOrder(candidates, (JSON.parse(json) as { order: number[] }).order ?? []), source: MODEL };
+}
+
 const SUMMARY_SYSTEM = `You summarize a conversation in an ICU room. The patient cannot speak; they answer by choosing one of a few suggested replies with their eyes, and the app speaks it for them. Each line is labeled with who said it.
 
 Return:
@@ -339,10 +439,11 @@ export interface Summary {
 }
 
 // null in mock mode (no API key): the app writes a plain summary itself.
-export async function summarize(inp: { history: Turn[]; patientProfile?: PatientProfile }): Promise<Summary | null> {
+export async function summarize(inp: { history: Turn[]; patientProfile?: PatientProfile; earlier?: string }): Promise<Summary | null> {
   if (mock()) return null;
   const prompt = [
     inp.patientProfile ? `Patient profile: ${JSON.stringify(inp.patientProfile)}` : "",
+    inp.earlier ? `Earlier (condensed, for background only):\n${inp.earlier}` : "",
     `Conversation, oldest first:\n${historyLines(inp.history.slice(-40))}`,
   ]
     .filter(Boolean)
@@ -360,6 +461,46 @@ export async function summarize(inp: { history: Turn[]; patientProfile?: Patient
     forCaregiver: parsed.for_caregiver.map((b) => b.trim()).filter(Boolean).slice(0, 5),
     source: SUMMARY_MODEL,
   };
+}
+
+// Long-term memory. The app keeps the last ~100 turns word for word; older ones are folded, 20 at a
+// time, into a short list of lasting facts that every call gets as `earlier`. Runs in the background,
+// about once every 20 turns, so it uses the summary model.
+export const CONDENSE_SYSTEM = `You keep the long-term memory of a patient in an ICU who is awake but cannot speak; they answer by choosing suggested phrases with their eyes. You get the memory so far and the oldest lines of the conversation, which are about to be dropped. Fold those lines into the memory and return the whole updated memory.
+
+The memory is a list of short notes, at most 20, each one line. Keep what will still matter later:
+- people around the patient, by the name or label used, and how they relate to the patient
+- the patient's preferences, and needs that come back (with when they come up: "thirsty most evenings")
+- what was explained, planned, or decided, with its date ("Oct 24: told the tube comes out tomorrow")
+- questions the patient asked that are still open, and how they are feeling when it recurs
+Drop small talk, greetings, and one-off requests that were dealt with, unless they recur. Merge notes that say the same thing. Keep dates as given in the lines. Never add a fact, symptom, plan, or name that is not in the memory or the lines, and never work one out (no dates calculated from "four days"). Call the patient "the patient" and never guess anyone's gender: use their label or "they".`;
+
+const CONDENSE_SCHEMA = {
+  type: "object",
+  properties: { memory: { type: "array", items: { type: "string" } } },
+  required: ["memory"],
+  additionalProperties: false,
+} as const;
+
+// null in mock mode (no API key): the app writes a plain digest itself.
+export async function condense(inp: { earlier?: string; turns: Turn[]; patientProfile?: PatientProfile }): Promise<string | null> {
+  if (mock()) return null;
+  const prompt = [
+    inp.patientProfile ? `Patient profile: ${JSON.stringify(inp.patientProfile)}` : "",
+    `Memory so far:\n${inp.earlier?.trim() || "(empty)"}`,
+    `Oldest lines, to fold in:\n${historyLines(inp.turns)}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const json = await ask({
+    model: SUMMARY_MODEL,
+    max_tokens: 4096,
+    output_config: { effort: "low", format: { type: "json_schema", schema: CONDENSE_SCHEMA } },
+    system: CONDENSE_SYSTEM,
+    messages: [{ role: "user", content: prompt }],
+  }, { timeout: SUMMARY_TIMEOUT_MS, maxRetries: 1 });
+  const notes = (JSON.parse(json) as { memory: string[] }).memory.map((n) => n.trim().replace(/^[-•]\s*/, "")).filter(Boolean);
+  return notes.slice(0, 20).map((n) => `- ${n}`).join("\n");
 }
 
 const COMPLETE_SYSTEM =

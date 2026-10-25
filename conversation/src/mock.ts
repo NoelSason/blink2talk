@@ -1,3 +1,5 @@
+import type { PastRequest, StartCategory } from "./claude.js";
+
 type Opt = { text: string; intent: string };
 const o = (text: string, intent: string): Opt => ({ text, intent });
 
@@ -16,6 +18,25 @@ export function mockReplies(transcript: string, category?: string): Opt[] {
   if (/pain|hurt/.test(t)) return [o("Yes, a lot", "yes"), o("No pain", "no"), o("Only a little", "mild")];
   if (/comfortable|position|pillow/.test(t)) return [o("Yes", "yes"), o("No", "no"), o("Raise my head", "raise-head")];
   return [o("Yes", "yes"), o("No", "no"), o("Please say that again", "repeat")];
+}
+
+// "I want to say something": each category's common phrases, most wanted first. Needs from the doc's
+// idle board plus suction; questions and feelings so that orientation, fear and closeness are two picks
+// away (references/quadrant-content.md). Keep in step with START_LISTS in app/renderer/conversation.js.
+export const START_LISTS: Record<StartCategory, string[]> = {
+  need: ["I'm thirsty", "Move me, please", "I need suctioning", "I'm cold", "I need the bathroom", "I want to sleep", "The light hurts", "I'm too hot", "It's too loud"],
+  say: ["What time is it?", "I'm scared", "Tell them I love them", "I want to see my family", "Don't leave", "How long have I been here?", "Where am I?", "What happened to me?", "Thank you"],
+};
+
+/** A category's items: past requests in it first (already ranked), then its common phrases. */
+export function startCandidates(category: StartCategory, past: PastRequest[] = []): string[] {
+  const seen = new Set<string>();
+  return [...past.map((p) => p.text), ...START_LISTS[category]].filter((t) => {
+    const k = t.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 export function mockComplete(prefix: string): string[] {

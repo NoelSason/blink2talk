@@ -35,6 +35,9 @@ export function createCarePanel({ memory, onAction }) {
   close.addEventListener('click', () => api.close());
   const alertList = el('div', { className: 'care__alerts' });
   const history = el('ol', { className: 'care__history' });
+  // Older than the last ~100 lines: the condensed notes Claude gets instead (memory.js).
+  const earlierNote = el('p', { className: 'care__note', textContent: 'Earlier, condensed (what the suggestions see):' });
+  const earlierList = el('ul', { className: 'care__summary' });
   const summaryList = el('ul', { className: 'care__summary' });
   const summaryNote = el('p', { className: 'care__note', textContent: 'Appears after the first exchange.' });
   const often = el('p', { className: 'care__note' });
@@ -65,7 +68,7 @@ export function createCarePanel({ memory, onAction }) {
     el('header', { className: 'care__head' }, el('div', {}, title, el('p', { className: 'care__note', textContent: 'Care panel' })), close),
     alertList,
     section('Summary', summaryList, summaryNote, button('Refresh summary', 'summary', 'care__button--quiet')),
-    section('Conversation', history, button('Clear conversation', 'clear-history', 'care__button--quiet')),
+    section('Conversation', history, earlierNote, earlierList, button('Clear conversation', 'clear-history', 'care__button--quiet')),
     section('About the patient',
       el('label', { className: 'care__field' }, el('span', { textContent: 'Name' }), name),
       el('label', { className: 'care__field' }, el('span', { textContent: 'Notes' }), notes),
@@ -96,6 +99,9 @@ export function createCarePanel({ memory, onAction }) {
     history.replaceChildren(...(turns.length ? turns.map((turn) => el('li', {},
       el('span', { className: 'care__note', textContent: `${clock(turn.t)} · ${turn.role === 'nurse' ? turn.speaker ?? 'Someone' : who}` }),
       el('span', { textContent: turn.text }))) : [el('li', { className: 'care__note', textContent: 'Nothing yet.' })]));
+    const notes = memory.earlier().text.split('\n').map((l) => l.replace(/^-\s*/, '').trim()).filter(Boolean);
+    earlierList.replaceChildren(...notes.map((n) => el('li', { textContent: n })));
+    earlierNote.hidden = earlierList.hidden = !notes.length;
     const said = memory.oftenSays();
     often.textContent = said.length ? `Often says: ${said.join(' · ')}` : '';
   }

@@ -7,6 +7,7 @@ const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
 const speakers = require('./speakers');
 const accuracy = require('./accuracy');
+const { createPatientMemory } = require('./patient-memory');
 
 const windowed = Boolean(process.env.BLINK2TALK_WINDOWED);
 const RENDERER = path.join(__dirname, 'renderer');
@@ -60,7 +61,7 @@ function stopServer() {
 const serverReady = startServer();
 
 // The page reaches the server through here instead of fetch, so the server needs no CORS setup.
-const ROUTES = new Set(['config', 'stt-token', 'replies', 'complete', 'speak', 'summary', 'local-warm']);
+const ROUTES = new Set(['config', 'stt-token', 'replies', 'starters', 'condense', 'complete', 'speak', 'summary', 'local-warm']);
 const GET_ROUTES = new Set(['config', 'stt-token']);
 ipcMain.handle('conversation', async (_event, { route, body }) => {
   if (!ROUTES.has(route)) throw new Error(`unknown route ${route}`);
@@ -80,6 +81,21 @@ ipcMain.handle('conversation', async (_event, { route, body }) => {
 });
 
 // ---------- Window ----------
+// ---------- Patient memory (patient-memory.js) ----------
+// patient_memory.json at the repo root: profile, conversation, picks, and requests. One patient per
+// computer for now. Loaded once as the page starts (sync, so memory.js can stay synchronous).
+const patientMemory = createPatientMemory();
+ipcMain.on('memory-load', (event) => {
+  event.returnValue = patientMemory.load();
+});
+ipcMain.on('memory-save', (_event, text) => patientMemory.save(text));
+// Don't quit with a write half done: wait for it, then quit again.
+app.on('will-quit', (event) => {
+  if (!patientMemory.busy) return;
+  event.preventDefault();
+  patientMemory.idle().then(() => app.quit());
+});
+
 // ---------- Who is speaking (speakers.js) ----------
 // One nurse-mic turn in, the voice it matches (or a new one) out. About 50 ms for a few seconds of speech.
 ipcMain.handle('speaker', (_event, pcm) => speakers.identify(pcm));

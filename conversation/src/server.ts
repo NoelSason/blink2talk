@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CATEGORIES, completeWord, fallbackReplies, getReplies, summarize, type Category } from "./claude.js";
+import { CATEGORIES, completeWord, condense, fallbackReplies, getReplies, getStarters, summarize, type Category, type PastRequest } from "./claude.js";
 import { localModelAvailable, warmLocal } from "./local.js";
 import { CONSENT_REPLIES, SPELL_OPTION, URGENT } from "./safety.js";
 import { sttToken, synthesize, usingClone, warm } from "./voice.js";
@@ -27,7 +27,7 @@ app.get("/config", (_req, res) => {
 
 // Always responds: on any model failure, falls back to safe generic options.
 app.post("/replies", async (req, res) => {
-  const { transcript, history, patientProfile, fatigue, speaker, local, rejected, category } = req.body ?? {};
+  const { transcript, history, patientProfile, fatigue, speaker, local, rejected, category, earlier, now } = req.body ?? {};
   if (typeof transcript !== "string" || !transcript.trim()) {
     res.status(400).json({ error: "transcript required" });
     return;
@@ -44,6 +44,8 @@ app.post("/replies", async (req, res) => {
       local: local === true,
       rejected: rejectedList,
       category: CATEGORIES.includes(category) ? (category as Category) : undefined,
+      earlier: typeof earlier === "string" ? earlier : undefined,
+      now: typeof now === "string" ? now : undefined,
     });
     res.json({ ...out, urgent: URGENT, spellOption: SPELL_OPTION, ms: Date.now() - t0 });
   } catch (err) {
@@ -57,21 +59,72 @@ app.post("/replies", async (req, res) => {
   }
 });
 
+// "I want to say something": one category's phrases in order for right now. Always responds: on any
+// model failure, the candidates as given (past requests first, then the common list).
+app.post("/starters", async (req, res) => {
+  const { category, candidates, history, patientProfile, pastRequests, now, earlier } = req.body ?? {};
+  if (!["need", "say"].includes(category) || !Array.isArray(candidates) || !candidates.length) {
+    res.status(400).json({ error: "category and candidates required" });
+    return;
+  }
+  const list = candidates.map(String).slice(0, 30);
+  const past: PastRequest[] = Array.isArray(pastRequests)
+    ? pastRequests
+        .filter((p) => typeof p?.text === "string" && p.text.trim())
+        .slice(0, 12)
+        .map((p) => ({ text: p.text, n: Number(p.n) || 1, ...(Number.isFinite(p.agoMin) ? { agoMin: p.agoMin } : {}) }))
+    : [];
+  const t0 = Date.now();
+  try {
+    const out = await getStarters({
+      category,
+      candidates: list,
+      history: Array.isArray(history) ? history : undefined,
+      patientProfile,
+      pastRequests: past,
+      now: typeof now === "string" ? now : undefined,
+      earlier: typeof earlier === "string" ? earlier : undefined,
+    });
+    res.json({ ...out, ms: Date.now() - t0 });
+  } catch (err) {
+    console.error("starters failed:", err);
+    res.json({ starters: list, source: "fallback", ms: Date.now() - t0 });
+  }
+});
+
 // A summary of the conversation for the patient and for a caregiver. 204 in mock mode, 502 on failure:
 // the app writes a plain summary itself either way.
 app.post("/summary", async (req, res) => {
-  const { history, patientProfile } = req.body ?? {};
+  const { history, patientProfile, earlier } = req.body ?? {};
   if (!Array.isArray(history) || history.length === 0) {
     res.status(400).json({ error: "history required" });
     return;
   }
   try {
-    const out = await summarize({ history, patientProfile });
+    const out = await summarize({ history, patientProfile, earlier: typeof earlier === "string" ? earlier : undefined });
     if (out) res.json(out);
     else res.status(204).end();
   } catch (err) {
     console.error("summary failed:", err);
     res.status(502).json({ error: "summary failed" });
+  }
+});
+
+// Long-term memory: the oldest turns folded into the condensed notes. 204 in mock mode (the app writes
+// a plain digest), 502 on failure (the app keeps the turns and tries again later).
+app.post("/condense", async (req, res) => {
+  const { earlier, turns, patientProfile } = req.body ?? {};
+  if (!Array.isArray(turns) || turns.length === 0) {
+    res.status(400).json({ error: "turns required" });
+    return;
+  }
+  try {
+    const text = await condense({ earlier: typeof earlier === "string" ? earlier : undefined, turns: turns.slice(0, 60), patientProfile });
+    if (text === null) res.status(204).end();
+    else res.json({ text });
+  } catch (err) {
+    console.error("condense failed:", err);
+    res.status(502).json({ error: "condense failed" });
   }
 });
 

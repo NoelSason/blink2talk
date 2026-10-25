@@ -17,6 +17,8 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ width: 1440, height: 900, show: false, useContentSize: true, webPreferences: { offscreen: true } });
   const wc = win.webContents;
   wc.setAudioMuted(true);
+  // Memory is read as the page loads, so last run's picks must be gone before it does.
+  await session.defaultSession.clearStorageData({ storages: ['localstorage'] });
   await win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'), { query: { test: '1' } });
   const js = (code) => wc.executeJavaScript(code);
   await js(`window.__errors = []; addEventListener('error', e => __errors.push(e.message)); addEventListener('unhandledrejection', e => __errors.push(String(e.reason))); speechSynthesis.speak = () => {}; localStorage.clear(); 1`);
@@ -50,10 +52,59 @@ app.whenReady().then(async () => {
   check('the first M turns it off', (await micLabel()) === 'Mic off' && (await state('s.mic')) === 'off');
   check('and shows it in red', await micRed());
 
-  // Listening: one item; a long blink opens the urgent options and Spell it.
+  // Listening: one item; a long blink opens the Start screen, the same four every time.
   check('listening shows one item', (await labels()).length === 1);
   await hold();
-  check('"I want to say something" opens the urgent options', JSON.stringify(await labels()) === JSON.stringify(["I'm in pain", "I can't breathe", 'Call the nurse', 'Spell it']));
+  const START = ['I need something', 'Emergency', 'I want to ask or say', "I'm in pain"];
+  check('"I want to say something" opens the two categories, Emergency, and pain', JSON.stringify(await labels()) === JSON.stringify(START));
+  // A category pages forward through one fixed list: nothing comes back, and the end is Spell it.
+  await cam(`select('topLeft')`);
+  await waitFor(`s.rowKind === 'browse'`);
+  const seenPhrases = [];
+  const page1 = await labels();
+  check('I need something shows three needs and None of these', JSON.stringify(page1) === JSON.stringify(["I'm thirsty", 'Move me, please', 'I need suctioning', 'None of these']));
+  seenPhrases.push(...page1.slice(0, 3));
+  await cam(`select('bottomRight')`);
+  await waitFor(`s.rowKind === 'browse' && s.browse.at === 3`);
+  const page2 = await labels();
+  seenPhrases.push(...page2.slice(0, 3));
+  await cam(`select('bottomRight')`);
+  await waitFor(`s.rowKind === 'browse' && s.browse.at === 6`);
+  const page3 = await labels();
+  seenPhrases.push(...page3.slice(0, 3));
+  check('None of these never shows a phrase twice', new Set(seenPhrases).size === 9 && page2[3] === 'None of these');
+  check('the last page offers Spell it instead', page3[3] === 'Spell it');
+  await cam(`select('bottomRight')`);
+  check('which opens Spell it', await waitFor(`s.rowKind === 'spell'`));
+  await doubleBlink();
+  await waitFor(`s.rowKind === 'browse'`);
+  check('double blink comes back to that page', JSON.stringify(await labels()) === JSON.stringify(page3));
+  await doubleBlink();
+  await doubleBlink();
+  await doubleBlink();
+  check('and walks back page by page to the Start screen', (await state('s.rowKind')) === 'start');
+  // A phrase the patient picks leads its category next time.
+  await cam(`select('bottomLeft')`);
+  await waitFor(`s.rowKind === 'browse' && s.browse.cat === 'say'`);
+  check('I want to ask or say starts with orientation', (await labels())[0] === 'What time is it?');
+  await cam(`select('topRight')`);
+  check('a picked phrase is spoken', (await state('s.speakText')) === "I'm scared" && (await waitFor(`s.rowKind === 'listen'`)));
+  await hold();
+  await cam(`select('bottomLeft')`);
+  await waitFor(`s.rowKind === 'browse' && s.browse.cat === 'say'`);
+  check('and leads that category next time', JSON.stringify((await labels()).slice(0, 2)) === JSON.stringify(["I'm scared", 'What time is it?']));
+  await doubleBlink();
+  // Emergency: one pick, says it out loud, alerts the care panel, and is never remembered.
+  await cam(`select('topRight')`);
+  check('Emergency speaks "I need help now"', (await state('s.speakText')) === 'I need help now');
+  check('and alerts the care panel', (await js(`document.querySelectorAll('.care-alert--strong').length`)) > 0);
+  await waitFor(`s.rowKind === 'listen'`);
+  await hold();
+  check('the Start screen stays the same after picks', JSON.stringify(await labels()) === JSON.stringify(START));
+  await cam(`select('topLeft')`);
+  await waitFor(`s.rowKind === 'browse'`);
+  check('Emergency is never remembered as a need', (await labels())[0] === "I'm thirsty");
+  await doubleBlink();
   await doubleBlink();
   check('double blink goes back to Listening', (await state('s.rowKind')) === 'listen');
 
@@ -82,8 +133,11 @@ app.whenReady().then(async () => {
   await cam(`select('bottomRight')`);
   check('None of these brings a fresh set of replies', (await waitFor(`s.rowKind === 'replies' && !s.loading`)) && JSON.stringify(await labels()) !== JSON.stringify(firstSet));
   check('and tells the server what was rejected', (await state('s.rejected.length')) === 3 && (await state('s.noneCount')) === 1);
+  check('and none of the rejected replies come back', !(await labels()).some((l) => firstSet.slice(0, 3).includes(l)));
+  // The samples have only two sets: a second re-ask shows only the one reply never shown, never a repeat.
   await cam(`select('bottomRight')`);
   await waitFor(`s.rowKind === 'replies' && !s.loading`);
+  check('a second None of these shows only replies never shown', JSON.stringify(await labels()) === JSON.stringify(["I'm not sure", null, null, 'None of these']));
   await cam(`select('bottomRight')`);
   check('the third None of these opens the urgent options', (await state('s.rowKind')) === 'starters');
   await doubleBlink();
@@ -97,7 +151,7 @@ app.whenReady().then(async () => {
 
   // Tired mode while replies are visible, and while they load (the old crash).
   await key('KeyT');
-  check('tired mode shows two replies', (await labels()).filter(Boolean).length === 3);
+  check('tired mode empties the third reply box', (await labels())[2] === null && (await labels())[3] === 'None of these');
   await key('KeyQ');
   await sleep(3000);
   await key('KeyT');
@@ -284,6 +338,16 @@ app.whenReady().then(async () => {
   check('and counts the row picker\'s column', scored.startsWith('Accuracy (row of 4): 6 of 8 (75%)') && (scored.match(/Middle left → Far left/g) ?? []).length === 2, scored.split('\n').slice(0, 5).join(' / '));
   await key('Backquote');
   await setLayout('kahoot');
+  // Long-term memory: past ~100 turns, the oldest 20 fold into the condensed notes (a plain digest
+  // here, with no server), and every turn Claude gets carries its time.
+  await js(`(() => { const m = window.__test.memory; m.clearHistory(); for (let i = 0; i < 125; i++) m.addTurn(i % 2 ? 'patient' : 'nurse', i % 2 ? 'Reply ' + i : 'Question ' + i); window.__test.conversationChanged(); return 1; })()`);
+  check('past 120 turns, the oldest 20 are condensed', await waitFor(`window.__test.memory.history.length === 105`));
+  const earlier = await js(`window.__test.memory.earlier().text`);
+  check('into notes that keep what the patient said', earlier.includes('“Reply 1”') && earlier.includes('“Reply 19”') && !earlier.includes('Reply 21'));
+  check('the verbatim turns pick up right after them', (await js(`window.__test.memory.history[0].text`)) === 'Question 20');
+  check('every turn sent to Claude has its time', await js(`window.__test.memory.turns().every((t) => /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \\d+, \\d\\d:\\d\\d$/.test(t.at))`));
+  await js(`window.__test.memory.clearHistory(); 1`);
+  check('clearing the conversation clears the notes too', (await js(`window.__test.memory.earlier().text`)) === '');
 
   const errors = await js('window.__errors');
   // Dev mode opens from its button and from the backtick key, and closes again.

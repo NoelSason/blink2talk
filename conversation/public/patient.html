@@ -121,7 +121,8 @@ async function moreReplies(extra) {
   // history already ends with the nurse's question, which goes in as the transcript
   const d = await post("/replies", { transcript: lastNurse, history: history.slice(0, -1), fatigue, rejected: shown, ...extra }).then((r) => r.json());
   // Claude timed out: the fallback (Yes / No / more time) would look like nothing happened, so move on.
-  if (d.source === "fallback") return extra.category ? (setState("spelling"), spelled = "", prefix = "", spellItems()) : showTopics();
+  // Same when every reply was one already rejected (the server drops those): never show them again.
+  if (d.source === "fallback" || !d.replies.length) return extra.category ? (setState("spelling"), spelled = "", prefix = "", spellItems()) : showTopics();
   $("heard").textContent = `Nurse: “${lastNurse}”`;
   showOptions(d.replies, d.options);
 }

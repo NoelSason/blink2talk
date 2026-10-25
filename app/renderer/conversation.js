@@ -57,6 +57,43 @@ export async function getReplies(body) {
   return { replies: set ?? ['Yes', 'No', "I'm not sure"], urgent: FALLBACK_URGENT, addressed: true, source: 'sample', speaker: null, highStakes: false, about: null };
 }
 
+// "I want to say something": each category's common phrases, most wanted first (references/
+// quadrant-content.md). Same lists as START_LISTS in conversation/src/mock.ts.
+export const START_LISTS = {
+  need: ["I'm thirsty", 'Move me, please', 'I need suctioning', "I'm cold", 'I need the bathroom', 'I want to sleep', 'The light hurts', "I'm too hot", "It's too loud"],
+  say: ['What time is it?', "I'm scared", 'Tell them I love them', 'I want to see my family', "Don't leave", 'How long have I been here?', 'Where am I?', 'What happened to me?', 'Thank you'],
+};
+const key = (text) => String(text).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** A category's phrases: past requests in it first (already ranked), then its common list, each once. */
+export function startCandidates(cat, pastRequests = []) {
+  const seen = new Set(FALLBACK_URGENT.map(key));
+  return [...pastRequests.map((p) => p.text), ...START_LISTS[cat]].filter((t) => {
+    const k = key(t);
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+/** For a request saved before categories existed: a common need is a need, anything else is "ask or say". */
+export const guessCategory = (text) => (START_LISTS.need.some((t) => key(t) === key(text)) ? 'need' : 'say');
+
+// The category's phrases in Claude's order for right now, or null when the server isn't reachable.
+// Only ever a reordering of the candidates sent: anything else is dropped, anything left out goes last.
+// body: { category, candidates, history, patientProfile, pastRequests, now }
+export async function getStarters(body) {
+  if (!call) return null;
+  try {
+    const d = await call('starters', body);
+    if (!Array.isArray(d?.starters)) return null;
+    const allowed = new Map(body.candidates.map((c) => [key(c), c]));
+    return [...new Set([...d.starters.map((t) => allowed.get(key(t))).filter(Boolean), ...body.candidates])];
+  } catch {
+    return null;
+  }
+}
+
 // Which voice said a nurse-mic turn (the speaker-recognition model in the main process):
 // { voice: 'voice-2', similarity, isNew }, or null without the model or for a very short turn.
 export async function identifySpeaker(audio) {
@@ -80,6 +117,34 @@ export async function getSummary(body) {
   } catch {
     return null;
   }
+}
+
+// Long-term memory: the oldest turns folded into the condensed notes. { text }, or null without the
+// server or a model (the caller writes plainCondense). Throws when the model failed, so the caller
+// keeps the turns and tries again later.
+// body: { earlier, turns: [{ role, text, speaker, at }], patientProfile }
+export async function condense(body) {
+  if (!call) return null;
+  let d;
+  try {
+    d = await call('condense', body);
+  } catch (err) {
+    if (/not running/.test(String(err?.message))) return null; // no server this launch
+    throw err;
+  }
+  return typeof d?.text === 'string' && d.text.trim() ? { text: d.text } : null;
+}
+
+// Without a model: the notes so far plus one line per day of what the patient said, last 20 lines.
+export function plainCondense(earlier, turns) {
+  const byDay = new Map();
+  for (const t of turns) {
+    if (t.role !== 'patient') continue;
+    const day = t.at.split(',').slice(0, 2).join(','); // "Sat, Oct 24"
+    byDay.set(day, [...(byDay.get(day) ?? []), t.text]);
+  }
+  const lines = [...byDay].map(([day, said]) => `- ${day}: the patient said ${said.map((x) => `“${x}”`).join(', ')}`);
+  return [...String(earlier ?? '').split('\n'), ...lines].map((l) => l.trim()).filter(Boolean).slice(-20).join('\n');
 }
 
 // Testing only: loads the small on-laptop model in the server, so the first local reply isn't slow.
