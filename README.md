@@ -9,15 +9,15 @@ Built at Cal Hacks 13.0.
 <!-- accuracy:start: written by app/accuracy.js after every calibration and accuracy test; edits here are overwritten -->
 **Accuracy test: none recorded yet.**
 
-**Calibrations (32 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again. It sorts into the 2x2 boxes, not the row of 4 (the default layout); the accuracy test scores the row.
+**Calibrations (49 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again. It sorts into the 2x2 boxes, not the row of 4 (the default layout); the accuracy test scores the row.
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
-| Oct 25, 1:04 AM PDT | — | **26%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
-| Oct 25, 1:00 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
-| Oct 25, 12:25 AM PDT | — | **0%** | 100% | **0%** | **22%** | 78% | hard to tell apart: center, top right, bottom left |
-| Oct 25, 12:25 AM PDT | — | **0%** | 100% | **35%** | **0%** | 83% | hard to tell apart: center, top right, bottom left; squint not found, full blinks select |
-| Oct 25, 12:10 AM PDT | — | **48%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 2:57 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 2:56 AM PDT | — | **50%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 2:55 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 2:51 AM PDT | — | 96% | 100% | 100% | 100% | 100% |  |
+| Oct 25, 2:48 AM PDT | — | **70%** | 100% | 100% | 100% | 98% | hard to tell apart: center |
 
 Updated automatically after every calibration and accuracy test. Full history: [docs/accuracy.md](docs/accuracy.md).
 <!-- accuracy:end -->

@@ -14,6 +14,23 @@ How well each calibration's own looks sort back into the right box. This checks 
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
+| Oct 25, 2:57 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 2:56 AM PDT | — | **50%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 2:55 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 2:51 AM PDT | — | 96% | 100% | 100% | 100% | 100% |  |
+| Oct 25, 2:48 AM PDT | — | **70%** | 100% | 100% | 100% | 98% | hard to tell apart: center |
+| Oct 25, 2:43 AM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
+| Oct 25, 2:40 AM PDT | — | **42%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 2:37 AM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
+| Oct 25, 2:33 AM PDT | — | 89% | 100% | 100% | 100% | 100% |  |
+| Oct 25, 2:29 AM PDT | — | 84% | 100% | 100% | 100% | 100% |  |
+| Oct 25, 2:13 AM PDT | — | **2%** | **54%** | **37%** | **0%** | **57%** | hard to tell apart: center, top left, top right, bottom right, bottom left; squint not found, full blinks select |
+| Oct 25, 2:10 AM PDT | — | **0%** | **48%** | **7%** | **63%** | **26%** | hard to tell apart: center, top left, top right, bottom right, bottom left; squint not found, full blinks select |
+| Oct 25, 2:03 AM PDT | — | **0%** | 91% | **54%** | **52%** | **43%** | hard to tell apart: center, top right, bottom right, bottom left; squint not found, full blinks select |
+| Oct 25, 1:57 AM PDT | — | **24%** | 100% | **55%** | **61%** | 100% | hard to tell apart: center, top right, bottom left |
+| Oct 25, 1:55 AM PDT | — | **37%** | 100% | 98% | 100% | 85% | hard to tell apart: center |
+| Oct 25, 1:32 AM PDT | — | 85% | 96% | 100% | 100% | 100% |  |
+| Oct 25, 1:30 AM PDT | — | **59%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 25, 1:04 AM PDT | — | **26%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 25, 1:00 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 25, 12:25 AM PDT | — | **0%** | 100% | **0%** | **22%** | 78% | hard to tell apart: center, top right, bottom left |
