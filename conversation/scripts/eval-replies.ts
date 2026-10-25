@@ -2,7 +2,9 @@
 // and a 1-5 grade from Claude Opus 5.5 for how well the three replies cover what a patient would say.
 //   npm run eval:replies                                 the model in CLAUDE_MODEL (default in claude.ts)
 //   CLAUDE_MODEL=claude-sonnet-5-5 npm run eval:replies  another model
+//   SET=held-out npm run eval:replies                    only the held-out phrases (or SET=tuned)
 // Set OUT=path.json to save every reply set. Each run costs a few cents.
+// The prompt was tuned on CASES, so their score flatters it; HELD_OUT is the honest number.
 import fs from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import { getReplies, MODEL } from "../src/claude.js";
@@ -54,6 +56,51 @@ const CASES: Case[] = [
   { q: "Can we place a feeding tube tomorrow morning?", kind: "yesno", highStakes: true },
   { q: "Hey, can you grab the chart from room 4?", kind: "open", addressed: false },
   { q: "Dr. Patel, the labs from bed 6 came back.", kind: "open", addressed: false },
+];
+
+// Written after the prompt was tuned and never used to change it. Keep it that way: don't edit the
+// prompt to fix a held-out phrase, and write fresh held-out phrases after any prompt change.
+const HELD_OUT: Case[] = [
+  { q: "Do you want me to fix your pillow?", kind: "yesno" },
+  { q: "Is your mouth dry?", kind: "yesno" },
+  { q: "Are you having trouble breathing?", kind: "yesno" },
+  { q: "Would you like some music on?", kind: "yesno" },
+  { q: "Is it too loud in here?", kind: "yesno" },
+  { q: "Do you feel sick to your stomach?", kind: "yesno" },
+  { q: "Your son called. Do you want me to tell him you're doing okay?", kind: "yesno" },
+  { q: "Are you itchy anywhere?", kind: "yesno" },
+  { q: "Do you want me to wipe your face?", kind: "yesno" },
+  { q: "Is the blood pressure cuff too tight?", kind: "yesno" },
+  { q: "Did the doctor explain your test results to you?", kind: "yesno" },
+  { q: "Do you want your glasses?", kind: "yesno" },
+  { q: "Can I check the dressing on your leg?", kind: "yesno" },
+  { q: "Are you feeling dizzy?", kind: "yesno" },
+  { q: "Would you like your family to stay overnight?", kind: "yesno" },
+  { q: "How hard is it to breathe, one being easy and ten being very hard?", kind: "scale" },
+  { q: "From one to five, how tired are you?", kind: "scale" },
+  { q: "Would you like ice chips or a mouth swab?", kind: "choice", choices: ["ice", "swab"] },
+  { q: "Should I call your wife or your sister first?", kind: "choice", choices: ["wife", "sister"] },
+  { q: "Do you want to sit up or lie flat?", kind: "choice", choices: ["sit", "flat"] },
+  { q: "Where do you feel the pressure?", kind: "where" },
+  { q: "What can I do for you right now?", kind: "open" },
+  { q: "What's worrying you the most?", kind: "open" },
+  { q: "Good morning, I'm Sam, your respiratory therapist. How did the night go?", kind: "open" },
+  { q: "What would you like to eat once the tube is out?", kind: "open" },
+  { q: "What kind of music do you like?", kind: "open" },
+  { q: "How's the new pain patch working?", kind: "open" },
+  { q: "We'd like to put you on a ventilator tonight. Do you agree?", kind: "yesno", highStakes: true },
+  { q: "Is it okay if we put in a central line?", kind: "yesno", highStakes: true },
+  { q: "Do you consent to the surgery tomorrow?", kind: "yesno", highStakes: true },
+  { q: "Should we stop the dialysis?", kind: "yesno", highStakes: true },
+  { q: "Do you want us to increase the morphine?", kind: "yesno", highStakes: true },
+  { q: "Can someone cover my patients while I take a break?", kind: "open", addressed: false },
+  { q: "Pharmacy says the antibiotic will be up in twenty minutes.", kind: "open", addressed: false },
+];
+
+const SET = process.env.SET ?? "all"; // all | tuned | held-out
+const RUN = [
+  ...(SET === "held-out" ? [] : CASES.map((c) => ({ ...c, set: "tuned" }))),
+  ...(SET === "tuned" ? [] : HELD_OUT.map((c) => ({ ...c, set: "held-out" }))),
 ];
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
@@ -112,7 +159,7 @@ async function grade(q: string, replies: string[]): Promise<{ score: number; iss
 }
 
 const results = [];
-for (const c of CASES) {
+for (const c of RUN) {
   const t0 = Date.now();
   try {
     const r = await getReplies({ transcript: c.q });
@@ -134,11 +181,14 @@ const ms = ok.map((r) => r.ms).sort((a, b) => a - b);
 const pick = (p: number) => ms[Math.min(ms.length - 1, Math.floor(p * ms.length))];
 const hs = results.filter((r) => "highStakesGot" in r && (r.highStakesGot === true) !== (r.highStakes === true));
 const addr = results.filter((r) => "addressedGot" in r && r.addressedGot !== (r.addressed !== false));
+const mean = (rs: { score: number }[]) => (rs.length ? Number((rs.reduce((s, r) => s + r.score, 0) / rs.length).toFixed(2)) : null);
 const summary = {
   model: MODEL,
   cases: results.length,
   failed: results.length - ok.length,
-  meanScore: Number((results.reduce((s, r) => s + r.score, 0) / results.length).toFixed(2)),
+  meanScore: mean(results),
+  meanScoreTuned: mean(results.filter((r) => r.set === "tuned")),
+  meanScoreHeldOut: mean(results.filter((r) => r.set === "held-out")),
   sets5: results.filter((r) => r.score === 5).length,
   setsWithRuleProblems: results.filter((r) => r.problems.length).length,
   highStakesWrong: hs.map((r) => r.q),
