@@ -1,9 +1,9 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-24 23:40 PDT (nurse mic listens from launch)
+Updated: 2026-10-25 00:20 PDT (row-layout accuracy test; red Mic off)
 
 ## Now
-- Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README, nurse mic listens from launch.
+- Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README, nurse mic listens from launch, red Mic off, accuracy test for the row layout.
 - Next: accuracy test on 4 people, 2 outside the team, in venue lighting; stage-log ratings and Figma share links; team call on Spell it and urgent alerts (Cut list).
 - Blocked on: nothing.
 
@@ -60,6 +60,8 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-25 (Noel): the dev accuracy test scores the layout in use. Row of 4: each column twice, the target at the column's center on the gaze area, counted by the row picker (`eyes-frame` now carries `column`). 2x2: corners, as before. Tests record `layout`; the README reports row and 2x2 apart, and the calibration fit note says it scores the 2x2. Why: the row became the default, but the test still scored the 2x2 classifier, so nothing measured the shipped layout. Rejected: scoring the row by the 2x2 classifier's left/right (it isn't what picks).
+- 2026-10-25 (Noel): "Mic off" in the top bar is red and bold (`--alert`; 4.7:1 dark, 4.3:1 light, large text). Why: Noel asked; a muted mic should stand out.
 - 2026-10-25 (Julian): calibration dots last 3 s instead of 2 s (`calibration.phaseMs` in `app/renderer/devsettings.js`); the squint step shares it. Vision side in context/input.md.
 - 2026-10-25 (Noel): nurse mic listens from launch again; M or the care panel's "Listen for the nurse" mutes it. Reverses Marco's 2026-10-24 off-at-launch. Why: Noel wants it hearing as soon as the app starts. Risk still open: room chatter is transcribed as the nurse, and Ink-2's language isn't pinned (it once detected Hindi).
 - 2026-10-24 (Julian): gaze circle (like Beam's gaze bubble) at the vision module's per-axis position, scaled to the calibration dots; hidden while the face is lost, calibrating, resting, or eyes closed for a pick. Off by default; dev mode switch. Calibration countdown only before the first dot and before the squint, none on the dots. Why: see what the tracker sees while testing; the patient asked for fewer countdowns.

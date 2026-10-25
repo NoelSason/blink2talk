@@ -2,7 +2,7 @@
 
 Written by `app/accuracy.js` after every calibration and every dev-mode accuracy test; don't edit it by hand. Each launch's raw results are in `docs/accuracy/`. `npm run accuracy` (in `app/`) rebuilds this page and the README section.
 
-To add a run: open Dev mode (backtick), type who's testing, recalibrate, then run **Accuracy test (8 corners)**.
+To add a run: open Dev mode (backtick), type who's testing, recalibrate, then run **Accuracy test (8 looks)**. It tests the layout chosen in Dev mode.
 
 ## Accuracy tests
 
@@ -10,10 +10,11 @@ To add a run: open Dev mode (backtick), type who's testing, recalibrate, then ru
 
 ## Calibrations
 
-How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again.
+How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again. It sorts into the 2x2 boxes, not the row of 4 (the default layout); the accuracy test scores the row.
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
+| Oct 24, 11:59 PM PDT | — | 87% | 100% | 100% | 100% | 100% |  |
 | Oct 24, 11:34 PM PDT | — | **61%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 24, 11:02 PM PDT | — | 100% | 80% | 100% | 100% | 100% |  |
 | Oct 24, 10:34 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |

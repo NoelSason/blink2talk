@@ -67,6 +67,7 @@ p { margin: 0; }
   color: var(--text-muted);
   line-height: 1.2;
 }
+.eye-status--off { color: var(--alert); font-weight: 600; }
 
 /* ---------- Caption ---------- */
 .caption {
@@ -638,6 +639,11 @@ p { margin: 0; }
 .dev-target[data-at="topRight"] { left: 75%; top: 40%; }
 .dev-target[data-at="bottomLeft"] { left: 25%; top: 78%; }
 .dev-target[data-at="bottomRight"] { left: 75%; top: 78%; }
+/* Row columns: devpanel.js places them on the gaze area; these are for when it isn't laid out. */
+.dev-target[data-at="farLeft"] { left: 12.5%; top: 60%; }
+.dev-target[data-at="midLeft"] { left: 37.5%; top: 60%; }
+.dev-target[data-at="midRight"] { left: 62.5%; top: 60%; }
+.dev-target[data-at="farRight"] { left: 87.5%; top: 60%; }
 
 /* Panels must honor the hidden attribute (their display rules would otherwise win). */
 .demo[hidden] { display: none; }

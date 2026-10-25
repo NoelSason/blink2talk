@@ -1,12 +1,17 @@
 // Dev mode: tune the eye tracker and measure it. Toggle with the backtick key (`). Patients never see it.
 // Rows marked "now" apply the moment the slider moves. The rest apply on "Apply & recalibrate".
-// The accuracy test shows a corner on the screen and checks where the patient's eyes were. It writes
-// nothing to disk; the results show in the panel, and you can copy them from there.
+// The accuracy test shows a box on the screen (a corner in 2x2, a column in the row) and checks where
+// the patient's eyes were. Results show in the panel and go to the README (eyes.js, accuracy.js).
 
 import { DEFAULTS, saveSettings } from './devsettings.js';
 
 const CORNERS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
-const NAME = { topLeft: 'Top left', topRight: 'Top right', bottomLeft: 'Bottom left', bottomRight: 'Bottom right', center: 'Middle (rest)' };
+const COLUMNS = ['farLeft', 'midLeft', 'midRight', 'farRight']; // the row layout's boxes, left to right (columns.js)
+const NAME = {
+  topLeft: 'Top left', topRight: 'Top right', bottomLeft: 'Bottom left', bottomRight: 'Bottom right', center: 'Middle (rest)',
+  farLeft: 'Far left', midLeft: 'Middle left', midRight: 'Middle right', farRight: 'Far right',
+};
+const LAYOUT_NAME = { row: 'row of 4', grid: '2x2' };
 const TRIAL_MS = 2000;
 const SAMPLE_FROM_MS = 800; // ignore the first part of a trial: the eyes are still travelling
 
@@ -61,7 +66,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   const live = { looking: el('span'), focus: el('span'), face: el('span'), mode: el('span'), blinks: el('span'), drift: el('span', { textContent: 'not run' }) };
   const recentBlinks = [];
   const results = el('pre', { className: 'dev__results', hidden: true });
-  const test = { running: false, order: [], i: 0, target: null, samples: [], shownAt: 0, rows: [], timer: null };
+  const test = { running: false, layout: 'grid', order: [], i: 0, target: null, samples: [], shownAt: 0, rows: [], timer: null };
 
   function markDirty() {
     dirty = true;
@@ -206,7 +211,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
       button('Drift check, 8 s (K)', () => { stopTest(); panel.hidden = true; onDrift(); }),
       el('label', { className: 'dev__row dev__row--text' },
         el('span', { className: 'dev__label', textContent: "Who's testing (then recalibrate)" }), testerInput),
-      button('Accuracy test (8 corners)', () => startTest()),
+      button('Accuracy test (8 looks)', () => startTest()),
       resetBtn,
       button('Copy settings', () => copy(JSON.stringify(settings, null, 2), 'Settings copied')),
       results),
@@ -219,11 +224,14 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   circleInput.checked = settings.gazeCircle;
   syncSliders();
 
-  // ---- Accuracy test: a corner is shown on screen; we count which box the vision module says the eyes are on.
+  // ---- Accuracy test: a box is shown on screen; we count which box the eyes are on. The row layout is
+  // scored by its own left-right picker (columns.js), the 2x2 layouts by the vision module's classifier.
   function startTest() {
     if (test.running) return;
     test.running = true;
-    test.order = [...CORNERS, ...CORNERS].sort(() => Math.random() - 0.5);
+    test.layout = settings.layout === 'row' ? 'row' : 'grid';
+    const boxes = test.layout === 'row' ? COLUMNS : CORNERS;
+    test.order = [...boxes, ...boxes].sort(() => Math.random() - 0.5);
     test.i = 0;
     test.rows = [];
     results.hidden = true;
@@ -236,10 +244,25 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
     test.samples = [];
     test.shownAt = performance.now();
     target.dataset.at = test.target;
+    placeTarget();
     target.textContent = `Look: ${NAME[test.target]} (${test.i + 1} of ${test.order.length})`;
     window.dispatchEvent(new CustomEvent('eyes-label', { detail: { label: `test:${test.target}` } }));
     target.hidden = false;
     test.timer = setTimeout(endTrial, TRIAL_MS);
+  }
+
+  // 2x2 corners are placed by app.css. A column goes at its center on the gaze area, the same mapping
+  // the calibration dots and columns.js use (x from -1 to 1 across the area; columns are its quarters).
+  function placeTarget() {
+    const column = COLUMNS.indexOf(test.target);
+    const area = document.getElementById('gaze-area')?.getBoundingClientRect();
+    if (column < 0 || !area?.width) {
+      target.style.left = target.style.top = '';
+      return;
+    }
+    const x = -0.75 + 0.5 * column;
+    target.style.left = `${area.left + area.width * (0.5 + x / 2)}px`;
+    target.style.top = `${area.top + area.height / 2}px`;
   }
 
   function endTrial() {
@@ -259,7 +282,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
     window.dispatchEvent(new CustomEvent('eyes-label', { detail: { label: null } }));
     const hits = test.rows.filter((r) => r.hit).length;
     const noData = test.rows.filter((r) => r.frames === 0).length;
-    const lines = [`Accuracy: ${hits} of ${test.rows.length} (${Math.round((100 * hits) / test.rows.length)}%)`];
+    const lines = [`Accuracy (${LAYOUT_NAME[test.layout]}): ${hits} of ${test.rows.length} (${Math.round((100 * hits) / test.rows.length)}%)`];
     if (noData) lines.push(`No eye data on ${noData} trial(s): the face wasn't seen.`);
     lines.push('', 'Missed trials (looked at → counted as):');
     for (const r of test.rows.filter((x) => !x.hit)) lines.push(`  ${NAME[r.target]} → ${r.guess ? NAME[r.guess] : 'nothing'}`);
@@ -267,7 +290,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
     results.textContent = lines.join('\n');
     results.hidden = false;
     // eyes.js logs it; main.js adds it to the README's Eye accuracy section (accuracy.js).
-    window.dispatchEvent(new CustomEvent('eyes-test', { detail: { rows: test.rows } }));
+    window.dispatchEvent(new CustomEvent('eyes-test', { detail: { rows: test.rows, layout: test.layout } }));
   }
 
   function stopTest() {
@@ -285,7 +308,9 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   let lastPaint = 0;
   window.addEventListener('eyes-frame', (e) => {
     const d = e.detail;
-    if (test.running && performance.now() - test.shownAt >= SAMPLE_FROM_MS) test.samples.push(d.looking);
+    if (test.running && performance.now() - test.shownAt >= SAMPLE_FROM_MS) {
+      test.samples.push(test.layout === 'row' ? COLUMNS[d.column] ?? null : d.looking);
+    }
     const now = performance.now();
     if (panel.hidden || now - lastPaint < 200) return;
     lastPaint = now;

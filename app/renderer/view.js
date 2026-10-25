@@ -115,6 +115,7 @@ export function createView() {
     screen: byId('screen'),
     eyeIcon: byId('eye-icon'),
     eyeLabel: byId('eye-label'),
+    micStatus: byId('mic-status'),
     micIcon: byId('mic-icon'),
     micLabel: byId('mic-label'),
     caption: byId('caption'),
@@ -289,6 +290,7 @@ export function createView() {
       els.eyeLabel.textContent = { lost: "Can't see you", rest: 'Resting', closed: 'Eyes closed', open: 'I can see you' }[eye];
     }
     if (changed('mic', model.micOn)) {
+      els.micStatus.classList.toggle('eye-status--off', !model.micOn); // red: the nurse isn't being heard
       els.micIcon.className = `icon icon--${model.micOn ? 'mic' : 'mic-off'}`;
       els.micLabel.textContent = model.micOn ? 'Mic on' : 'Mic off';
     }

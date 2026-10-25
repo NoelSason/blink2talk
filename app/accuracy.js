@@ -12,7 +12,15 @@ const START = '<!-- accuracy:start';
 const END = '<!-- accuracy:end -->';
 const BOXES = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 const TARGETS = ['center', ...BOXES];
-const NAME = { center: 'Center', topLeft: 'Top left', topRight: 'Top right', bottomLeft: 'Bottom left', bottomRight: 'Bottom right' };
+const COLUMNS = ['farLeft', 'midLeft', 'midRight', 'farRight']; // the row layout's boxes, left to right
+const NAME = {
+  center: 'Center', topLeft: 'Top left', topRight: 'Top right', bottomLeft: 'Bottom left', bottomRight: 'Bottom right',
+  farLeft: 'Far left', midLeft: 'Middle left', midRight: 'Middle right', farRight: 'Far right',
+};
+// The row layout is scored by its left-right picker, the 2x2 layouts by the vision module's classifier,
+// so their results are kept apart. Tests from before the row layout existed were all 2x2.
+const LAYOUT = { row: 'row of 4', grid: '2x2' };
+const layoutOf = (t) => (t.layout === 'row' ? 'row' : 'grid');
 const TRACKER = { vision: 'vision module', 'vision+head': 'vision + head model' };
 const README_ROWS = 5; // newest runs and calibrations shown in the README; docs/accuracy.md has all
 
@@ -51,7 +59,7 @@ function addToSession(root, session, text, firstT) {
       data.calibrations.push({ t: e.t, at: at(e), tester: tester || null, fit: e.accuracy, warnings: e.warnings ?? [] });
       added++;
     } else if (e.event === 'test' && Array.isArray(e.rows) && !data.tests.some((x) => x.t === e.t)) {
-      data.tests.push({ t: e.t, at: at(e), tester: tester || null, source: e.source ?? 'vision', rows: e.rows });
+      data.tests.push({ t: e.t, at: at(e), tester: tester || null, source: e.source ?? 'vision', layout: layoutOf(e), rows: e.rows });
       added++;
     }
   }
@@ -87,17 +95,20 @@ function loadSessions(root) {
 const side = (box) => ({ x: box.endsWith('Left') ? -1 : 1, y: box.startsWith('top') ? -1 : 1 });
 const counted = (row) => (row.guess && row.guess !== 'center' ? side(row.guess) : null);
 
-// Trials across tests: right overall, per box, and per axis (a guess of the middle or no eye data
-// is wrong on both axes).
-function tally(tests) {
+// Trials across tests of one layout: right overall, per box, and for 2x2 per axis (a guess of the
+// middle or no eye data is wrong on both axes).
+function tally(tests, layout = 'grid') {
   const rows = tests.flatMap((t) => t.rows);
-  const out = { hits: 0, total: rows.length, x: 0, y: 0, box: Object.fromEntries(BOXES.map((b) => [b, { hits: 0, total: 0 }])) };
+  const boxes = layout === 'row' ? COLUMNS : BOXES;
+  const out = { hits: 0, total: rows.length, x: 0, y: 0, box: Object.fromEntries(boxes.map((b) => [b, { hits: 0, total: 0 }])) };
   for (const r of rows) {
-    const want = side(r.target);
-    const got = counted(r);
     if (r.hit) out.hits++;
-    if (got?.x === want.x) out.x++;
-    if (got?.y === want.y) out.y++;
+    if (layout === 'grid') {
+      const want = side(r.target);
+      const got = counted(r);
+      if (got?.x === want.x) out.x++;
+      if (got?.y === want.y) out.y++;
+    }
     if (out.box[r.target]) {
       out.box[r.target].total++;
       if (r.hit) out.box[r.target].hits++;
@@ -123,11 +134,11 @@ function shortWarning(w) {
 }
 
 function testsTable(tests) {
-  const lines = ['| When | Tester | Tracker | Right | Missed (looked at → counted as) |', '|---|---|---|---|---|'];
+  const lines = ['| When | Tester | Layout | Tracker | Right | Missed (looked at → counted as) |', '|---|---|---|---|---|---|'];
   for (const t of tests) {
     const hits = t.rows.filter((r) => r.hit).length;
     const missed = t.rows.filter((r) => !r.hit).map((r) => `${NAME[r.target]} → ${r.frames === 0 ? 'no eye data' : NAME[r.guess] ?? 'nothing'}`);
-    lines.push(`| ${when(t.at)} | ${cell(t.tester ?? '—')} | ${TRACKER[t.source] ?? t.source} | ${hits} of ${t.rows.length} | ${cell(missed.join('; ') || 'none')} |`);
+    lines.push(`| ${when(t.at)} | ${cell(t.tester ?? '—')} | ${LAYOUT[layoutOf(t)]} | ${TRACKER[t.source] ?? t.source} | ${hits} of ${t.rows.length} | ${cell(missed.join('; ') || 'none')} |`);
   }
   return lines.join('\n');
 }
@@ -148,25 +159,33 @@ function calibrationsTable(cals) {
 
 function headline(tests) {
   if (!tests.length) return '**Accuracy test: none recorded yet.**';
-  const s = tally(tests);
+  return Object.keys(LAYOUT)
+    .map((layout) => [layout, tests.filter((t) => layoutOf(t) === layout)])
+    .filter(([, ts]) => ts.length)
+    .map(([layout, ts]) => layoutHeadline(ts, layout))
+    .join('\n\n');
+}
+
+function layoutHeadline(tests, layout) {
+  const s = tally(tests, layout);
   const people = new Set(tests.map((t) => t.tester).filter(Boolean));
   const unnamed = tests.filter((t) => !t.tester).length;
   const trackers = Object.entries(Object.groupBy(tests, (t) => t.source)).map(([src, ts]) => {
-    const n = tally(ts);
+    const n = tally(ts, layout);
     return `${TRACKER[src] ?? src} ${n.hits} of ${n.total}`;
   });
   return [
-    `**Accuracy test: ${s.hits} of ${s.total} looks counted in the right box (${pct(s.hits, s.total)})**, over ${tests.length} run${tests.length === 1 ? '' : 's'}`
+    `**Accuracy test, ${LAYOUT[layout]}: ${s.hits} of ${s.total} looks counted in the right box (${pct(s.hits, s.total)})**, over ${tests.length} run${tests.length === 1 ? '' : 's'}`
       + ` by ${people.size} tester${people.size === 1 ? '' : 's'}${unnamed ? ` (${unnamed} run${unnamed === 1 ? '' : 's'} with no tester named)` : ''}.`,
     '',
-    `Left/right ${pct(s.x, s.total)} · top/bottom ${pct(s.y, s.total)} · `
-      + BOXES.map((b) => `${NAME[b].toLowerCase()} ${s.box[b].hits}/${s.box[b].total}`).join(' · ')
+    (layout === 'grid' ? `Left/right ${pct(s.x, s.total)} · top/bottom ${pct(s.y, s.total)} · ` : '')
+      + Object.entries(s.box).map(([b, n]) => `${NAME[b].toLowerCase()} ${n.hits}/${n.total}`).join(' · ')
       + (trackers.length > 1 ? ` · ${trackers.join(' · ')}` : ''),
   ].join('\n');
 }
 
-const FIT_NOTE = 'How well each calibration\'s own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again.';
-const TEST_NOTE = 'Each run names a box 8 times (every box twice, in random order) for 2 s each, and counts the box the eyes were on most in the last 1.2 s. A look counted in the middle, or with no eye data, is a miss.';
+const FIT_NOTE = 'How well each calibration\'s own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again. It sorts into the 2x2 boxes, not the row of 4 (the default layout); the accuracy test scores the row.';
+const TEST_NOTE = 'Each run names a box 8 times (every box twice, in random order) for 2 s each, and counts the box the eyes were on most in the last 1.2 s. A look counted in the middle (2x2 only), or with no eye data, is a miss. Row-of-4 runs (the default layout) score its left-right picker; 2x2 runs score the 2x2 classifier.';
 
 function readmeBlock(sessions) {
   const tests = sessions.flatMap((s) => s.tests).sort(newest);
@@ -186,7 +205,7 @@ function report(sessions) {
   return [
     '# Eye accuracy log',
     'Written by `app/accuracy.js` after every calibration and every dev-mode accuracy test; don\'t edit it by hand. Each launch\'s raw results are in `docs/accuracy/`. `npm run accuracy` (in `app/`) rebuilds this page and the README section.',
-    'To add a run: open Dev mode (backtick), type who\'s testing, recalibrate, then run **Accuracy test (8 corners)**.',
+    'To add a run: open Dev mode (backtick), type who\'s testing, recalibrate, then run **Accuracy test (8 looks)**. It tests the layout chosen in Dev mode.',
     '## Accuracy tests',
     headline(tests),
     ...(tests.length ? [TEST_NOTE, testsTable(tests)] : []),

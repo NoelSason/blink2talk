@@ -42,6 +42,23 @@ test('per axis: a top/bottom mistake is still right left/right; the middle or no
   assert.deepEqual(s.box.bottomRight, { hits: 0, total: 2 });
 });
 
+const rowRun = {
+  t: 6000, event: 'test', at: Date.UTC(2026, 9, 25, 4, 2), tester: 'Noel', source: 'vision', layout: 'row',
+  rows: [row('farLeft', 'farLeft'), row('midLeft', 'farLeft'), row('midRight', 'midRight'), row('farRight', 'farRight'),
+    row('farLeft', 'farLeft'), row('midLeft', 'midLeft'), row('midRight', 'farRight'), row('farRight', 'farRight')],
+};
+
+test('row-of-4 and 2x2 runs are counted apart, the row per column and without axes', () => {
+  const root = repo();
+  accuracy.record('2026-10-25T04-00-00-000Z', line(testRun) + line(rowRun), { root });
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  assert.match(readme, /Accuracy test, row of 4: 6 of 8 looks counted in the right box \(75%\)/);
+  assert.match(readme, /Accuracy test, 2x2: 5 of 8 looks counted in the right box \(63%\)/);
+  assert.match(readme, /\nfar left 2\/2 · middle left 1\/2 · middle right 1\/2 · far right 2\/2\n/);
+  assert.match(readme, /\| row of 4 \| vision module \| 6 of 8 \| Middle left → Far left; Middle right → Far right \|/);
+  assert.deepEqual(accuracy.tally([rowRun], 'row').box.midLeft, { hits: 1, total: 2 });
+});
+
 test('recording the same events twice adds nothing', () => {
   const root = repo();
   const session = '2026-10-25T04-00-00-000Z';

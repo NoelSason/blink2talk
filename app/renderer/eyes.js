@@ -107,7 +107,7 @@ export async function startEyes(on, settings) {
   let tester = null;
   window.addEventListener('eyes-tester', (e) => { tester = e.detail?.tester ?? null; });
   window.addEventListener('eyes-test', (e) => {
-    log({ t: r(performance.now(), 10), event: 'test', at: Date.now(), tester, source: settings.headPose ? 'vision+head' : 'vision', rows: e.detail?.rows ?? [] });
+    log({ t: r(performance.now(), 10), event: 'test', at: Date.now(), tester, source: settings.headPose ? 'vision+head' : 'vision', layout: e.detail?.layout ?? 'grid', rows: e.detail?.rows ?? [] });
   });
   let faceChange = null;       // { to, since } while a change is waiting out its debounce
 
@@ -357,8 +357,10 @@ export async function startEyes(on, settings) {
     }
 
     // For the dev panel's live readout and accuracy test. Not used by the patient screen.
+    // column: the row layout's column the eyes are on now (0-3, left to right), before the dwell.
+    const column = rowLayout() && out.mode === 'running' && !drift ? columns?.looking ?? null : null;
     window.dispatchEvent(new CustomEvent('eyes-frame', {
-      detail: { mode: out.mode, faceFound: out.faceFound, looking: out.quadrant?.looking ?? null, focus },
+      detail: { mode: out.mode, faceFound: out.faceFound, looking: out.quadrant?.looking ?? null, column, focus },
     }));
   };
 

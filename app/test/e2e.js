@@ -43,10 +43,12 @@ app.whenReady().then(async () => {
   const micLabel = () => js(`document.getElementById('mic-label').textContent`);
   await js(`window.__test.state.mic = 'on'; 1`);
   await sleep(80);
-  check('the top bar shows when the mic is on', (await micLabel()) === 'Mic on');
+  const micRed = () => js(`document.getElementById('mic-status').classList.contains('eye-status--off')`);
+  check('the top bar shows when the mic is on', (await micLabel()) === 'Mic on' && !(await micRed()));
   await key('KeyM');
   await sleep(80);
   check('the first M turns it off', (await micLabel()) === 'Mic off' && (await state('s.mic')) === 'off');
+  check('and shows it in red', await micRed());
 
   // Listening: one item; a long blink opens the urgent options and Spell it.
   check('listening shows one item', (await labels()).length === 1);
@@ -225,6 +227,28 @@ app.whenReady().then(async () => {
     check('Kahoot: corner dots sit inside their boxes', inBox(tl, rects[0]) && inBox(br, rects[3]), JSON.stringify({ tl, br, rects }));
     check('Kahoot: center dot sits where the boxes meet', Math.abs(mid[1] - meetY) < 12, `${mid[1]} vs ${meetY}`);
   } else check('Kahoot: grid has four boxes to measure', false, `${rects.length}`);
+
+  // Dev mode's accuracy test in the row layout (the default): each target sits in its column's quarter
+  // of the gaze area, and the score counts the row picker's column. Frames stand in for eyes.js; one
+  // column is answered wrong on purpose. 8 trials of 2 s.
+  await js(`document.getElementById('dev-open').click(); [...document.querySelectorAll('.dev button')].find((b) => b.textContent === 'Accuracy test (8 looks)').click(); 1`);
+  await js(`window.__placed = {}; window.__feed = setInterval(() => {
+    const t = document.querySelector('.dev-target');
+    if (t.hidden) return;
+    const cols = ['farLeft', 'midLeft', 'midRight', 'farRight'];
+    const i = cols.indexOf(t.dataset.at);
+    const a = document.getElementById('gaze-area').getBoundingClientRect();
+    const r = t.getBoundingClientRect();
+    window.__placed[t.dataset.at] = Math.floor((r.left + r.width / 2 - a.left) / (a.width / 4)) === i;
+    dispatchEvent(new CustomEvent('eyes-frame', { detail: { mode: 'running', faceFound: true, looking: null, column: i === 1 ? 0 : i, focus: null } }));
+  }, 50); 1`);
+  await sleep(16600);
+  await js(`clearInterval(window.__feed); 1`);
+  const placed = await js('window.__placed');
+  check('row accuracy test: every column target sits in its own quarter', Object.keys(placed).length === 4 && Object.values(placed).every(Boolean), JSON.stringify(placed));
+  const scored = await js(`document.querySelector('.dev__results').textContent`);
+  check('and counts the row picker\'s column', scored.startsWith('Accuracy (row of 4): 6 of 8 (75%)') && (scored.match(/Middle left → Far left/g) ?? []).length === 2, scored.split('\n').slice(0, 5).join(' / '));
+  await key('Backquote');
 
   const errors = await js('window.__errors');
   // Dev mode opens from its button and from the backtick key, and closes again.

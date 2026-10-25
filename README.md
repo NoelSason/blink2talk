@@ -9,20 +9,20 @@ Built at Cal Hacks 13.0.
 <!-- accuracy:start: written by app/accuracy.js after every calibration and accuracy test; edits here are overwritten -->
 **Accuracy test: none recorded yet.**
 
-**Calibrations (26 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again.
+**Calibrations (27 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again. It sorts into the 2x2 boxes, not the row of 4 (the default layout); the accuracy test scores the row.
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
+| Oct 24, 11:59 PM PDT | — | 87% | 100% | 100% | 100% | 100% |  |
 | Oct 24, 11:34 PM PDT | — | **61%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 24, 11:02 PM PDT | — | 100% | 80% | 100% | 100% | 100% |  |
 | Oct 24, 10:34 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
 | Oct 24, 10:19 PM PDT | — | **22%** | **43%** | 93% | 80% | **49%** | hard to tell apart: center, top left, bottom right |
-| Oct 24, 10:08 PM PDT | — | **39%** | 89% | 100% | 100% | 100% | hard to tell apart: center |
 
 Updated automatically after every calibration and accuracy test. Full history: [docs/accuracy.md](docs/accuracy.md).
 <!-- accuracy:end -->
 
-To add a result: open Dev mode (backtick), type who's testing (a first name or "Guest 1"; it goes into the repo), recalibrate, then run **Accuracy test (8 corners)**. The section above updates on its own. After pulling teammates' results, run `npm run accuracy` in `app/`.
+To add a result: open Dev mode (backtick), type who's testing (a first name or "Guest 1"; it goes into the repo), recalibrate, then run **Accuracy test (8 looks)** (it tests the layout chosen in Dev mode; the row of 4 is the default). The section above updates on its own. After pulling teammates' results, run `npm run accuracy` in `app/`.
 
 ## What it does
 
