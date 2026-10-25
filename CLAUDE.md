@@ -43,6 +43,7 @@ Cartesia Ink (STT) + Sonic-3.6 (TTS, cloned voice). API keys live in the main pr
 - Spacetime, Figma pass, iOS, packaging/asar, local LLM.
 - Vertical-only gaze, Morse code, any "FDA-cleared" wording.
 - Presage / camera vitals (pulse, breathing). ICU patients are already on monitors; a vented patient's breathing rate is the ventilator's. Cut 2026-10-24.
+- Head-movement input (nod or turn to pick) and phone face tracking (iPhone TrueDepth/LiDAR). Most of our patients can't move their head reliably (tube, sedation, neck collars, ALS neck weakness, locked-in). Eyes stay the only input. Cut 2026-10-24.
 
 ## Input (one path)
 
@@ -97,6 +98,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-24 — Marco: head-movement input and the phone face-tracking model cut. Our target patients mostly can't move their head; eye input must work alone. The dev-mode head-pose switch only corrects eye picks for head turns and isn't an input.
 - 2026-10-24 — Input/Product (Marco): box picking decides left/right and top/bottom on separate axes; calibration dots and corner marks at the box corners (±0.9); kept picks teach the classifier; WebEyeTrack available as a test gaze source in dev mode. Dwell to highlight stays 300 ms (vision default), not 700. Measured cause in context/input.md.
 - 2026-10-24 — Product/Conversation (Noel): `/replies` now returns `highStakes` (Claude classifies; keyword rule only as fallback) and `about`, closer to the `options.highStakes` row above. Eye calibration auto-starts at launch again; three quick blinks offer recalibration.
 
