@@ -10,7 +10,7 @@
     "start": "electron .",
     "prewindowed": "npm run prestart",
     "windowed": "BLINK2TALK_WINDOWED=1 electron .",
-    "test": "node --no-warnings --test test/drift.test.mjs test/speakers.test.mjs test/accuracy.test.mjs && electron test/e2e.js",
+    "test": "node --no-warnings --test test/drift.test.mjs test/columns.test.mjs test/speakers.test.mjs test/accuracy.test.mjs && electron test/e2e.js",
     "accuracy": "node scripts/accuracy.mjs",
     "voices": "node scripts/fetch-voice-model.mjs",
     "stress": "electron test/stress.js"

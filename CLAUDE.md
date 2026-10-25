@@ -98,6 +98,7 @@ Exactly 3 first-person replies ≤ 8 words, different intents. Consent / code-st
 
 ## Decisions log (append, newest first; date + who)
 
+- 2026-10-25 — Marco: default patient layout is a row of 4 tall boxes (left-right eye movement only) instead of the 2x2. Up-down was the weak axis. 2x2 layouts remain in dev mode. Details in context/product.md.
 - 2026-10-25 — Marco: Claude asks before every push (commits locally until then). Auto-pushing was annoying. Still straight to `main`, no PRs.
 - 2026-10-24 — Noel: WebEyeTrack removed (code, weights, dependency, `G` switch); the vision module is the only gaze source. Replies move to `claude-opus-5-5` in fast mode with a rewritten prompt: on 37 labeled phrases, grade 3.81 → 4.51 of 5 and median 1.33 → 1.21 s (`npm run eval:replies`). The prompt was tuned on those 37, so on 34 held-out phrases it never saw: 3.76 → 4.38, rule problems 4 → 0, median 1.53 → 1.16 s. @Samarth: `conversation/` changed, see context/conversation.md.
 - 2026-10-25 — Marco: patient screen is Kahoot style (question on top, 2x2 colored boxes together below). Spread layout kept as a dev-mode switch. Details and the reading-the-question risk in context/product.md.

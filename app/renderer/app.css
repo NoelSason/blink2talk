@@ -694,3 +694,30 @@ p { margin: 0; }
 .reply-row--single > .reply-card .reply-card__hold-track { stroke: color-mix(in srgb, var(--on-tile) 35%, transparent); }
 .reply-row--single > .reply-card .reply-card__hold-fill { stroke: var(--on-tile); }
 .reply-row--single > .reply-card > .reply-card__icon { display: none; } /* no icons, like the 2x2 boxes */
+
+/* Row layout (default): the question on top, the four boxes side by side as tall columns, so only
+   left-right eye movement picks. Shown left to right as boxes 1, 3, 2, 4: the left two are the "Left"
+   boxes and the right two the "Right" ones (columns.js), so "None of these" (box 4) is on the right. */
+[data-layout="row"] .reply-grid {
+  --hl-scale: 1.015;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 1fr;
+  gap: var(--sp-2);
+}
+[data-layout="row"] .reply-grid > :nth-child(1) { grid-area: 1 / 1; }
+[data-layout="row"] .reply-grid > :nth-child(3) { grid-area: 1 / 2; }
+[data-layout="row"] .reply-grid > :nth-child(2) { grid-area: 1 / 3; }
+[data-layout="row"] .reply-grid > :nth-child(4) { grid-area: 1 / 4; }
+/* Two-box confirm screens: left half and right half. */
+[data-layout="row"] .reply-grid--columns > :nth-child(1) { grid-area: 1 / 1 / 2 / 3; }
+[data-layout="row"] .reply-grid--columns > :nth-child(2) { grid-area: 1 / 3 / 2 / 5; }
+[data-layout="row"] .reply-grid > :is(.reply-card, .end-option) { border-radius: var(--r-end, 8px); }
+[data-layout="row"] .caption {
+  min-height: calc(var(--fs-body) * 1.2 + var(--fs-caption) * 1.2 + var(--sp-1) + 2 * var(--sp-3));
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: var(--surface);
+  padding: var(--sp-3) var(--sp-4);
+}
+[data-layout="row"] .caption .caption__text { font-weight: 700; }

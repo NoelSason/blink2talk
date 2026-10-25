@@ -101,7 +101,7 @@ export function createDevPanel({ settings, onRebuild, onDrift, onBlink }) {
   });
 
   const layoutInput = el('select', {});
-  for (const [v, text] of [['kahoot', 'Kahoot: question on top, boxes together'], ['spread', 'Spread: boxes in the corners']]) {
+  for (const [v, text] of [['row', 'Row of 4: left to right only'], ['kahoot', 'Kahoot 2x2: question on top, boxes together'], ['spread', 'Spread 2x2: boxes in the corners']]) {
     layoutInput.append(el('option', { value: v, textContent: text }));
   }
   layoutInput.addEventListener('change', () => {

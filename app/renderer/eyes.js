@@ -10,6 +10,7 @@
 import { createGazeModel, featureVector, headPose, TARGETS } from './gaze.js';
 import { measureDrift, shiftCenters } from './drift.js';
 import { dotPositions } from './devsettings.js';
+import { createColumnPicker, COLUMN_BOX } from './columns.js';
 
 // Every handler app.js must provide. Checked at startup, so a missing one fails loudly instead of
 // throwing on every camera frame.
@@ -46,7 +47,11 @@ export async function startEyes(on, settings) {
     on.status('Eyes: keyboard (eye tracker not built; run npm run eyes)');
     return null;
   }
-  const { EyePipeline, FaceTracker, openWebcam, featureVector: visionFeatures } = vision;
+  const { EyePipeline, FaceTracker, openWebcam, featureVector: visionFeatures, axisPosition } = vision;
+  // Row layout (four boxes side by side): left-right only, from the same calibration (columns.js).
+  const rowLayout = () => settings.layout === 'row';
+  let columns = null;
+  let armedColumn = null;
   const video = document.getElementById('camera');
 
   on.status('Eyes: loading the face model…');
@@ -120,6 +125,8 @@ export async function startEyes(on, settings) {
     document.documentElement.dataset.dots = settings.dots;
     build();
     gaze = createGazeModel();
+    columns = createColumnPicker({ focusMs: settings.quadrant.focusMs, reach: dotPositions(settings.dots, settings.layout).topRight[0] });
+    armedColumn = null;
     labels = { phase: null, since: 0, looks: {}, poses: [] };
   }
 
@@ -282,7 +289,12 @@ export async function startEyes(on, settings) {
       countBlink(t, frame.ear);
       on.hold(out.blink ?? null);
       visionFocus = out.quadrant?.focus ?? null;
-      if (settings.headPose && gaze?.ready) visionFocus = gaze.update(t, f, pose, !!out.blink?.engaged);
+      if (rowLayout()) {
+        const cal = pipeline.calibration?.quadrants;
+        // Closing lids move the iris estimate, so the column holds still during a blink or hold.
+        if (cal && !out.blink?.engaged) columns.update(t, axisPosition(cal, visionFeatures(frame, cal.dims), 'x'));
+        visionFocus = COLUMN_BOX[columns.focus] ?? null;
+      } else if (settings.headPose && gaze?.ready) visionFocus = gaze.update(t, f, pose, !!out.blink?.engaged);
       focus = visionFocus;
       on.focus(focus);
     }
@@ -290,8 +302,9 @@ export async function startEyes(on, settings) {
     for (const e of out.events) {
       if (e.type === 'holdStart') {
         if (settings.headPose) gaze?.holdStart(e.t);
+        armedColumn = columns?.focus ?? null; // the box a row-layout hold picks
       } else if (e.type === 'quadrantSelect') {
-        const box = settings.headPose && gaze?.ready ? gaze.lockedFocus : e.quadrant;
+        const box = rowLayout() ? COLUMN_BOX[armedColumn] ?? null : settings.headPose && gaze?.ready ? gaze.lockedFocus : e.quadrant;
         log({ t: r(e.t, 10), event: 'select', box, visionBox: e.quadrant, via: e.via });
         blinkQuietUntil = e.t + 1000;
         if (!drift) on.select(box, e.look);
@@ -350,7 +363,8 @@ export async function startEyes(on, settings) {
     },
     // A pick that was spoken and not undone: teach the box classifier where the eyes were for that box.
     learn(quadrant, look) {
-      if (quadrant && look) pipeline?.learn(quadrant, look);
+      // Not in the row layout: its boxes aren't the quadrants the classifier learns.
+      if (quadrant && look && !rowLayout()) pipeline?.learn(quadrant, look);
     },
   };
 }

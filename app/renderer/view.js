@@ -248,7 +248,8 @@ export function createView() {
   function renderCalibration(c) {
     const lead = c?.leadRemainingMs > 0;
     const seconds = c ? Math.max(1, Math.ceil((lead ? c.leadRemainingMs : c.remainingMs) / 1000)) : 0;
-    if (!changed('calibration', c ? `${c.phase}|${lead}|${seconds}` : '')) return;
+    const where = `${document.documentElement.dataset.dots}|${document.documentElement.dataset.layout}`; // a switch moves the dot
+    if (!changed('calibration', c ? `${c.phase}|${lead}|${seconds}|${where}` : '')) return;
     els.calibration.hidden = !c;
     if (!c) return;
     // Dots go where the grid's boxes are, so calibration matches what the patient will look at.
