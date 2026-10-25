@@ -679,3 +679,15 @@ p { margin: 0; }
   padding: var(--sp-3) var(--sp-4);
 }
 [data-layout="kahoot"] .caption .caption__text { font-weight: 700; }
+
+/* Listening's single "I want to say something" card in the same Kahoot colors: blue, white text. */
+.reply-row--single > .reply-card:not([data-state="loading"]) {
+  background: var(--tile-2);
+  color: var(--on-tile);
+  border-color: transparent;
+}
+.reply-row--single > .reply-card .reply-card__progress { background: color-mix(in srgb, var(--on-tile) 35%, transparent); }
+.reply-row--single > .reply-card .reply-card__progress-fill { background: var(--on-tile); }
+.reply-row--single > .reply-card .reply-card__hold-track { stroke: color-mix(in srgb, var(--on-tile) 35%, transparent); }
+.reply-row--single > .reply-card .reply-card__hold-fill { stroke: var(--on-tile); }
+.reply-row--single > .reply-card > .reply-card__icon { display: none; } /* no icons, like the 2x2 boxes */
