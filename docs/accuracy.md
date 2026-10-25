@@ -14,6 +14,7 @@ How well each calibration's own looks sort back into the right box. This checks 
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
+| Oct 24, 11:34 PM PDT | — | **61%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 24, 11:02 PM PDT | — | 100% | 80% | 100% | 100% | 100% |  |
 | Oct 24, 10:34 PM PDT | — | 100% | 100% | 100% | 100% | 100% |  |
 | Oct 24, 10:19 PM PDT | — | **22%** | **43%** | 93% | 80% | **49%** | hard to tell apart: center, top left, bottom right |

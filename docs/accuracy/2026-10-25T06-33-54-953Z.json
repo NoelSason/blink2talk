@@ -1,0 +1,21 @@
+{
+  "session": "2026-10-25T06-33-54-953Z",
+  "calibrations": [
+    {
+      "t": 18800,
+      "at": 1792910051085,
+      "tester": null,
+      "fit": {
+        "center": 0.6086956521739131,
+        "topLeft": 1,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": [
+        "Hard to tell apart: center. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate."
+      ]
+    }
+  ],
+  "tests": []
+}
