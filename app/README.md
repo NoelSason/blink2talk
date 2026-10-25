@@ -13,7 +13,7 @@ BLINK2TALK_WINDOWED=1 ./start    # 1440×900 window
 
 Keys go in `conversation/.env` (see `conversation/README.md`): `ANTHROPIC_API_KEY`, `CARTESIA_API_KEY`, and `CARTESIA_VOICE_ID` for the patient's cloned voice. Without them the app still runs, with sample replies, the system voice, and no mic.
 
-`npm start` (here in `app/`) does the same as `./start` once everything is installed. It bundles `../vision` into `renderer/vendor/`, downloads the speaker-recognition model into `models/` the first time (~100 MB), starts the conversation server if nothing answers on `http://localhost:8787`, and stops it on quit.
+`npm start` (here in `app/`) does the same as `./start` once everything is installed. It bundles `../vision` into `renderer/vendor/`, downloads the speaker-recognition model into `models/` the first time (~100 MB), starts the conversation server if nothing answers on `http://localhost:8790`, and stops it on quit.
 
 ## How the patient uses it
 

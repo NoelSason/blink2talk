@@ -113,7 +113,7 @@ app.post("/speak", async (req, res) => {
   }
 });
 
-const port = Number(process.env.PORT ?? 8787);
+const port = Number(process.env.PORT ?? 8790);
 app.listen(port, () => {
   console.log(`conversation server on http://localhost:${port}`);
   console.log(`  replies: ${process.env.ANTHROPIC_API_KEY ? "claude" : "MOCK (no ANTHROPIC_API_KEY)"}`);

@@ -7,7 +7,7 @@ Nurse speech in (Cartesia Ink-2), 3-4 predicted patient replies out (Claude), ch
 npm install
 cp .env.example .env     # add ANTHROPIC_API_KEY and CARTESIA_API_KEY
 npm run clone -- clip.wav   # ~30 s of the patient's voice -> prints CARTESIA_VOICE_ID, add to .env
-npm start                   # http://localhost:8787/patient.html (patient screen), / (API test page)
+npm start                   # http://localhost:8790/patient.html (patient screen), / (API test page)
 ```
 With no keys it runs in mock mode (canned replies, browser voice, Chrome Web Speech mic). Set `MOCK_REPLIES=1` / `MOCK_VOICE=1` to force it. Use Chrome.
 

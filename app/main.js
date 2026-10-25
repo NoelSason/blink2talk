@@ -21,7 +21,7 @@ function serveRenderer() {
     return net.fetch(pathToFileURL(file).toString());
   });
 }
-const SERVER = process.env.CONVERSATION_URL || 'http://localhost:8787';
+const SERVER = process.env.CONVERSATION_URL || 'http://localhost:8790';
 const CONVERSATION_DIR = path.join(__dirname, '..', 'conversation');
 
 // ---------- Conversation server ----------

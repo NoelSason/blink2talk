@@ -29,7 +29,7 @@ Input: the renderer imports `../vision` (`npm run eyes` bundles it) in its quadr
 | `fatigue { level }` | `elevated` turns on tired mode |
 | `calibrated` | Listening |
 
-Conversation: `main.js` relays to `localhost:8787` over `ipcMain.handle('conversation')` (15 s timeout) and starts the server if it's down.
+Conversation: `main.js` relays to `localhost:8790` over `ipcMain.handle('conversation')` (15 s timeout) and starts the server if it's down.
 
 | Route | App use |
 | --- | --- |
@@ -58,6 +58,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude. On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-24 (Marco): conversation server moved to port 8790. Port 8787 is taken on some Macs (the Obsidian kanban UI). Why: the app silently talked to the wrong server. Rejected: killing the other process.
 - 2026-10-24 (Marco): camera double blink counts closures under 800 ms (was 700), and the spelling page's double-blink check now uses camera blinks. Dev mode shows each blink's length. Why: a deliberate blink ran past 700 ms and was ignored. Squint instruction reworded to plain words.
 - 2026-10-24 (Marco): calibration shows the next dot's name and a countdown before each dot (2 s, set in dev mode). The overlay covers the window, translucent, with large text. Why: the patient couldn't read the prompt, and the dot appeared before they could look at it.
 - 2026-10-24 (Marco): calibration never starts on its own. A Calibrate button (bottom left, highlighted until the first calibration) and C start it. Panels honor the hidden attribute, so the demo panel no longer opens at launch over the calibration dots. Why: a bad automatic calibration hid the dots and couldn't be fixed on screen.

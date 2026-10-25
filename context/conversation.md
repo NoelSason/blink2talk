@@ -13,7 +13,7 @@ Updated: 2026-10-24 23:30 PDT
 - Step 4 ("none of these" flow): NOT built server-side. Needs `rejected` and category round in `/replies`.
 
 ## Interfaces as built
-HTTP on `localhost:8787` (Noel's `main.js` proxies it over IPC):
+HTTP on `localhost:8790` (Noel's `main.js` proxies it over IPC):
 - `POST /replies {transcript, history?, patientProfile?, fatigue?, speaker?}` -> `{replies: string[3-4], addressed, speaker, urgent[], spellOption, source, ms}`. `speaker` in: `{voice, label?, isNew?}` (app's voice model); out: `{label, role}` or null.
 - `POST /summary {history, patientProfile?}` -> `{forPatient, forCaregiver[], source}` (`SUMMARY_MODEL`, default `claude-opus-5-5`; 204 = mock, 502 = failed)
 - `POST /complete {prefix, sentenceSoFar?, context?}` -> `{words[]}`
@@ -52,7 +52,7 @@ HTTP on `localhost:8787` (Noel's `main.js` proxies it over IPC):
 
 ## Run and check
 ```sh
-cd conversation && npm install && cp .env.example .env && npm start   # http://localhost:8787/patient.html (Chrome)
+cd conversation && npm install && cp .env.example .env && npm start   # http://localhost:8790/patient.html (Chrome)
 npm run eval      # 28 nurse phrases: replies, latency, consent rule, NOT ADDRESSED flags
 ```
 Offline: `MOCK_REPLIES=1 MOCK_VOICE=1 npm start`. Keys: same `CARTESIA_API_KEY` and `CARTESIA_VOICE_ID` as Samarth to get his cloned voice.
