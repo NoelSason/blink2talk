@@ -75,6 +75,8 @@ const s = {
   resting: false,             // eyes closed 3 s: the camera treats it as a rest, not a choice
   mic: 'off',                 // 'off' | 'starting' | 'on' | 'unavailable'
   turn: null,                 // who said the current question: { speaker, voice, given }
+  noneCount: 0,               // "None of these" presses for the current question
+  rejected: [],               // replies shown for it that the patient said none of
   summary: null,              // { forPatient, forCaregiver, source, t }: the conversation so far
   localReplies: savedLocal(), // testing only: replies from a small model on this laptop (care panel)
   localAvailable: false,      // the conversation server has that model
@@ -176,6 +178,8 @@ function playQuestion(q) {
 // audio: the turn's speech from the mic, for the speaker-recognition model.
 function nurseSaid(text, speaker = null, audio = null) {
   reset();
+  s.noneCount = 0;
+  s.rejected = [];
   s.turn = { text, speaker, voice: null, voiceId: null, given: !!speaker, endedAt: now() };
   s.caption = { kind: 'question', speaker: speaker ?? 'Someone', text };
   s.transcript = text;
@@ -261,6 +265,19 @@ async function requestReplies(audio = null) {
   showReplies(d.replies);
 }
 
+// A fresh set of replies to the same question, without the ones already rejected.
+const NONE_REASKS = 2;
+async function reaskReplies() {
+  const token = ++requestToken;
+  Object.assign(s, { stage: 'choose', rowKind: 'replies', items: replyItems(['', '', '']), loading: true, hl: -1, selected: -1 });
+  const d = await getReplies({ ...repliesBody(s.transcript, memory.turns().slice(0, -1), s.turn), rejected: s.rejected, round: s.noneCount });
+  if (token !== requestToken) return;
+  s.urgent = d.urgent;
+  s.consent = d.highStakes;
+  s.stakesAbout = d.about;
+  showReplies(d.replies);
+}
+
 // Claude's guess at who spoke ({ label, role }): it names this line, the caption, and every line of
 // the same voice this launch. A label given up front (sample questions) stays.
 function nameSpeaker(turn, guess) {
@@ -288,11 +305,18 @@ function select(i) {
     s.caption = { kind: 'prompt', text: 'What do you want to say?' };
     setRow('starters', starterItems());
   } else if (item.action === 'more') {
-    // "None of these": the grid has room for four boxes, so the urgent options and Spell it are the
-    // next page. A double blink goes back to the replies.
+    // "None of these": up to NONE_REASKS fresh sets of replies (the server is told what was already
+    // shown, so it doesn't repeat them), then the urgent options and Spell it. A double blink goes
+    // back one page.
     chime();
     s.prevPage = page(i);
-    setRow('starters', starterItems());
+    if (s.noneCount < NONE_REASKS) {
+      s.noneCount++;
+      s.rejected.push(...sayable(s.items));
+      reaskReplies();
+    } else {
+      setRow('starters', starterItems());
+    }
   } else if (item.action === 'anyway') {
     chime();
     memory.addTurn('nurse', s.transcript, { speaker: s.turn?.speaker, voice: s.turn?.voice });
@@ -397,6 +421,11 @@ function goBack() {
   } else if (s.prevPage) {
     chime('undo');
     showPage(s.prevPage);
+  } else if (s.rowKind === 'replies' || s.rowKind === 'unaddressed') {
+    // The replies are the first page after a question; going back from them is "not now".
+    // Noel's log: double blinks there were seen but did nothing, so it felt broken.
+    chime('undo');
+    toListening();
   }
 }
 

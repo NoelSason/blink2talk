@@ -52,7 +52,9 @@ export async function getReplies(body) {
     } catch {}
   }
   const sample = QUESTIONS.find((q) => q.text === body.transcript);
-  return { replies: sample?.replySets[0] ?? ['Yes', 'No', "I'm not sure"], urgent: FALLBACK_URGENT, addressed: true, source: 'sample', speaker: null, highStakes: false, about: null };
+  // Without the server: the sample's next reply set for each "None of these" (body.round).
+  const set = sample?.replySets[Math.min(body.round ?? 0, sample.replySets.length - 1)];
+  return { replies: set ?? ['Yes', 'No', "I'm not sure"], urgent: FALLBACK_URGENT, addressed: true, source: 'sample', speaker: null, highStakes: false, about: null };
 }
 
 // Which voice said a nurse-mic turn (the speaker-recognition model in the main process):

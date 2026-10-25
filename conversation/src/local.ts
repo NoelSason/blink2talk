@@ -52,7 +52,9 @@ export function localList(system: string, user: string, count: number): Promise<
     const { mod, llama, sequence } = await load();
     if (!grammars.has(count)) {
       const items = Array.from({ length: count }, () => "item").join(' " | " ');
-      grammars.set(count, llama.createGrammar({ grammar: `root ::= ${items}\nitem ::= [^|\n]+` }));
+      // Plain words only, no periods, at most 40 characters: with "anything but |" the model ran a
+      // reply on into emoji, and with periods it chained sentences to fill a third slot.
+      grammars.set(count, llama.createGrammar({ grammar: `root ::= ${items}\nitem ::= [A-Za-z0-9 ,'?-]{1,40}` }));
     }
     const grammar = await grammars.get(count)!;
     const session = new mod.LlamaChatSession({ contextSequence: sequence, systemPrompt: system });

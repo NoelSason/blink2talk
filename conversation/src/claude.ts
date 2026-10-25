@@ -101,7 +101,13 @@ export const REPLIES_SCHEMA = {
 
 // The local model's short prompts (see getReplies and completeWord): plain lists, not JSON.
 const LOCAL_SYSTEM =
-  "A patient who can't speak picks a reply with their eyes. Write 3 different short first-person replies they could say, at most 5 words each, separated by ' | '. For a yes/no question, include Yes and No. Write only the replies.";
+  "A patient who can't speak picks a reply with their eyes. Write 3 different short first-person replies they could say, at most 5 words each, separated by ' | '. Write only the replies. Never repeat a rejected reply.\n" +
+  "Examples:\n" +
+  "Are you in pain? -> Yes | No | A little\n" +
+  "Do you want the doctor or the nurse? -> The doctor | The nurse | Both\n" +
+  "Would you like tea or water? -> Tea | Water | Neither\n" +
+  "Who should I call? -> My mother | My brother | No one\n" +
+  "How did you sleep? -> Well | Badly | I'm tired";
 const LOCAL_COMPLETE_SYSTEM =
   "A patient is spelling a word with their eyes. Write the 4 most likely whole words that start with the letters typed so far, separated by ' | '. Write only the words.";
 
@@ -166,7 +172,8 @@ export async function getReplies(inp: RepliesInput): Promise<RepliesOut> {
   if (inp.local && localModelAvailable()) {
     if (isConsentQuestion(inp.transcript)) return ruleReplies(inp.transcript, consentOptions(), "local");
     try {
-      const replies = (await localList(LOCAL_SYSTEM, `Just said to the patient: "${inp.transcript}"`, 3)).slice(0, 3);
+      const rejected = inp.rejected?.length ? `\nRejected (none of these fit): ${inp.rejected.join(", ")}` : "";
+      const replies = (await localList(LOCAL_SYSTEM, `Just said to the patient: "${inp.transcript}"${rejected}`, 3)).slice(0, 3);
       // The local list has no intents; the contract still gets {text, intent}.
       const options = replies.map((text) => ({ text, intent: "" }));
       if (replies.length) return { replies, options, source: "local", addressed: true, speaker: null, highStakes: false, about: null };

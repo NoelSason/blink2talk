@@ -58,8 +58,15 @@ app.whenReady().then(async () => {
   check('focus(null) highlights nothing', (await state('s.hl')) === -1);
   await cam('select(null)');
   check('select(null) in the middle band picks nothing', (await state('s.selected')) === -1 && (await state('s.rowKind')) === 'replies');
+  // None of these: two fresh sets of replies (without the rejected ones), then the urgent options.
+  const firstSet = await labels();
   await cam(`select('bottomRight')`);
-  check('select(bottomRight) opens the urgent options', (await state('s.rowKind')) === 'starters');
+  check('None of these brings a fresh set of replies', (await waitFor(`s.rowKind === 'replies' && !s.loading`)) && JSON.stringify(await labels()) !== JSON.stringify(firstSet));
+  check('and tells the server what was rejected', (await state('s.rejected.length')) === 3 && (await state('s.noneCount')) === 1);
+  await cam(`select('bottomRight')`);
+  await waitFor(`s.rowKind === 'replies' && !s.loading`);
+  await cam(`select('bottomRight')`);
+  check('the third None of these opens the urgent options', (await state('s.rowKind')) === 'starters');
   await doubleBlink();
   check('double blink goes back to the replies', (await state('s.rowKind')) === 'replies');
 
@@ -107,8 +114,11 @@ app.whenReady().then(async () => {
   await key('KeyQ'); // next sample question, back to a replies grid
   await waitFor(`s.rowKind === 'replies' && !s.loading`, 9000);
 
-  // Spell it: E takes two picks (E T A O, then E).
-  await cam(`select('bottomRight')`);
+  // Spell it: E takes two picks (E T A O, then E). Three None of these reach the urgent options.
+  for (let i = 0; i < 3; i++) {
+    await cam(`select('bottomRight')`);
+    await waitFor(`!s.loading`);
+  }
   await cam(`select('bottomRight')`);
   check('Spell it opens on the grid', (await state('s.rowKind')) === 'spell');
   await cam(`select('topLeft')`);
@@ -146,6 +156,12 @@ app.whenReady().then(async () => {
 
   // The testing-only fast local replies switch: off, and greyed out without the model.
   check('the local replies switch is off and unavailable without its model', await js(`(() => { const box = [...document.querySelectorAll('.care label')].find((l) => l.textContent.includes('testing only'))?.querySelector('input'); return !!box && !box.checked && box.disabled; })()`));
+
+  // Double blink on the replies (no page before them) goes back to Listening.
+  await key('KeyQ');
+  await waitFor(`s.rowKind === 'replies' && !s.loading`);
+  await doubleBlink();
+  check('double blink on the replies goes back to Listening', (await state('s.rowKind')) === 'listen');
 
   // Summary: back on Listening, the conversation so far shows for the patient and in the care panel.
   // No server here, so it's the plain version: the last few lines as said, with who said them.
