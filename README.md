@@ -1,5 +1,7 @@
 # Blink2Talk
 
+> Julian was a registered member of our team but had to leave because of a serious illness the night before the demo.
+
 Blink2Talk lets an ICU patient who is awake but can't speak or use their hands answer by eye. A nurse or family member talks; the patient sees a few short replies in a 2×2 grid, looks at one, and closes their eyes or squints for about a second to choose it. The app says the reply in the patient's own voice.
 
 Built at Cal Hacks 13.0.
