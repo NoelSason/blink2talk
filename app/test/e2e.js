@@ -192,8 +192,10 @@ app.whenReady().then(async () => {
   await doubleBlink();
   check('double blink on the replies goes back to Listening', (await state('s.rowKind')) === 'listen');
 
-  // Arrow keys in the row layout (the default): right walks the boxes as drawn, left to right, through
-  // all four; up and down don't move; tired mode's empty box is skipped. (Tired mode is still on from above.)
+  // Arrow keys in the row layout (a dev-mode switch; the 2x2 is the default): right walks the boxes as drawn,
+  // left to right, through all four; up and down don't move; tired mode's empty box is skipped. (Tired mode is still on from above.)
+  const setLayout = (v) => js(`(() => { const s = [...document.querySelectorAll('.dev select')].find((x) => [...x.options].some((o) => o.value === 'row')); s.value = '${v}'; s.dispatchEvent(new Event('change')); return document.documentElement.dataset.layout; })()`);
+  await setLayout('row');
   const wasTired = await state('s.tired');
   if (wasTired) await key('KeyT');
   await key('KeyQ');
@@ -221,6 +223,7 @@ app.whenReady().then(async () => {
   }
   check('in tired mode the arrows skip the empty box', (await state('s.tired')) && JSON.stringify(tiredWalk) === '[1,0]', JSON.stringify(tiredWalk));
   if (!wasTired) await key('KeyT');
+  await setLayout('kahoot');
 
   // Summary: back on Listening, the conversation so far shows for the patient and in the care panel.
   // No server here, so it's the plain version: the last few lines as said, with who said them.
@@ -258,9 +261,10 @@ app.whenReady().then(async () => {
     check('Kahoot: center dot sits where the boxes meet', Math.abs(mid[1] - meetY) < 12, `${mid[1]} vs ${meetY}`);
   } else check('Kahoot: grid has four boxes to measure', false, `${rects.length}`);
 
-  // Dev mode's accuracy test in the row layout (the default): each target sits in its column's quarter
+  // Dev mode's accuracy test in the row layout: each target sits in its column's quarter
   // of the gaze area, and the score counts the row picker's column. Frames stand in for eyes.js; one
   // column is answered wrong on purpose. 8 trials of 2 s.
+  await setLayout('row');
   await js(`document.getElementById('dev-open').click(); [...document.querySelectorAll('.dev button')].find((b) => b.textContent === 'Accuracy test (8 looks)').click(); 1`);
   await js(`window.__placed = {}; window.__feed = setInterval(() => {
     const t = document.querySelector('.dev-target');
@@ -279,6 +283,7 @@ app.whenReady().then(async () => {
   const scored = await js(`document.querySelector('.dev__results').textContent`);
   check('and counts the row picker\'s column', scored.startsWith('Accuracy (row of 4): 6 of 8 (75%)') && (scored.match(/Middle left → Far left/g) ?? []).length === 2, scored.split('\n').slice(0, 5).join(' / '));
   await key('Backquote');
+  await setLayout('kahoot');
 
   const errors = await js('window.__errors');
   // Dev mode opens from its button and from the backtick key, and closes again.

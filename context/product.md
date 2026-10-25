@@ -1,6 +1,6 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-25 00:51 PDT (arrow keys in the row layout; "None of these" stress test and fixes)
+Updated: 2026-10-25 (default layout back to the Kahoot 2x2)
 
 ## Now
 - Working on: submission. Done tonight: eye accuracy record in the README, WebEyeTrack removed, replies on Opus 5.5 fast, stage log filled in, nurse quote in the README, nurse mic listens from launch, red Mic off, accuracy test for the row layout, arrow keys in the row layout, "None of these" re-asks stress-tested and fixed.
@@ -59,6 +59,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude (0.8 or more: Claude makes the first two replies stand on their own). On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-25 (Marco): default layout back to the Kahoot 2x2 (`devsettings.js` `layout: 'kahoot'`). Why: four columns didn't work when Marco tested it. Row of 4 stays in dev mode (Layout); e2e switches to it for the row checks. A laptop that saved a layout in dev mode keeps it until changed there.
 - 2026-10-25 (Noel): arrow keys follow the row layout. `gridMove` still moved by 2x2 row and column, but the row draws the cells as 1, 3, 2, 4 (columns.js `COLUMN_BOX`), so Right only reached the first and third bars. Now left and right step through the bars as drawn (`ROW_ORDER`), skipping an empty one (tired mode), and up and down do nothing; the 2x2 layouts keep all four directions. e2e checks the highlighted box moves right across all four bars on screen.
 - 2026-10-25 (Noel): "None of these" stays two re-asks on the same question, then urgent + Spell it; CLAUDE.md's flow now says so (the topic picker stays in `patient.html`). Why: the second set should still answer the question ("Did you sleep ok?" → why it was good or bad). The re-ask fixes are server-side (context/conversation.md). Rejected: sending which reply the patient looked at longest; the longest look mostly marks the reply that took longest to read.
 - 2026-10-25 (Noel): the dev accuracy test scores the layout in use. Row of 4: each column twice, the target at the column's center on the gaze area, counted by the row picker (`eyes-frame` now carries `column`). 2x2: corners, as before. Tests record `layout`; the README reports row and 2x2 apart, and the calibration fit note says it scores the 2x2. Why: the row became the default, but the test still scored the 2x2 classifier, so nothing measured the shipped layout. Rejected: scoring the row by the 2x2 classifier's left/right (it isn't what picks).

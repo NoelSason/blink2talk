@@ -46,7 +46,7 @@ const URGENT_ICONS = { "I'm in pain": 'bandage', "I can't breathe": 'wind', 'Cal
 // Grid cells in reading order; the vision module names them by quadrant.
 const GRID = { topLeft: 0, topRight: 1, bottomLeft: 2, bottomRight: 3 };
 const QUADRANT = Object.keys(GRID); // cell index -> quadrant name
-// The row layout (dev setting 'row', the default) shows the same cells left to right in this order (columns.js).
+// The row layout (dev setting 'row'; the 2x2 is the default) shows the same cells left to right in this order (columns.js).
 const ROW_ORDER = COLUMN_BOX.map((box) => GRID[box]);
 
 const memory = createMemory({ name: PATIENT });
