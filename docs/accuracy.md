@@ -14,6 +14,16 @@ How well each calibration's own looks sort back into the right box. This checks 
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
+| Oct 25, 11:49 AM PDT | — | 83% | 100% | 100% | 100% | 100% |  |
+| Oct 25, 11:48 AM PDT | — | **59%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 11:46 AM PDT | — | 83% | 96% | 100% | 100% | 100% |  |
+| Oct 25, 11:45 AM PDT | — | **0%** | **26%** | 71% | 100% | **2%** | hard to tell apart: center, top left, bottom right; squint not found, full blinks select |
+| Oct 25, 10:52 AM PDT | — | **6%** | **47%** | 98% | 100% | 100% | hard to tell apart: center, top left |
+| Oct 25, 10:46 AM PDT | — | **70%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 10:25 AM PDT | — | **16%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 10:20 AM PDT | — | **11%** | **46%** | 73% | 76% | 83% | hard to tell apart: center, top left |
+| Oct 25, 9:21 AM PDT | — | 93% | 100% | 100% | 100% | 100% |  |
+| Oct 25, 8:25 AM PDT | — | **7%** | 91% | 100% | 96% | 100% | hard to tell apart: center |
 | Oct 25, 2:57 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 25, 2:56 AM PDT | — | **50%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
 | Oct 25, 2:55 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |

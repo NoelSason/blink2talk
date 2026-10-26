@@ -1,0 +1,63 @@
+{
+  "session": "2026-10-25T18-44-38-554Z",
+  "calibrations": [
+    {
+      "t": 43635.5,
+      "at": 1792953919487,
+      "tester": null,
+      "fit": {
+        "center": 0,
+        "topLeft": 0.2608695652173913,
+        "topRight": 0.7111111111111111,
+        "bottomRight": 0.021739130434782608,
+        "bottomLeft": 1
+      },
+      "warnings": [
+        "Hard to tell apart: center, topLeft, bottomRight. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate.",
+        "Squint couldn't be told apart from normal looks; select with full blinks."
+      ]
+    },
+    {
+      "t": 89311.3,
+      "at": 1792953965162,
+      "tester": null,
+      "fit": {
+        "center": 0.8260869565217391,
+        "topLeft": 0.9574468085106383,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": []
+    },
+    {
+      "t": 261250.3,
+      "at": 1792954137104,
+      "tester": null,
+      "fit": {
+        "center": 0.5869565217391305,
+        "topLeft": 1,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": [
+        "Hard to tell apart: center. Make the eye movements bigger (screen closer, camera at eye level) and recalibrate."
+      ]
+    },
+    {
+      "t": 318916.1,
+      "at": 1792954194768,
+      "tester": null,
+      "fit": {
+        "center": 0.8260869565217391,
+        "topLeft": 1,
+        "topRight": 1,
+        "bottomRight": 1,
+        "bottomLeft": 1
+      },
+      "warnings": []
+    }
+  ],
+  "tests": []
+}

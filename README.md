@@ -11,15 +11,15 @@ Built at Cal Hacks 13.0.
 <!-- accuracy:start: written by app/accuracy.js after every calibration and accuracy test; edits here are overwritten -->
 **Accuracy test: none recorded yet.**
 
-**Calibrations (49 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again. It sorts into the 2x2 boxes, not the row of 4 (the default layout); the accuracy test scores the row.
+**Calibrations (59 recorded, newest first).** How well each calibration's own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again. It sorts into the 2x2 boxes, not the row of 4 (the default layout); the accuracy test scores the row.
 
 | When | Tester | Center | Top left | Top right | Bottom left | Bottom right | Notes |
 |---|---|---|---|---|---|---|---|
-| Oct 25, 2:57 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
-| Oct 25, 2:56 AM PDT | — | **50%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
-| Oct 25, 2:55 AM PDT | — | **0%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
-| Oct 25, 2:51 AM PDT | — | 96% | 100% | 100% | 100% | 100% |  |
-| Oct 25, 2:48 AM PDT | — | **70%** | 100% | 100% | 100% | 98% | hard to tell apart: center |
+| Oct 25, 11:49 AM PDT | — | 83% | 100% | 100% | 100% | 100% |  |
+| Oct 25, 11:48 AM PDT | — | **59%** | 100% | 100% | 100% | 100% | hard to tell apart: center |
+| Oct 25, 11:46 AM PDT | — | 83% | 96% | 100% | 100% | 100% |  |
+| Oct 25, 11:45 AM PDT | — | **0%** | **26%** | 71% | 100% | **2%** | hard to tell apart: center, top left, bottom right; squint not found, full blinks select |
+| Oct 25, 10:52 AM PDT | — | **6%** | **47%** | 98% | 100% | 100% | hard to tell apart: center, top left |
 
 Updated automatically after every calibration and accuracy test. Full history: [docs/accuracy.md](docs/accuracy.md).
 <!-- accuracy:end -->

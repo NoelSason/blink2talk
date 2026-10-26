@@ -651,7 +651,7 @@ p { margin: 0; }
 /* Calibrate and Re-center: start the dots on request. Calibrate is highlighted until the first calibration. */
 .eye-controls { position: fixed; left: 16px; bottom: 16px; z-index: 20; display: flex; gap: 8px; }
 .eye-button {
-  font: inherit; font-size: 14px; padding: 10px 16px; border-radius: 999px;
+  font: 14px var(--font-care); padding: 10px 16px; border-radius: 999px;
   border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer;
 }
 .eye-button[hidden] { display: none; }
