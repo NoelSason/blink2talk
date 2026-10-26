@@ -184,8 +184,8 @@ function layoutHeadline(tests, layout) {
   ].join('\n');
 }
 
-const FIT_NOTE = 'How well each calibration\'s own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again. It sorts into the 2x2 boxes, not the row of 4 (the default layout); the accuracy test scores the row.';
-const TEST_NOTE = 'Each run names a box 8 times (every box twice, in random order) for 2 s each, and counts the box the eyes were on most in the last 1.2 s. A look counted in the middle (2x2 only), or with no eye data, is a miss. Row-of-4 runs (the default layout) score its left-right picker; 2x2 runs score the 2x2 classifier.';
+const FIT_NOTE = 'How well each calibration\'s own looks sort back into the right box. This checks the fit, not accuracy: under 70% (bold) on any box means calibrate again. It sorts into the 2x2 boxes (the default layout).';
+const TEST_NOTE = 'Each run names a box 8 times (every box twice, in random order) for 2 s each, and counts the box the eyes were on most in the last 1.2 s. A look counted in the middle (2x2 only), or with no eye data, is a miss. 2x2 runs (the default layout) score the 2x2 classifier; row-of-4 runs (a Dev mode layout) score its left-right picker.';
 
 function readmeBlock(sessions) {
   const tests = sessions.flatMap((s) => s.tests).sort(newest);
