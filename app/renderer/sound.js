@@ -10,21 +10,35 @@ const CHIMES = {
   tick: [[784, 0]],
   alert: [[987.77, 0], [987.77, 0.2], [1318.5, 0.4]], // urgent pick, for the people in the room
 };
-export function chime(kind = 'select') {
+// Box sounds (pitch.js): given a box's note, 'select' rises a fourth from it, 'tick' is that note,
+// and 'focus' is that note, softer and shorter, when the box lights up.
+function notesFor(kind, note) {
+  if (note && kind === 'select') return [[note, 0], [note * 4 / 3, 0.14]];
+  if (note && (kind === 'tick' || kind === 'focus')) return [[note, 0]];
+  return CHIMES[kind] ?? [];
+}
+const SHAPE = { focus: { peak: 0.07, length: 0.3 } };
+const QUIET_MS = 600; // a box lighting up this soon after another chime stays silent, so the two don't run together
+let quietUntil = 0;
+
+export function chime(kind = 'select', note = null) {
+  const t = performance.now();
+  if (kind === 'focus' && t < quietUntil) return;
+  if (kind !== 'focus') quietUntil = t + QUIET_MS;
   audio ??= new AudioContext();
   const start = audio.currentTime;
-  const notes = CHIMES[kind];
-  for (const [freq, delay] of notes) {
+  const { peak, length } = SHAPE[kind] ?? { peak: 0.18, length: 0.6 };
+  for (const [freq, delay] of notesFor(kind, note)) {
     const osc = audio.createOscillator();
     const gain = audio.createGain();
     osc.type = 'sine';
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0, start + delay);
-    gain.gain.linearRampToValueAtTime(0.18, start + delay + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + delay + 0.6);
+    gain.gain.linearRampToValueAtTime(peak, start + delay + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + delay + length);
     osc.connect(gain).connect(audio.destination);
     osc.start(start + delay);
-    osc.stop(start + delay + 0.65);
+    osc.stop(start + delay + length + 0.05);
   }
 }
 

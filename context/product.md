@@ -1,10 +1,10 @@
 # Product context (owner: Noel)
 
-Updated: 2026-10-26 12:35 PDT (README rebuilt for sharing: screenshots, hero, demo GIF in docs/media/)
+Updated: 2026-10-26 20:08 PDT (box sounds: each box has its own pitch)
 
 ## Now
-- Working on: public README. Done: real screenshots, hero and social card, captioned demo GIF (`docs/media/`); Calibrate / Dev mode buttons no longer fall back to a serif font; the accuracy notes call the 2x2 the default layout.
-- Next: accuracy test on 4 people, 2 outside the team, in venue lighting; stage-log ratings and Figma share links; team call on Spell it and urgent alerts (Cut list).
+- Working on: box sounds (Sahana's idea): each box plays its own note when it lights up, and a pick chimes up from it. Care panel switch, on by default. e2e 91/91.
+- Next: try box sounds with someone outside the team, eyes closed; `npm run stress` still expects the old 100-line history cap and fails (102–104 lines; memory condenses at 120), not touched here; accuracy test on 4 people; team call on Spell it and urgent alerts (Cut list).
 - Blocked on: nothing.
 
 ## Build-order status
@@ -60,6 +60,7 @@ Also accepted from any tracker: `window.blinkvoice.{select, gazeLeft, gazeRight,
 | 2026-10-24 | Fatigue is step 6, after 1–5: one dwell multiplier | Tired mode: 2 replies, larger text, fatigue sent to Claude (0.8 or more: Claude makes the first two replies stand on their own). On from vision `elevated` or `T` | Built before CLAUDE.md, for the demo | Input, Conversation | No. |
 
 ## Decisions (newest first)
+- 2026-10-26 (Noel): box sounds, from Sahana's suggestion to use pitch (F0) so patients know what they chose. Each box has its own note (`renderer/pitch.js`, G4 B4 D5 F#5: a third apart, no octave), higher at the top and to the right; the row layout rises left to right; the two-box confirm screens use the lowest and highest. A box that lights up (camera or arrow keys) plays its note softly (`chime('focus')`), silent for 600 ms after another chime so a pick and the next page's highlight don't run together. Picks rise a fourth from the box's note (top left is the old select chime), Spell it ticks are the box's note; undo, alert, and Listening's single box are unchanged. Care panel "Box sounds" switch, on by default, saved per laptop (`blink2talk.boxSounds`). e2e records the oscillator frequencies. Rejected: reading each lit box aloud (the room hears words that sound like the patient speaking, and it talks over the nurse); stereo panning for left/right (bedside speakers are often mono).
 - 2026-10-26 (Noel): README images are captured from the real page, off-screen at 2880×1800, with live replies from the conversation server; eye input comes from the `?test` hooks (`window.__test.camera`), and the README says so under the GIF. Operator buttons (Calibrate, Re-center, Dev mode) are hidden in the shots. Rejected: AI-generated "in use" photos, which would show a patient the app was never used with.
 - 2026-10-25 (Noel): hold S (1 s) during the eye calibration skips it: back to the last calibration this session (`eyes.js` keeps it), or keyboard only until C. A hold, so a stray S does nothing. Tested with Chromium's fake camera: a 0.3 s tap does nothing; a 1.2 s hold ends the dots and shows Listening.
 - 2026-10-25 (Noel): nurse mic is push-to-talk on M (hold, let go to send); the care panel's "Always listening" switch (saved per laptop) brings back the always-on mic, where M mutes. Push-to-talk keeps the audio from before the socket opens, joins every Ink turn in the hold, and sends on letting go: about 0.5 to 0.8 s after a mid-sentence release (Ink transcribes the rest and hangs up), 0.3 s if the last sentence had already ended (Ink doesn't hang up then). Measured end to end with the real page, Ink-2, and Claude, the mic fed a spoken WAV: 3 s of speech with M up was not heard; "did you sleep okay last night?" came through whole, with replies. A 0.7 s hold of two words came back empty from Ink. Top bar: "Hold M to talk" (not red: that's normal between holds), "Listening" while held, red "Mic off" only when the mic can't work or is muted while always listening. Why: Noel asked for push-to-talk instead of always listening, then for a switch.

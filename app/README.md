@@ -29,6 +29,7 @@ Every launch starts with eye calibration, because lighting, posture, and the lap
 
 - **High-stakes answers:** when a yes or no would make a medical decision (consent to a treatment, a procedure, a medication change, CPR), the replies are Yes / No / Explain more, and a Yes or No is confirmed before it's spoken: "You said “Yes” to more pain medication. Is that correct?" with "Yes, that's right" on the left and "No, go back" on the right. Only left or right counts there, the direction the eye tracker reads best. Ordinary questions ("are you in pain?", "okay with the lights off?") aren't confirmed.
 - **Blink three times quickly:** offers "Calibrate your eyes again?". Two quick blinks still go back; quick blinks count even when they're fast.
+- **Box sounds:** each box plays its own note when it lights up, higher at the top and to the right, and a pick chimes up from that note, so the patient can tell which box they chose with their eyes closed. The care panel's Box sounds switch turns them off (saved on this laptop).
 
 ## How the gaze works
 

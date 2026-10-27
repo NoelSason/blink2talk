@@ -13,6 +13,7 @@ import { createMemory, timeLabel } from './memory.js';
 import { spellBoxes } from './speller.js';
 import { onPatientInput, onDemoKey, onHoldKey, onMicKey } from './input.js';
 import { chime, speak, stopSpeaking } from './sound.js';
+import { boxNote } from './pitch.js';
 import { FALLBACK_URGENT, completeWord, condense, getConfig, getReplies, getStarters, getSummary, guessCategory, identifySpeaker, plainCondense, prefetchVoice, startCandidates, sttToken, voiceAudio, warmLocalModel } from './conversation.js';
 import { startEyes } from './eyes.js';
 import { loadSettings } from './devsettings.js';
@@ -93,6 +94,7 @@ const s = {
   summary: null,              // { forPatient, forCaregiver, source, t }: the conversation so far
   localReplies: savedLocal(), // testing only: replies from a small model on this laptop (care panel)
   localAvailable: false,      // the conversation server has that model
+  boxSounds: savedBoxSounds(), // each box has its own note (care panel); on unless switched off on this laptop
 };
 // Claude's name for each voice the speaker-recognition model has heard ("voice key" -> "Dr. Lee").
 // Voice ids last one launch, so keys carry the launch, and saved lines from earlier launches keep theirs.
@@ -338,19 +340,20 @@ function showReplies(replies) {
 function select(i) {
   const item = s.items[i];
   if (!item) return;
+  const note = noteFor(i); // before the page changes
   if (item.action === 'start') {
-    chime();
+    chime('select', note);
     s.prevPage = page(i);
     s.caption = { kind: 'prompt', text: 'What do you want to say?' };
     setRow('start', startItems());
   } else if (item.action === 'browse') {
-    chime();
+    chime('select', note);
     s.prevPage = page(i);
     s.browse = { cat: item.cat, list: browseList(item.cat), at: 0, size: 3 };
     showBrowse();
   } else if (item.action === 'more' && s.rowKind === 'browse') {
     // The next page of the same fixed list; past the end, Spell it. Never back to a phrase already shown.
-    chime();
+    chime('select', note);
     const at = s.browse.at + s.browse.size;
     if (at >= s.browse.list.length) return openSpell(); // Spell it remembers this page itself
     s.prevPage = page(i);
@@ -360,7 +363,7 @@ function select(i) {
     // "None of these": up to NONE_REASKS fresh sets of replies (the server is told what was already
     // shown, so it doesn't repeat them), then the urgent options and Spell it. A double blink goes
     // back one page.
-    chime();
+    chime('select', note);
     s.prevPage = page(i);
     if (s.noneCount < NONE_REASKS) {
       s.noneCount++;
@@ -370,20 +373,20 @@ function select(i) {
       setRow('starters', urgentItems());
     }
   } else if (item.action === 'anyway') {
-    chime();
+    chime('select', note);
     memory.addTurn('nurse', s.transcript, { speaker: s.turn?.speaker, voice: s.turn?.voice });
     conversationChanged();
     s.caption = { kind: 'question', speaker: s.turn?.speaker ?? 'Someone', text: s.transcript };
     showReplies(s.held);
   } else if (item.action === 'spell') {
-    chime();
+    chime('select', note);
     openSpell();
   } else if (item.action === 'spell-pick') {
     spellPick(item.box, i);
   } else if (item.action === 'confirmed') {
     choose(i, item.say);
   } else if (item.action === 'recalibrate') {
-    chime();
+    chime('select', note);
     runAction('calibrate');
   } else if (item.action === 'unconfirm') {
     goBack();
@@ -400,7 +403,7 @@ function select(i) {
 // Only on a high-stakes question (the conversation server classifies it): the caption says what the
 // pick agrees to, "You said “Yes” to more pain medication. Is that correct?"
 function askConfirm(i, text) {
-  chime('tick');
+  chime('tick', noteFor(i));
   s.prevPage = page(i);
   const to = s.stakesAbout ? ` to ${s.stakesAbout}` : '';
   s.caption = { kind: 'prompt', text: `You said “${text}”${to}. Is that correct?` };
@@ -438,7 +441,7 @@ const browseList = (cat) => starterSets.get(startersKey(cat)) ?? startCandidates
 
 // Selected: the card turns green with a check and a chime; Speaking follows (see tick).
 function choose(i, text) {
-  chime();
+  chime('select', noteFor(i));
   beforeSelect = { caption: s.caption, rowKind: s.rowKind, items: s.items, hl: i, spell: s.spell && { ...s.spell } };
   s.selected = i;
   s.selectedAt = now();
@@ -579,7 +582,7 @@ function spellPick(box, i) {
     return;
   }
   if (box.pick === 'action' && box.label === 'Back') return leaveSpell();
-  chime('tick');
+  chime('tick', noteFor(i));
   if (box.pick === 'group') sp.path.push({ kind: 'letters', letters: box.letters });
   else if (box.pick === 'words') sp.path.push({ kind: 'words' });
   else if (box.pick === 'actions') sp.path.push({ kind: 'actions' });
@@ -812,7 +815,9 @@ const gridShown = () => s.stage === 'choose' && s.rowKind !== 'listen' && !s.loa
 // Arrow keys (or gazeLeft/gazeRight): move around the grid.
 function onLook(dir) {
   if (s.eyesClosed || !gridShown()) return;
+  const prev = s.hl;
   s.hl = gridMove(s.hl, dir);
+  lit(prev);
   keyboardUntil = now() + TIMING.keyboard;
 }
 
@@ -823,6 +828,18 @@ function cellFor(quadrant) {
 }
 const twoColumns = () => s.rowKind === 'confirm' || s.rowKind === 'recalibrate';
 const rowLayout = () => eyeSettings.layout === 'row';
+
+// Box sounds: a cell's note as the screen draws it now (pitch.js), or null when they're switched off
+// or on Listening's single box.
+function noteFor(i) {
+  if (!s.boxSounds || s.rowKind === 'listen') return null;
+  return boxNote(i, twoColumns() ? 'two' : rowLayout() ? 'row' : 'grid', ROW_ORDER);
+}
+// A box that lights up (arrow keys or the camera) plays its note softly; staying on it plays nothing more.
+function lit(prev) {
+  const note = s.hl >= 0 && s.hl !== prev ? noteFor(s.hl) : null;
+  if (note) chime('focus', note);
+}
 
 // The 2x2 moves by row and column. In the row layout the cells sit left to right in ROW_ORDER, so
 // left and right step along it (skipping empty cells) and up and down do nothing.
@@ -909,7 +926,9 @@ const camera = {
     eyesOn = true;
     if (!gridShown() || now() < keyboardUntil) return;
     const i = cellFor(quadrant);
+    const prev = s.hl;
     s.hl = i >= 0 && s.items[i] ? i : -1;
+    lit(prev);
   },
   // Selects the box that had focus when the hold started. Listening has one item, so any hold picks it.
   select: (quadrant, look) => {
@@ -1094,6 +1113,7 @@ function runAction(action, arg) {
   if (action === 'profile') memory.setProfile(arg);
   if (action === 'summary') refreshSummary();
   if (action === 'local-replies') setLocalReplies(arg ?? !s.localReplies);
+  if (action === 'box-sounds') setBoxSounds(arg ?? !s.boxSounds);
   if (action === 'clear-history') {
     memory.clearHistory();
     conversationChanged();
@@ -1106,7 +1126,7 @@ function syncPanels() {
   demo.sync({ tired: s.tired, faceLost: s.faceLost, light });
   care.update({
     tired: s.tired, faceLost: s.faceLost, mic: s.mic, micMode: s.micMode, light,
-    local: s.localReplies, localAvailable: s.localAvailable,
+    local: s.localReplies, localAvailable: s.localAvailable, boxSounds: s.boxSounds,
   });
 }
 
@@ -1125,6 +1145,21 @@ function setLocalReplies(on) {
     localStorage.setItem('blink2talk.localReplies', s.localReplies ? 'on' : 'off');
   } catch {}
   if (s.localReplies) warmLocalModel(); // load it now, not on the next question
+}
+
+// Box sounds (care panel): on by default, and kept between launches on this machine.
+function savedBoxSounds() {
+  try {
+    return localStorage.getItem('blink2talk.boxSounds') !== 'off';
+  } catch {
+    return true;
+  }
+}
+function setBoxSounds(on) {
+  s.boxSounds = on;
+  try {
+    localStorage.setItem('blink2talk.boxSounds', on ? 'on' : 'off');
+  } catch {}
 }
 
 const demo = createDemoPanel({ questions: QUESTIONS, onAction: runAction });

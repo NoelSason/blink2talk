@@ -16,7 +16,7 @@ export function createCarePanel({ memory, onAction }) {
   const panel = document.getElementById('care');
   const opener = document.querySelector('.care-button');
   let alerts = []; // { text, t }
-  let state = { tired: false, faceLost: false, mic: 'idle', micMode: 'talk', light: false };
+  let state = { tired: false, faceLost: false, mic: 'idle', micMode: 'talk', light: false, boxSounds: true };
 
   const section = (title, ...children) => el('section', { className: 'care__section' }, el('h3', { className: 'care__heading', textContent: title }), ...children);
   const toggle = (text, action) => {
@@ -58,6 +58,8 @@ export function createCarePanel({ memory, onAction }) {
   notes.addEventListener('input', saveProfile);
 
   const tired = toggle('Tired mode: 2 replies, larger text', 'tired');
+  const sounds = toggle('Box sounds', 'box-sounds');
+  const soundsNote = el('p', { className: 'care__note' });
   const mic = toggle('Always listening', 'mic-mode');
   const light = toggle('Light theme', 'theme');
   const micNote = el('p', { className: 'care__note' });
@@ -73,7 +75,7 @@ export function createCarePanel({ memory, onAction }) {
       el('label', { className: 'care__field' }, el('span', { textContent: 'Name' }), name),
       el('label', { className: 'care__field' }, el('span', { textContent: 'Notes' }), notes),
       often),
-    section('Settings', tired.row, mic.row, micNote, light.row, local.row, localNote, button('Calibrate eyes again', 'calibrate')),
+    section('Settings', tired.row, sounds.row, soundsNote, mic.row, micNote, light.row, local.row, localNote, button('Calibrate eyes again', 'calibrate')),
   );
 
   function renderAlerts() {
@@ -127,6 +129,8 @@ export function createCarePanel({ memory, onAction }) {
     update(next) {
       state = { ...state, ...next };
       tired.input.checked = state.tired;
+      sounds.input.checked = state.boxSounds;
+      soundsNote.textContent = `Each box plays its own note, higher at the top, so ${memory.profile.name} can hear which box is lit and which one they picked.`;
       mic.input.checked = state.micMode === 'always';
       micNote.textContent = state.mic === 'unavailable'
         ? 'The microphone needs the conversation server and its speech key.'

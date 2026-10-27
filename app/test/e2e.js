@@ -21,7 +21,7 @@ app.whenReady().then(async () => {
   await session.defaultSession.clearStorageData({ storages: ['localstorage'] });
   await win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'), { query: { test: '1' } });
   const js = (code) => wc.executeJavaScript(code);
-  await js(`window.__errors = []; addEventListener('error', e => __errors.push(e.message)); addEventListener('unhandledrejection', e => __errors.push(String(e.reason))); speechSynthesis.speak = () => {}; localStorage.clear(); 1`);
+  await js(`window.__errors = []; addEventListener('error', e => __errors.push(e.message)); addEventListener('unhandledrejection', e => __errors.push(String(e.reason))); speechSynthesis.speak = () => {}; localStorage.clear(); window.__notes = []; const start = OscillatorNode.prototype.start; OscillatorNode.prototype.start = function (...a) { __notes.push(Math.round(this.frequency.value)); return start.apply(this, a); }; 1`);
   await js('document.fonts.ready.then(() => 1)');
 
   const key = (code, type = 'keydown') => js(`dispatchEvent(new KeyboardEvent('${type}', { code: '${code}' })); 1`);
@@ -32,6 +32,8 @@ app.whenReady().then(async () => {
   // Two blinks act once the wait for a possible third is over (TIMING.thirdBlink).
   const doubleBlink = async () => { await blinks(2); await sleep(800); };
   const cam = (call) => js(`window.__test.camera.${call}; 1`);
+  // Box sounds: the notes played since the last call, rounded to the hertz (G4 392, B4 494, D5 587, F#5 740).
+  const notes = () => js(`window.__notes.splice(0)`);
   const state = (expr) => js(`(s => ${expr})(window.__test.state)`);
   // Boxes as drawn (the next frame), in reading order; null for an empty cell. The middle band (question and status) isn't a box.
   const labels = async () => {
@@ -147,9 +149,26 @@ app.whenReady().then(async () => {
   check('a hold on None of these shows the fill ring', await js(`(() => { const el = document.querySelectorAll('#reply-row > [role=option]')[3]; const ring = el?.querySelector('.reply-card__hold'); return el?.dataset.state === 'hold' && !!ring && getComputedStyle(ring).display === 'block'; })()`));
   await cam('hold(null)');
 
+  // Box sounds (on by default): a box that lights up plays its own note, higher at the top and to the
+  // right; staying on it plays nothing more. A pick rises a fourth from the picked box's note.
+  await sleep(700);
+  await notes();
+  for (const q of ['bottomLeft', 'bottomLeft', 'bottomRight', 'topLeft', 'topRight']) await cam(`focus('${q}')`);
+  check('each box that lights up plays its own note, higher at the top and to the right', JSON.stringify(await notes()) === '[392,494,587,740]');
+  const soundSwitch = `[...document.querySelectorAll('.care label')].find((l) => l.textContent.includes('Box sounds'))?.querySelector('input')`;
+  check('the care panel has the box sounds switch, on by default', await js(`(() => { const box = ${soundSwitch}; return !!box && box.checked; })()`));
+  await js(`${soundSwitch}.click(); 1`);
+  await cam(`focus('bottomLeft')`);
+  check('switched off, a box lighting up is silent, and that is saved', (await notes()).length === 0 && (await js(`localStorage.getItem('blink2talk.boxSounds')`)) === 'off');
+  await js(`${soundSwitch}.click(); 1`);
+  check('switched back on', (await state('s.boxSounds')) === true);
+  await cam(`focus('topRight')`);
+  await notes();
+
   // None of these: two fresh sets of replies (without the rejected ones), then the urgent options.
   const firstSet = await labels();
   await cam(`select('bottomRight')`);
+  check('picking a box chimes up from its note', JSON.stringify((await notes()).slice(0, 2)) === '[494,659]');
   check('None of these brings a fresh set of replies', (await waitFor(`s.rowKind === 'replies' && !s.loading`)) && JSON.stringify(await labels()) !== JSON.stringify(firstSet));
   check('and tells the server what was rejected', (await state('s.rejected.length')) === 3 && (await state('s.noneCount')) === 1);
   check('and none of the rejected replies come back', !(await labels()).some((l) => firstSet.slice(0, 3).includes(l)));
@@ -184,8 +203,12 @@ app.whenReady().then(async () => {
   check('the confirm screen says what was chosen, above two boxes', JSON.stringify(await labels()) === JSON.stringify(["Yes, that's right", 'No, go back'])
     && (await state('s.caption.text')) === 'You said “Yes, please”. Is that correct?'
     && (await js(`document.getElementById('caption').parentElement.id`)) === 'gaze-area');
+  await sleep(700); // the pick's chime, then box notes again
+  await notes();
   await cam(`focus('bottomLeft')`);
   check('on the confirm screen, any look to the left means the left box', (await state('s.hl')) === 0);
+  await cam(`focus('topRight')`);
+  check('and its two boxes play the lowest and highest notes', JSON.stringify(await notes()) === '[392,740]');
   await cam(`select('bottomRight')`);
   check('"Go back" returns to the replies', (await state('s.rowKind')) === 'replies');
   await state('(s.consent = false)');
@@ -276,6 +299,7 @@ app.whenReady().then(async () => {
   const highlightedX = () => js(`document.querySelector('#reply-row > [data-state=highlighted]')?.getBoundingClientRect().left ?? null`);
   const xs = [];
   const hls = [];
+  await notes();
   for (let i = 0; i < 4; i++) {
     await key('ArrowRight');
     await sleep(80);
@@ -283,6 +307,8 @@ app.whenReady().then(async () => {
     hls.push(await state('s.hl'));
   }
   check('arrow right reaches all four boxes, left to right', new Set(hls).size === 4 && xs.every((x, i) => x != null && (i === 0 || x > xs[i - 1])), JSON.stringify({ hls, xs }));
+  const rowNotes = await notes();
+  check('and their notes rise left to right', JSON.stringify(rowNotes) === '[392,494,587,740]', JSON.stringify(rowNotes));
   const before = await state('s.hl');
   await key('ArrowUp');
   await key('ArrowDown');
